@@ -1303,7 +1303,7 @@ h3 {
 
 .admin-page-nav {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1387,6 +1387,58 @@ h3 {
   gap: 10px;
 }
 
+.admin-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(150px, 0.35fr));
+  gap: 10px;
+}
+
+.admin-filter-bar input,
+.admin-filter-bar select {
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  color: #102033;
+  background: #ffffff;
+}
+
+.admin-insight-grid,
+.security-rule-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-insight-grid > div,
+.security-rule-grid article {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.admin-insight-grid h3,
+.security-rule-grid strong {
+  margin-bottom: 8px;
+  color: #102033;
+  font-size: 16px;
+}
+
+.admin-insight-grid p,
+.security-rule-grid span {
+  display: block;
+  margin: 6px 0 0;
+  color: #5b6878;
+  line-height: 1.55;
+}
+
+.security-panel {
+  grid-column: 1 / -1;
+}
+
 .ops-metric-grid,
 .ops-bottom-grid {
   display: grid;
@@ -1422,6 +1474,32 @@ h3 {
   grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
   gap: 14px;
   align-items: stretch;
+}
+
+.ops-live-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ops-live-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.ops-live-card strong,
+.ops-live-card small {
+  overflow-wrap: anywhere;
+}
+
+.ops-live-card small {
+  color: #6a7685;
+  line-height: 1.45;
 }
 
 .ops-service-grid,
@@ -2634,7 +2712,7 @@ h3 {
   }
 
   .admin-page-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .login-panel {
@@ -2666,8 +2744,12 @@ h3 {
   }
 
   .ops-metric-grid,
+  .ops-live-grid,
   .ops-bottom-grid,
-  .ops-layout {
+  .ops-layout,
+  .admin-filter-bar,
+  .admin-insight-grid,
+  .security-rule-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2748,6 +2830,7 @@ h3 {
   }
 
   .ops-action-row,
+  .ops-live-grid,
   .ops-metric-grid {
     grid-template-columns: 1fr;
   }

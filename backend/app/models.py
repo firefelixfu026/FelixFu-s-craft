@@ -29,6 +29,7 @@ class User(Base):
     reactions: Mapped[list["UserReaction"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     comments: Mapped[list["Comment"]] = relationship(back_populates="user")
     ai_generations: Mapped[list["AiGeneration"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    admin_audit_logs: Mapped[list["AdminAuditLog"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Article(Base):
@@ -137,3 +138,17 @@ class SummerPlan(Base):
     key: Mapped[str] = mapped_column(String(80), primary_key=True, default="current")
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AdminAuditLog(Base):
+    __tablename__ = "admin_audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True)
+    action: Mapped[str] = mapped_column(String(80), nullable=False)
+    target_type: Mapped[str] = mapped_column(String(80), default="")
+    target_label: Mapped[str] = mapped_column(String(255), default="")
+    detail: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped[User | None] = relationship(back_populates="admin_audit_logs")

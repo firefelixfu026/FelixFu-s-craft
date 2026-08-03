@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const services = [
   {
@@ -83,9 +83,11 @@ function statusClass(status) {
   return status === 'online' ? 'ready' : status === 'attention' ? 'warning' : 'danger';
 }
 
-function ProjectOpsPanel() {
+function ProjectOpsPanel({ authToken }) {
   const [selectedServiceId, setSelectedServiceId] = useState('backend');
   const [selectedAction, setSelectedAction] = useState('logs');
+  const [systemHealth, setSystemHealth] = useState(null);
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
   const [events, setEvents] = useState([
     ['后端 API 日志检查', '建议先看 backend 日志再处理 500 或登录异常'],
     ['数据库备份提醒', '大改、展示、迁移前先执行 backup-postgres.sh'],
@@ -98,6 +100,35 @@ function ProjectOpsPanel() {
   );
   const command = selectedService.commands[selectedAction];
   const onlineCount = services.filter((service) => service.status === 'online').length;
+  const liveServices = systemHealth?.services || [];
+
+  useEffect(() => {
+    refreshSystemHealth();
+  }, [authToken]);
+
+  async function refreshSystemHealth() {
+    if (!authToken) return;
+    setIsCheckingHealth(true);
+    try {
+      const response = await fetch('/api/admin/system/health', {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      if (!response.ok) return;
+      const payload = await response.json();
+      setSystemHealth(payload);
+      setEvents((current) => [
+        ['真实健康检查完成', new Date(payload.checkedAt).toLocaleString('zh-CN', { hour12: false })],
+        ...current.slice(0, 4)
+      ]);
+    } catch {
+      setEvents((current) => [
+        ['真实健康检查失败', '当前无法读取 /api/admin/system/health'],
+        ...current.slice(0, 4)
+      ]);
+    } finally {
+      setIsCheckingHealth(false);
+    }
+  }
 
   async function copyCommand() {
     await navigator.clipboard.writeText(command);
@@ -122,7 +153,9 @@ function ProjectOpsPanel() {
           <h2>项目运维控制台</h2>
           <span>/opt/felixfu-blog · 安全预览模式</span>
         </div>
-        <span className="status-badge">模拟执行</span>
+        <button className="ghost-button" type="button" onClick={refreshSystemHealth}>
+          {isCheckingHealth ? '检查中' : '真实检查'}
+        </button>
       </div>
 
       <div className="ops-metric-grid">
@@ -142,6 +175,18 @@ function ProjectOpsPanel() {
           <span>网关路由</span>
           <strong>{gatewayRoutes.length} 条</strong>
         </div>
+      </div>
+
+      <div className="ops-live-grid">
+        {liveServices.length === 0 ? (
+          <p className="empty-state">点击真实检查读取 API、数据库、上传目录和 AI 配置状态</p>
+        ) : liveServices.map((service) => (
+          <article className="ops-live-card" key={service.name}>
+            <span className={`ops-status ${statusClass(service.status)}`}>{statusLabel(service.status)}</span>
+            <strong>{service.name}</strong>
+            <small>{service.detail}</small>
+          </article>
+        ))}
       </div>
 
       <div className="ops-layout">

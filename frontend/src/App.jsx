@@ -1117,6 +1117,10 @@ function App() {
     setIsSavingArticle(true);
     setAdminMessage('');
 
+    const submitterStatus = event.nativeEvent?.submitter?.value;
+    const nextStatus = submitterStatus === 'draft' || submitterStatus === 'published'
+      ? submitterStatus
+      : articleForm.status;
     const payload = {
       title: articleForm.title,
       summary: articleForm.summary,
@@ -1128,7 +1132,7 @@ function App() {
         .filter(Boolean),
       date: articleForm.date,
       readTime: articleForm.readTime,
-      status: articleForm.status,
+      status: nextStatus,
       category: articleForm.category,
       pinned: articleForm.pinned
     };
@@ -1151,7 +1155,7 @@ function App() {
 
       await refreshArticles();
       await refreshAdminAuditLogs();
-      setAdminMessage(editingArticleId ? '文章已更新' : '文章已发布');
+      setAdminMessage(nextStatus === 'draft' ? '草稿已保存' : editingArticleId ? '文章已更新并发布' : '文章已发布');
       setArticleForm(createEmptyArticleForm());
       setEditingArticleId(null);
       clearArticleDraft('');
@@ -3691,7 +3695,7 @@ function AdminWorkspace({
         })}
       </nav>
 
-      {activeAdminPage === 'ops' && <ProjectOpsPanel />}
+      {activeAdminPage === 'ops' && <ProjectOpsPanel authToken={authToken} />}
 
       {activeAdminPage === 'overview' && (
         <>
@@ -4162,9 +4166,17 @@ function AdminWorkspace({
           </div>
 
           <div className="admin-actions">
-            <button className="primary-action" type="submit" disabled={isSavingArticle}>
+            <button className="ghost-button" type="submit" value="draft" disabled={isSavingArticle}>
+              <Save size={17} />
+              <span>{isSavingArticle ? '保存中' : '保存草稿'}</span>
+            </button>
+            <button className="primary-action" type="submit" value="published" disabled={isSavingArticle}>
               {editingArticleId ? <Save size={17} /> : <PlusCircle size={17} />}
-              <span>{isSavingArticle ? '保存中' : editingArticleId ? '保存修改' : '发布文章'}</span>
+              <span>{isSavingArticle ? '发布中' : editingArticleId ? '发布修改' : '发布文章'}</span>
+            </button>
+            <button className="ghost-button" type="button" onClick={() => openAdminPage('articles')}>
+              <BookOpen size={17} />
+              <span>回文章库</span>
             </button>
             <button className="ghost-button" type="button" onClick={resetArticleForm}>
               <X size={17} />
@@ -4180,11 +4192,41 @@ function AdminWorkspace({
         <section className="admin-panel article-manager">
           <div className="admin-panel-heading">
             <h2>已有文章</h2>
-            <span>{articles.length} 篇</span>
+            <span>{filteredManagerArticles.length} / {articles.length} 篇</span>
+          </div>
+
+          <div className="admin-filter-bar">
+            <input
+              value={articleManagerQuery}
+              onChange={(event) => setArticleManagerQuery(event.target.value)}
+              placeholder="搜索标题、摘要、分类或标签"
+              aria-label="搜索文章"
+            />
+            <select
+              value={articleManagerStatus}
+              onChange={(event) => setArticleManagerStatus(event.target.value)}
+              aria-label="文章状态"
+            >
+              <option value="all">全部状态</option>
+              <option value="published">已发布</option>
+              <option value="draft">草稿</option>
+            </select>
+            <select
+              value={articleManagerCategory}
+              onChange={(event) => setArticleManagerCategory(event.target.value)}
+              aria-label="文章分类"
+            >
+              <option value="all">全部分类</option>
+              {articleCategoryOptions.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
           </div>
 
           <div className="manager-list">
-            {articles.map((article) => (
+            {filteredManagerArticles.length === 0 ? (
+              <p className="empty-state">没有符合条件的文章</p>
+            ) : filteredManagerArticles.map((article) => (
               <article className="manager-row" key={article.id}>
                 <div>
                   <div className="manager-title-line">
@@ -4248,7 +4290,7 @@ function AdminWorkspace({
           <div className="admin-panel-heading">
             <h2>图片管理</h2>
             <div className="manager-actions">
-              <span>{isLoadingUploadedImages ? '加载中' : `${uploadedImages.length} 张`}</span>
+              <span>{isLoadingUploadedImages ? '加载中' : `${filteredUploadedImages.length} / ${uploadedImages.length} 张`}</span>
               <button type="button" onClick={() => refreshUploadedImages()}>
                 <RefreshCw size={17} />
                 <span>刷新</span>
@@ -4256,11 +4298,31 @@ function AdminWorkspace({
             </div>
           </div>
 
+          <div className="admin-filter-bar">
+            <input
+              value={imageManagerQuery}
+              onChange={(event) => setImageManagerQuery(event.target.value)}
+              placeholder="搜索图片文件名"
+              aria-label="搜索图片"
+            />
+            <select
+              value={imageManagerSort}
+              onChange={(event) => setImageManagerSort(event.target.value)}
+              aria-label="图片排序"
+            >
+              <option value="newest">最新上传</option>
+              <option value="largest">文件最大</option>
+              <option value="name">文件名</option>
+            </select>
+          </div>
+
           <div className="image-resource-grid">
             {uploadedImages.length === 0 ? (
               <p className="empty-state">暂无上传图片</p>
+            ) : filteredUploadedImages.length === 0 ? (
+              <p className="empty-state">没有符合条件的图片</p>
             ) : (
-              uploadedImages.map((image) => (
+              filteredUploadedImages.map((image) => (
                 <article className="image-resource" key={image.filename}>
                   <div className="image-resource-preview">
                     <MarkdownImage src={image.url} alt={image.filename} />

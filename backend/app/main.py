@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import (
@@ -30,7 +30,7 @@ from app.auth import (
 )
 from app.database import SessionLocal, get_db, init_db
 from app.github_oauth import fetch_github_identity, get_github_authorize_url
-from app.models import AiGeneration, Article, Comment, ReactionCounter, SummerPlan, Tag, User, UserReaction
+from app.models import AdminAuditLog, AiGeneration, Article, Comment, ReactionCounter, SummerPlan, Tag, User, UserReaction
 from app.seed import REACTION_TYPES, seed_database
 
 
@@ -270,6 +270,7 @@ def update_summer_plan(
         plan.payload = payload.payload
     db.commit()
     db.refresh(plan)
+    _record_admin_event(db, current_user, "更新学习计划", "summer-plan", "current", "保存暑假计划云端数据")
     return plan.payload
 
 
@@ -555,6 +556,7 @@ def create_admin_article(
     ]
     db.add(article)
     db.commit()
+    _record_admin_event(db, current_user, "创建文章", "article", article.title, f"状态：{article.status}")
     return _article_to_dict(_get_article_or_404(db, article.id), current_user)
 
 
@@ -577,6 +579,7 @@ def update_admin_article(
     article.pinned = payload.pinned
     article.tags = [_get_or_create_tag(db, tag_name) for tag_name in _clean_tags(payload.tags)]
     db.commit()
+    _record_admin_event(db, current_user, "更新文章", "article", article.title, f"状态：{article.status}")
     return _article_to_dict(_get_article_or_404(db, article.id), current_user)
 
 
@@ -587,8 +590,10 @@ def delete_admin_article(
     current_user: User = Depends(require_admin),
 ) -> dict[str, str]:
     article = _get_article_or_404(db, article_id)
+    title = article.title
     db.delete(article)
     db.commit()
+    _record_admin_event(db, current_user, "删除文章", "article", title, article_id)
     return {"status": "deleted", "articleId": article_id}
 
 
@@ -596,6 +601,7 @@ def delete_admin_article(
 async def upload_admin_image(
     file: UploadFile = File(...),
     current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
 ) -> dict[str, str | int]:
     content_type = (file.content_type or "").lower()
     suffix = ALLOWED_IMAGE_TYPES.get(content_type)
@@ -615,6 +621,7 @@ async def upload_admin_image(
     filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{uuid4().hex}{suffix}"
     destination = UPLOAD_DIR / filename
     destination.write_bytes(content)
+    _record_admin_event(db, current_user, "上传图片", "upload", filename, f"{len(content)} bytes")
     return {"url": f"/uploads/{filename}", "filename": filename, "size": len(content)}
 
 
@@ -638,6 +645,7 @@ def list_admin_images(current_user: User = Depends(require_admin)) -> list[dict[
 def delete_admin_image(
     filename: str,
     current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
 ) -> dict[str, str]:
     if Path(filename).name != filename or Path(filename).suffix.lower() not in IMAGE_SUFFIXES:
         raise HTTPException(status_code=400, detail="Invalid image filename")
@@ -647,6 +655,7 @@ def delete_admin_image(
         raise HTTPException(status_code=404, detail="Image not found")
 
     target.unlink()
+    _record_admin_event(db, current_user, "删除图片", "upload", filename, "")
     return {"status": "deleted", "filename": filename}
 
 
@@ -673,8 +682,10 @@ def delete_admin_comment(
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
 
+    detail = comment.content[:160]
     db.delete(comment)
     db.commit()
+    _record_admin_event(db, current_user, "删除评论", "comment", str(comment_id), detail)
     return {"status": "deleted", "commentId": comment_id}
 
 
@@ -688,10 +699,69 @@ def approve_admin_comment(
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
 
+    detail = comment.content[:160]
     comment.status = "approved"
     db.commit()
+    _record_admin_event(db, current_user, "通过评论", "comment", str(comment_id), detail)
     db.refresh(comment)
     return _admin_comment_to_dict(comment)
+
+
+@app.get("/api/admin/audit-logs")
+def list_admin_audit_logs(
+    limit: int = Query(default=30, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> list[dict]:
+    logs = db.scalars(
+        select(AdminAuditLog)
+        .options(selectinload(AdminAuditLog.user))
+        .order_by(AdminAuditLog.created_at.desc())
+        .limit(limit)
+    ).all()
+    return [
+        {
+            "id": item.id,
+            "action": item.action,
+            "targetType": item.target_type,
+            "targetLabel": item.target_label,
+            "detail": item.detail,
+            "createdAt": item.created_at.isoformat(),
+            "operator": item.user.display_name if item.user else "未知管理员",
+        }
+        for item in logs
+    ]
+
+
+@app.get("/api/admin/system/health")
+def get_admin_system_health(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict[str, Any]:
+    database_ok = True
+    database_message = "连接正常"
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as exc:
+        database_ok = False
+        database_message = str(exc)[:180]
+
+    upload_ok = UPLOAD_DIR.exists() and UPLOAD_DIR.is_dir()
+    upload_count = len([path for path in UPLOAD_DIR.iterdir() if path.is_file()]) if upload_ok else 0
+    return {
+        "checkedAt": datetime.utcnow().isoformat(),
+        "services": [
+            {"name": "Backend API", "status": "online", "detail": app.version},
+            {"name": "Database", "status": "online" if database_ok else "attention", "detail": database_message},
+            {"name": "Uploads", "status": "online" if upload_ok else "attention", "detail": f"{upload_count} 个文件"},
+            {"name": "AI Provider", "status": "online" if _is_ai_configured() else "attention", "detail": AI_MODEL or "未配置真实模型"},
+        ],
+        "limits": {
+            "maxUploadMb": MAX_UPLOAD_BYTES // (1024 * 1024),
+            "commentMaxLength": COMMENT_MAX_LENGTH,
+            "commentCooldownSeconds": COMMENT_COOLDOWN_SECONDS,
+        },
+    }
 
 
 @app.get("/api/admin/stats")
@@ -1381,6 +1451,26 @@ def get_card_war_info() -> dict[str, str]:
         "playUrl": "https://firefelixfu026.github.io/card-war-made-by-class-3/",
         "status": "embedded",
     }
+
+
+def _record_admin_event(
+    db: Session,
+    current_user: User,
+    action: str,
+    target_type: str = "",
+    target_label: str = "",
+    detail: str = "",
+) -> None:
+    db.add(
+        AdminAuditLog(
+            user_id=current_user.id,
+            action=action[:80],
+            target_type=target_type[:80],
+            target_label=target_label[:255],
+            detail=detail[:1000],
+        )
+    )
+    db.commit()
 
 
 def _load_articles(db: Session) -> list[Article]:
