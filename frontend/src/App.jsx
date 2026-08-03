@@ -78,9 +78,106 @@ const IMAGE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_UPLOAD_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']);
 const ARTICLE_DRAFT_KEY = 'felix_blog_article_form_draft';
 const SUMMER_PLAN_KEY = 'felix_blog_summer_plan';
+const AUTH_TOKEN_KEY = 'felix_blog_token';
+const AUTH_USER_KEY = 'felix_blog_user';
+const AUTH_EXPIRES_KEY = 'felix_blog_token_expires_at';
+const ACTIVE_VIEW_KEY = 'felix_blog_active_view';
+const ADMIN_PAGE_KEY = 'felix_blog_admin_page';
 const emptyReactionState = { like: false, favorite: false, downvote: false, question: false };
 const ALL_FILTER = '全部';
 const ALL_ARCHIVE = '全部';
+
+function readCookie(name) {
+  if (typeof document === 'undefined') return '';
+  const prefix = `${name}=`;
+  return document.cookie
+    .split(';')
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(prefix))
+    ?.slice(prefix.length) || '';
+}
+
+function writeAuthCookie(token, expiresAt) {
+  if (typeof document === 'undefined') return;
+  const maxAge = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  const base = `${AUTH_TOKEN_KEY}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secure}`;
+  document.cookie = base;
+  if (window.location.hostname.endsWith('felixfu.xyz')) {
+    document.cookie = `${base}; Domain=.felixfu.xyz`;
+  }
+}
+
+function clearAuthCookies() {
+  if (typeof document === 'undefined') return;
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${AUTH_TOKEN_KEY}=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+  if (window.location.hostname.endsWith('felixfu.xyz')) {
+    document.cookie = `${AUTH_TOKEN_KEY}=; Path=/; Domain=.felixfu.xyz; Max-Age=0; SameSite=Lax${secure}`;
+  }
+}
+
+function getTokenExpiresAt(token) {
+  try {
+    const payloadPart = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(window.atob(payloadPart.padEnd(payloadPart.length + (-payloadPart.length % 4), '=')));
+    return Number(payload.exp) ? Number(payload.exp) * 1000 : Date.now() + 7 * 24 * 60 * 60 * 1000;
+  } catch {
+    return Date.now() + 7 * 24 * 60 * 60 * 1000;
+  }
+}
+
+function clearStoredAuthSession() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_USER_KEY);
+  localStorage.removeItem(AUTH_EXPIRES_KEY);
+  clearAuthCookies();
+}
+
+function persistAuthSession(token, user = null) {
+  const expiresAt = getTokenExpiresAt(token);
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+  localStorage.setItem(AUTH_EXPIRES_KEY, String(expiresAt));
+  if (user) {
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+  } else {
+    localStorage.removeItem(AUTH_USER_KEY);
+  }
+  writeAuthCookie(token, expiresAt);
+}
+
+function readStoredAuthToken() {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY) || decodeURIComponent(readCookie(AUTH_TOKEN_KEY) || '');
+  if (!token) return '';
+  const expiresAt = Number(localStorage.getItem(AUTH_EXPIRES_KEY)) || getTokenExpiresAt(token);
+  if (expiresAt <= Date.now()) {
+    clearStoredAuthSession();
+    return '';
+  }
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+  localStorage.setItem(AUTH_EXPIRES_KEY, String(expiresAt));
+  writeAuthCookie(token, expiresAt);
+  return token;
+}
+
+function readStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem(AUTH_USER_KEY) || 'null');
+  } catch {
+    localStorage.removeItem(AUTH_USER_KEY);
+    return null;
+  }
+}
+
+function readStoredActiveView() {
+  if (typeof localStorage === 'undefined') return 'overview';
+  return localStorage.getItem(ACTIVE_VIEW_KEY) || 'overview';
+}
+
+function readStoredAdminPage() {
+  if (typeof localStorage === 'undefined') return 'overview';
+  return localStorage.getItem(ADMIN_PAGE_KEY) || 'overview';
+}
 
 const defaultSummerPlan = {
   goals: {
@@ -305,7 +402,7 @@ function aiTaskLabel(task) {
 
 
 function App() {
-  const [activeView, setActiveView] = useState('overview');
+  const [activeView, setActiveView] = useState(readStoredActiveView);
   const [query, setQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState(ALL_FILTER);
   const [selectedCategory, setSelectedCategory] = useState(ALL_FILTER);
@@ -350,14 +447,8 @@ function App() {
   });
   const [aiTestMessage, setAiTestMessage] = useState('');
   const [isTestingAi, setIsTestingAi] = useState(false);
-  const [authToken, setAuthToken] = useState(() => localStorage.getItem('felix_blog_token') || '');
-  const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('felix_blog_user') || 'null');
-    } catch {
-      return null;
-    }
-  });
+  const [authToken, setAuthToken] = useState(readStoredAuthToken);
+  const [currentUser, setCurrentUser] = useState(readStoredUser);
   const [authMode, setAuthMode] = useState('login');
   const [authForm, setAuthForm] = useState({
     email: '',
@@ -380,6 +471,10 @@ function App() {
 
     return [...readerNavItems, accountNavItem];
   }, [currentUser?.role]);
+
+  useEffect(() => {
+    localStorage.setItem(ACTIVE_VIEW_KEY, activeView);
+  }, [activeView]);
 
   useEffect(() => {
     async function loadInitialData() {
@@ -413,8 +508,7 @@ function App() {
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
 
     if (token) {
-      localStorage.setItem('felix_blog_token', token);
-      localStorage.removeItem('felix_blog_user');
+      persistAuthSession(token);
       setCurrentUser(null);
       setAuthToken(token);
       setAuthMessage('GitHub 登录成功');
@@ -428,8 +522,7 @@ function App() {
 
   useEffect(() => {
     if (!authToken) {
-      localStorage.removeItem('felix_blog_token');
-      localStorage.removeItem('felix_blog_user');
+      clearStoredAuthSession();
       setCurrentUser(null);
       return;
     }
@@ -445,7 +538,7 @@ function App() {
         }
         const result = await response.json();
         setCurrentUser(result.user);
-        localStorage.setItem('felix_blog_user', JSON.stringify(result.user));
+        persistAuthSession(authToken, result.user);
         await refreshArticles();
       } catch {
         setAuthMessage('后端服务不可用，无法校验登录状态');
@@ -750,8 +843,7 @@ function App() {
         return;
       }
 
-      localStorage.setItem('felix_blog_token', result.token);
-      localStorage.setItem('felix_blog_user', JSON.stringify(result.user));
+      persistAuthSession(result.token, result.user);
       setAuthToken(result.token);
       setCurrentUser(result.user);
       setInteractionMessage('');
@@ -768,8 +860,7 @@ function App() {
   }
 
   function logout(redirect = true) {
-    localStorage.removeItem('felix_blog_token');
-    localStorage.removeItem('felix_blog_user');
+    clearStoredAuthSession();
     setAuthToken('');
     setCurrentUser(null);
     setAuthMessage('');
@@ -1442,6 +1533,8 @@ function App() {
     }
   }
 
+  const isRestoringSession = Boolean(authToken && !currentUser);
+
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="博客导航">
@@ -1508,6 +1601,17 @@ function App() {
             <span>本地 MVP</span>
           </div>
         </header>
+
+        {isRestoringSession && activeView !== 'login' && (
+          <section className="admin-panel auth-restore-panel">
+            <div className="admin-panel-heading">
+              <div>
+                <h2>正在恢复登录</h2>
+                <span>已找到上次保存的登录信息，正在和后端确认账号状态。</span>
+              </div>
+            </div>
+          </section>
+        )}
 
         {activeView === 'overview' && <Overview profile={profile} articles={articles} setActiveView={setActiveView} currentUser={currentUser} />}
 
@@ -3753,7 +3857,7 @@ function AdminWorkspace({
   ];
   const contentTextareaRef = useRef(null);
   const [aiInsertMode, setAiInsertMode] = useState('append');
-  const [activeAdminPage, setActiveAdminPage] = useState('overview');
+  const [activeAdminPage, setActiveAdminPage] = useState(readStoredAdminPage);
   const [adminStatsRange, setAdminStatsRange] = useState('7d');
   const [articleManagerQuery, setArticleManagerQuery] = useState('');
   const [articleManagerStatus, setArticleManagerStatus] = useState('all');
@@ -3761,6 +3865,11 @@ function AdminWorkspace({
   const [imageManagerQuery, setImageManagerQuery] = useState('');
   const [imageManagerSort, setImageManagerSort] = useState('newest');
   const shouldShowAdminLayout = ['editor', 'articles', 'media', 'comments'].includes(activeAdminPage);
+
+  useEffect(() => {
+    localStorage.setItem(ADMIN_PAGE_KEY, activeAdminPage);
+  }, [activeAdminPage]);
+
   const articleCategoryOptions = Array.from(
     new Set(articles.map((article) => article.category || '未分类'))
   ).sort((first, second) => first.localeCompare(second, 'zh-CN'));
@@ -3843,6 +3952,7 @@ function AdminWorkspace({
 
   function openAdminPage(pageId) {
     setActiveAdminPage(pageId);
+    localStorage.setItem(ADMIN_PAGE_KEY, pageId);
   }
 
   function handleStartEditingArticle(article) {

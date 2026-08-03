@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
+const SITE_LAUNCHED_AT = new Date('2026-07-04T00:00:00+08:00');
+
 const services = [
   {
     id: 'frontend',
@@ -83,11 +85,41 @@ function statusClass(status) {
   return status === 'online' ? 'ready' : status === 'attention' ? 'warning' : 'danger';
 }
 
+function formatDateTime(date) {
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+}
+
+function formatDuration(from, to) {
+  const totalSeconds = Math.max(0, Math.floor((to.getTime() - from.getTime()) / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (days > 0) return `${days} 天 ${hours} 小时 ${minutes} 分钟`;
+  if (hours > 0) return `${hours} 小时 ${minutes} 分钟 ${seconds} 秒`;
+  return `${minutes} 分钟 ${seconds} 秒`;
+}
+
+function parseServerTime(value) {
+  if (!value) return null;
+  const text = String(value);
+  return new Date(/[zZ]|[+-]\d\d:\d\d$/.test(text) ? text : `${text}Z`);
+}
+
 function ProjectOpsPanel({ authToken }) {
   const [selectedServiceId, setSelectedServiceId] = useState('backend');
   const [selectedAction, setSelectedAction] = useState('logs');
   const [systemHealth, setSystemHealth] = useState(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+  const [now, setNow] = useState(() => new Date());
   const [events, setEvents] = useState([
     ['后端 API 日志检查', '建议先看 backend 日志再处理 500 或登录异常'],
     ['数据库备份提醒', '大改、展示、迁移前先执行 backup-postgres.sh'],
@@ -100,7 +132,13 @@ function ProjectOpsPanel({ authToken }) {
   );
   const command = selectedService.commands[selectedAction];
   const onlineCount = services.filter((service) => service.status === 'online').length;
-  const liveServices = systemHealth?.services || [];
+  const liveServices = Array.isArray(systemHealth?.services) ? systemHealth.services : [];
+  const checkedAt = parseServerTime(systemHealth?.checkedAt);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     refreshSystemHealth();
@@ -115,9 +153,12 @@ function ProjectOpsPanel({ authToken }) {
       });
       if (!response.ok) return;
       const payload = await response.json();
-      setSystemHealth(payload);
+      setSystemHealth({
+        ...payload,
+        services: Array.isArray(payload.services) ? payload.services : []
+      });
       setEvents((current) => [
-        ['真实健康检查完成', new Date(payload.checkedAt).toLocaleString('zh-CN', { hour12: false })],
+        ['真实健康检查完成', formatDateTime(parseServerTime(payload.checkedAt) || new Date())],
         ...current.slice(0, 4)
       ]);
     } catch {
@@ -131,11 +172,18 @@ function ProjectOpsPanel({ authToken }) {
   }
 
   async function copyCommand() {
-    await navigator.clipboard.writeText(command);
-    setEvents((current) => [
-      [`已复制 ${selectedService.name} ${commandLabels[selectedAction]}命令`, command],
-      ...current.slice(0, 4)
-    ]);
+    try {
+      await navigator.clipboard.writeText(command);
+      setEvents((current) => [
+        [`已复制 ${selectedService.name} ${commandLabels[selectedAction]}命令`, command],
+        ...current.slice(0, 4)
+      ]);
+    } catch {
+      setEvents((current) => [
+        ['复制失败', '浏览器暂未允许剪贴板权限，可手动选中命令复制'],
+        ...current.slice(0, 4)
+      ]);
+    }
   }
 
   function simulateAction(action) {
@@ -174,6 +222,18 @@ function ProjectOpsPanel({ authToken }) {
         <div className="ops-metric">
           <span>网关路由</span>
           <strong>{gatewayRoutes.length} 条</strong>
+        </div>
+        <div className="ops-metric ops-clock-metric">
+          <span>当前时间</span>
+          <strong>{formatDateTime(now)}</strong>
+        </div>
+        <div className="ops-metric ops-clock-metric">
+          <span>已上线</span>
+          <strong>{formatDuration(SITE_LAUNCHED_AT, now)}</strong>
+        </div>
+        <div className="ops-metric ops-clock-metric">
+          <span>最近检查</span>
+          <strong>{checkedAt ? formatDateTime(checkedAt) : '尚未检查'}</strong>
         </div>
       </div>
 

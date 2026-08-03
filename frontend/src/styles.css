@@ -1442,7 +1442,7 @@ h3 {
 .ops-metric-grid,
 .ops-bottom-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
 }
 
@@ -1467,6 +1467,41 @@ h3 {
   overflow-wrap: anywhere;
   color: #102033;
   font-size: 17px;
+}
+
+.ops-clock-metric strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.app-error-boundary {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 28px;
+  background: #f4f7fb;
+}
+
+.app-error-card {
+  display: grid;
+  gap: 14px;
+  width: min(560px, 100%);
+  padding: 24px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  color: #102033;
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(16, 32, 51, 0.08);
+}
+
+.app-error-card h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.app-error-card p {
+  margin: 0;
+  color: #5b6878;
+  line-height: 1.65;
 }
 
 .ops-layout {
