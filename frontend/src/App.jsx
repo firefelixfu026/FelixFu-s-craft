@@ -1742,6 +1742,7 @@ function App() {
             approveAdminComment={approveAdminComment}
             deleteAdminComment={deleteAdminComment}
             currentUser={currentUser}
+            authToken={authToken}
             logout={logout}
           />
         )}
@@ -3859,6 +3860,7 @@ function AdminWorkspace({
   approveAdminComment,
   deleteAdminComment,
   currentUser,
+  authToken,
   logout
 }) {
   const adminCommentArticleOptions = uniqueCommentOptions(adminComments, 'articleTitle', 'articleId');
