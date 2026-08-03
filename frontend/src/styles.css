@@ -1821,6 +1821,25 @@ h3 {
   gap: 12px;
 }
 
+.release-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.release-pager span {
+  min-width: 64px;
+  color: #5b6878;
+  font-weight: 800;
+  text-align: center;
+}
+
+.release-pager button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .release-version-card {
   display: grid;
   grid-template-columns: minmax(160px, 0.3fr) auto minmax(260px, 1fr);

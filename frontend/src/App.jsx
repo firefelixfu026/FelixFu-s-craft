@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+import changelogText from '../../CHANGELOG.md?raw';
 import { aiNews as fallbackNews, articles as fallbackArticles, gameModule, profile as fallbackProfile } from './data.js';
 import ProjectOpsPanel from './ProjectOpsPanel.jsx';
 
@@ -217,6 +218,35 @@ const releaseRoadmap = [
     status: '已上线',
     points: ['AI 写作辅助入口', '发布状态总览', '站点统计卡片', '安全日志入口']
   }
+];
+const RELEASE_PAGE_SIZE = 6;
+
+function parseChangelogReleases(text) {
+  return text
+    .split(/^## /m)
+    .slice(1)
+    .map((section) => {
+      const [heading = '', ...bodyLines] = section.trim().split('\n');
+      const [, version = '未命名版本', title = '版本更新'] = heading.match(/^(v[\d.]+)\s*-\s*(.+)$/) || [];
+      const points = bodyLines
+        .map((line) => line.trim())
+        .filter((line) => line.startsWith('- '))
+        .map((line) => line.slice(2))
+        .slice(0, 5);
+      return {
+        version,
+        title,
+        date: '历史版本',
+        status: '已归档',
+        points: points.length ? points : ['版本记录已归档']
+      };
+    })
+    .filter((release) => /^v\d+\.\d+/.test(release.version));
+}
+
+const releaseArchive = [
+  ...releaseRoadmap,
+  ...parseChangelogReleases(changelogText)
 ];
 
 const defaultSummerPlan = {
@@ -3847,16 +3877,24 @@ class AdminPanelErrorBoundary extends React.Component {
 }
 
 function ReleaseWorkspace() {
-  const latestRelease = releaseRoadmap[0];
-  const shippedCount = releaseRoadmap.filter((release) => release.status === '已上线').length;
-  const totalPoints = releaseRoadmap.reduce((total, release) => total + release.points.length, 0);
+  const [releasePage, setReleasePage] = useState(0);
+  const latestRelease = releaseArchive[0];
+  const shippedCount = releaseArchive.filter((release) => release.status === '已上线').length;
+  const archivedCount = releaseArchive.filter((release) => release.status === '已归档').length;
+  const totalPoints = releaseArchive.reduce((total, release) => total + release.points.length, 0);
+  const pageCount = Math.max(1, Math.ceil(releaseArchive.length / RELEASE_PAGE_SIZE));
+  const safeReleasePage = Math.min(releasePage, pageCount - 1);
+  const visibleReleases = releaseArchive.slice(
+    safeReleasePage * RELEASE_PAGE_SIZE,
+    safeReleasePage * RELEASE_PAGE_SIZE + RELEASE_PAGE_SIZE
+  );
 
   return (
     <section className="admin-panel release-page">
       <div className="admin-panel-heading">
         <div>
           <h2>版本清单</h2>
-          <span>从 v2.1 到 v2.5 的后台改造记录</span>
+          <span>从 v0.1.0 到 {latestRelease.version} 的更新档案</span>
         </div>
         <span className="release-badge">{latestRelease.version}</span>
       </div>
@@ -3871,6 +3909,10 @@ function ReleaseWorkspace() {
           <strong>{shippedCount} 个</strong>
         </div>
         <div className="release-metric">
+          <span>历史归档</span>
+          <strong>{archivedCount} 个</strong>
+        </div>
+        <div className="release-metric">
           <span>改动点</span>
           <strong>{totalPoints} 项</strong>
         </div>
@@ -3880,15 +3922,37 @@ function ReleaseWorkspace() {
         </div>
       </div>
 
+      <div className="release-pager">
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={() => setReleasePage((page) => Math.max(0, page - 1))}
+          disabled={safeReleasePage === 0}
+        >
+          上一页
+        </button>
+        <span>{safeReleasePage + 1} / {pageCount}</span>
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={() => setReleasePage((page) => Math.min(pageCount - 1, page + 1))}
+          disabled={safeReleasePage === pageCount - 1}
+        >
+          下一页
+        </button>
+      </div>
+
       <div className="release-timeline">
-        {releaseRoadmap.map((release) => (
+        {visibleReleases.map((release) => (
           <article className="release-version-card" key={release.version}>
             <div>
               <span className="release-version">{release.version}</span>
               <h3>{release.title}</h3>
               <small>{release.date}</small>
             </div>
-            <span className="ops-status ready">{release.status}</span>
+            <span className={`ops-status ${release.status === '已上线' ? 'ready' : 'warning'}`}>
+              {release.status}
+            </span>
             <ul>
               {release.points.map((point) => (
                 <li key={point}>
