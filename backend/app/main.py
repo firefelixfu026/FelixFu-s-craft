@@ -2,6 +2,7 @@ import hmac
 import json
 import os
 import re
+import subprocess
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any, Literal
@@ -40,6 +41,7 @@ AI_API_STYLE = os.getenv("AI_API_STYLE", "openai").strip().lower() or "openai"
 AI_BASE_URL = os.getenv("AI_BASE_URL", "").strip()
 AI_MODEL = os.getenv("AI_MODEL", "").strip()
 AI_API_KEY = os.getenv("AI_API_KEY", "").strip()
+AI_SETTINGS_FILE = Path(os.getenv("AI_SETTINGS_FILE", "data/ai-settings.json"))
 try:
     AI_REQUEST_TIMEOUT = float(os.getenv("AI_REQUEST_TIMEOUT", "25") or "25")
 except ValueError:
@@ -338,6 +340,16 @@ class AiTestIn(BaseModel):
     baseUrl: str = ""
     model: str = ""
     apiKey: str = ""
+
+
+class AiSettingsIn(BaseModel):
+    providerName: str = "OpenAI Compatible"
+    apiStyle: str = "openai"
+    baseUrl: str = ""
+    model: str = ""
+    apiKey: str = ""
+    timeout: float = 25.0
+    enabled: bool = True
 
 
 @app.on_event("startup")
@@ -856,14 +868,16 @@ def get_admin_system_health(
 
     upload_ok = UPLOAD_DIR.exists() and UPLOAD_DIR.is_dir()
     upload_count = len([path for path in UPLOAD_DIR.iterdir() if path.is_file()]) if upload_ok else 0
+    ai_config = _current_ai_config()
     return {
         "checkedAt": datetime.utcnow().isoformat(),
         "services": [
             {"name": "Backend API", "status": "online", "detail": app.version},
             {"name": "Database", "status": "online" if database_ok else "attention", "detail": database_message},
             {"name": "Uploads", "status": "online" if upload_ok else "attention", "detail": f"{upload_count} 个文件"},
-            {"name": "AI Provider", "status": "online" if _is_ai_configured() else "attention", "detail": AI_MODEL or "未配置真实模型"},
+            {"name": "AI Provider", "status": "online" if ai_config["configured"] else "attention", "detail": ai_config["model"] or "未配置真实模型"},
         ],
+        "containers": _read_container_statuses(),
         "limits": {
             "maxUploadMb": MAX_UPLOAD_BYTES // (1024 * 1024),
             "commentMaxLength": COMMENT_MAX_LENGTH,
@@ -915,33 +929,216 @@ def get_ai_news() -> list[dict]:
     return AI_NEWS
 
 
-@app.get("/api/ai/status")
-def get_ai_status() -> dict[str, str | bool]:
-    configured = _is_ai_configured()
-    return {
+def _load_saved_ai_settings() -> dict[str, Any]:
+    try:
+        if not AI_SETTINGS_FILE.exists():
+            return {}
+        data = json.loads(AI_SETTINGS_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _write_saved_ai_settings(settings: dict[str, Any]) -> None:
+    AI_SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    AI_SETTINGS_FILE.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _delete_saved_ai_settings() -> None:
+    try:
+        AI_SETTINGS_FILE.unlink()
+    except FileNotFoundError:
+        return
+
+
+def _read_container_statuses() -> list[dict[str, str]]:
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "ps", "--format", "json"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return [
+            {
+                "name": "Docker 容器",
+                "status": "attention",
+                "detail": "后端容器当前无法访问 Docker 状态，可在服务器开放 docker compose ps 后显示真实容器。",
+            }
+        ]
+
+    if result.returncode != 0:
+        return [
+            {
+                "name": "Docker 容器",
+                "status": "attention",
+                "detail": (result.stderr or result.stdout or "docker compose ps 执行失败")[:180],
+            }
+        ]
+
+    containers: list[dict[str, str]] = []
+    for line in result.stdout.splitlines():
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        parsed_items = parsed if isinstance(parsed, list) else [parsed]
+        for item in parsed_items:
+            if not isinstance(item, dict):
+                continue
+            state = str(item.get("State") or item.get("Status") or "").lower()
+            containers.append({
+                "name": str(item.get("Name") or item.get("Service") or "Docker 服务"),
+                "status": "online" if "running" in state or state == "healthy" else "attention",
+                "detail": str(item.get("Status") or item.get("State") or "状态未知")[:180],
+            })
+    return containers or [
+        {
+            "name": "Docker 容器",
+            "status": "attention",
+            "detail": "没有读取到容器列表。",
+        }
+    ]
+
+
+def _current_ai_config() -> dict[str, Any]:
+    saved = _load_saved_ai_settings()
+    has_saved_settings = bool(saved)
+    api_key = _optional_text(saved.get("apiKey")) if has_saved_settings else ""
+    env_key = AI_API_KEY
+    config = {
         "provider": AI_PROVIDER_NAME,
         "apiStyle": _normalize_ai_style(AI_API_STYLE),
-        "model": AI_MODEL or "未配置",
-        "baseUrlConfigured": bool(AI_BASE_URL),
-        "apiKeyConfigured": bool(AI_API_KEY),
+        "baseUrl": AI_BASE_URL,
+        "model": AI_MODEL,
+        "apiKey": env_key,
+        "timeout": AI_REQUEST_TIMEOUT,
+        "enabled": True,
+        "source": "环境变量" if (AI_BASE_URL or AI_MODEL or AI_API_KEY) else "未配置",
+        "saved": False,
+    }
+    if has_saved_settings:
+        try:
+            timeout = float(saved.get("timeout", AI_REQUEST_TIMEOUT) or AI_REQUEST_TIMEOUT)
+        except (TypeError, ValueError):
+            timeout = AI_REQUEST_TIMEOUT
+        config.update({
+            "provider": _optional_text(saved.get("providerName")) or _optional_text(saved.get("provider")) or "OpenAI Compatible",
+            "apiStyle": _normalize_ai_style(_optional_text(saved.get("apiStyle")) or "openai"),
+            "baseUrl": _optional_text(saved.get("baseUrl")),
+            "model": _optional_text(saved.get("model")),
+            "apiKey": api_key,
+            "timeout": max(5.0, min(timeout, 120.0)),
+            "enabled": bool(saved.get("enabled", True)),
+            "source": "后台保存",
+            "saved": True,
+        })
+    config["configured"] = bool(config["enabled"] and config["baseUrl"] and config["model"] and config["apiKey"])
+    config["apiKeyTail"] = f"***{config['apiKey'][-4:]}" if config["apiKey"] else ""
+    return config
+
+
+def _public_ai_settings() -> dict[str, str | bool | float]:
+    config = _current_ai_config()
+    configured = bool(config["configured"])
+    return {
+        "provider": config["provider"],
+        "apiStyle": config["apiStyle"],
+        "model": config["model"] or "",
+        "baseUrl": config["baseUrl"] or "",
+        "baseUrlConfigured": bool(config["baseUrl"]),
+        "apiKeyConfigured": bool(config["apiKey"]),
+        "apiKeyTail": config["apiKeyTail"],
+        "configured": configured,
+        "enabled": bool(config["enabled"]),
+        "saved": bool(config["saved"]),
+        "source": config["source"],
+        "timeout": float(config["timeout"]),
+        "note": "后台保存的密钥只显示末尾几位；停用或删除后写作助手会回到本地模板。",
+    }
+
+
+@app.get("/api/ai/status")
+def get_ai_status() -> dict[str, str | bool]:
+    config = _current_ai_config()
+    configured = bool(config["configured"])
+    return {
+        "provider": config["provider"],
+        "apiStyle": config["apiStyle"],
+        "model": config["model"] or "未配置",
+        "baseUrlConfigured": bool(config["baseUrl"]),
+        "apiKeyConfigured": bool(config["apiKey"]),
         "configured": configured,
         "mode": "real-model-ready" if configured else "local-placeholder",
-        "message": "真实模型配置已就绪，将优先调用 OpenAI 兼容接口。" if configured else "当前使用本地占位生成；配置 AI_BASE_URL、AI_MODEL 和 AI_API_KEY 后可接入真实模型。",
+        "message": "真实模型配置已就绪，将优先调用保存的 AI 配置。" if configured else "当前使用本地占位生成；可在后台 AI 页保存真实模型配置。",
     }
 
 
 @app.get("/api/admin/ai/settings")
 def get_admin_ai_settings(current_user: User = Depends(require_admin)) -> dict[str, str | bool | float]:
-    return {
-        "provider": AI_PROVIDER_NAME,
-        "apiStyle": _normalize_ai_style(AI_API_STYLE),
-        "model": AI_MODEL or "",
-        "baseUrlConfigured": bool(AI_BASE_URL),
-        "apiKeyConfigured": bool(AI_API_KEY),
-        "configured": _is_ai_configured(),
-        "timeout": AI_REQUEST_TIMEOUT,
-        "note": "密钥不从接口返回。后台测试框只做一次性连通性验证，不会写入仓库。",
+    return _public_ai_settings()
+
+
+@app.put("/api/admin/ai/settings")
+def save_admin_ai_settings(
+    payload: AiSettingsIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict[str, str | bool | float]:
+    existing = _load_saved_ai_settings()
+    api_key = _optional_text(payload.apiKey) or _optional_text(existing.get("apiKey"))
+    base_url = _optional_text(payload.baseUrl)
+    model = _optional_text(payload.model)
+    if payload.enabled and (not base_url or not model or not api_key):
+        raise HTTPException(status_code=400, detail="启用 AI 前需要填写 Base URL、模型名和 API Key")
+    settings = {
+        "providerName": _optional_text(payload.providerName) or "OpenAI Compatible",
+        "apiStyle": _normalize_ai_style(payload.apiStyle),
+        "baseUrl": base_url,
+        "model": model,
+        "apiKey": api_key,
+        "timeout": max(5.0, min(float(payload.timeout or 25.0), 120.0)),
+        "enabled": bool(payload.enabled),
+        "updatedAt": datetime.utcnow().isoformat(),
+        "updatedBy": current_user.email,
     }
+    _write_saved_ai_settings(settings)
+    _record_admin_event(db, current_user, "保存 AI 配置", "ai", settings["providerName"], f"模型：{settings['model']}")
+    return _public_ai_settings()
+
+
+@app.post("/api/admin/ai/settings/disable")
+def disable_admin_ai_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict[str, str | bool | float]:
+    settings = _load_saved_ai_settings()
+    if not settings:
+        settings = {
+            "providerName": AI_PROVIDER_NAME,
+            "apiStyle": _normalize_ai_style(AI_API_STYLE),
+            "baseUrl": AI_BASE_URL,
+            "model": AI_MODEL,
+            "apiKey": AI_API_KEY,
+            "timeout": AI_REQUEST_TIMEOUT,
+        }
+    settings["enabled"] = False
+    settings["updatedAt"] = datetime.utcnow().isoformat()
+    settings["updatedBy"] = current_user.email
+    _write_saved_ai_settings(settings)
+    _record_admin_event(db, current_user, "停用 AI 配置", "ai", _optional_text(settings.get("providerName")))
+    return _public_ai_settings()
+
+
+@app.delete("/api/admin/ai/settings")
+def delete_admin_ai_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict[str, str | bool | float]:
+    _delete_saved_ai_settings()
+    _record_admin_event(db, current_user, "删除 AI 配置", "ai", "后台保存配置")
+    return _public_ai_settings()
 
 
 @app.post("/api/admin/ai/test")
@@ -949,11 +1146,12 @@ def test_admin_ai_settings(
     payload: AiTestIn,
     current_user: User = Depends(require_admin),
 ) -> dict[str, str | bool]:
-    base_url = _optional_text(payload.baseUrl) or AI_BASE_URL
-    model = _optional_text(payload.model) or AI_MODEL
-    api_key = _optional_text(payload.apiKey) or AI_API_KEY
-    provider = _optional_text(payload.providerName) or AI_PROVIDER_NAME
-    api_style = _normalize_ai_style(_optional_text(payload.apiStyle) or AI_API_STYLE)
+    config = _current_ai_config()
+    base_url = _optional_text(payload.baseUrl) or config["baseUrl"]
+    model = _optional_text(payload.model) or config["model"]
+    api_key = _optional_text(payload.apiKey) or config["apiKey"]
+    provider = _optional_text(payload.providerName) or config["provider"]
+    api_style = _normalize_ai_style(_optional_text(payload.apiStyle) or config["apiStyle"])
     if not base_url or not model or not api_key:
         return {
             "ok": False,
@@ -973,7 +1171,7 @@ def test_admin_ai_settings(
                 {"role": "system", "content": "你是一个用于连通性测试的中文助手。"},
                 {"role": "user", "content": "请只回复：AI 配置测试成功"},
             ],
-            timeout=min(AI_REQUEST_TIMEOUT, 20),
+            timeout=min(float(config["timeout"]), 20),
         )
         return {
             "ok": True,
@@ -1012,15 +1210,16 @@ def run_ai_workbench(payload: AiWorkbenchIn) -> dict:
     tags = [_optional_text(tag) for tag in payload.tags if _optional_text(tag)]
     tone = _optional_text(payload.tone) or "技术学习"
 
-    if _is_ai_configured():
+    ai_config = _current_ai_config()
+    if ai_config["configured"]:
         try:
-            return _run_real_ai_workbench(payload, topic, content, tags, tone)
+            return _run_real_ai_workbench(payload, topic, content, tags, tone, ai_config)
         except RuntimeError as exc:
             items = _build_local_ai_items(payload.mode, topic, content, tags, tone)
             return {
                 "mode": payload.mode,
-                "provider": AI_PROVIDER_NAME,
-                "model": AI_MODEL,
+                "provider": ai_config["provider"],
+                "model": ai_config["model"],
                 "status": "fallback",
                 "message": f"真实模型调用失败，已返回本地候选：{exc}",
                 "items": items,
@@ -1050,13 +1249,14 @@ def run_ai_editor(
     tone = _optional_text(payload.tone) or "技术学习"
     source_text = selected_text or content
 
-    if _is_ai_configured():
+    ai_config = _current_ai_config()
+    if ai_config["configured"]:
         try:
-            generated = _run_real_ai_editor(payload.task, title, summary, source_text, tone)
+            generated = _run_real_ai_editor(payload.task, title, summary, source_text, tone, ai_config)
             result = {
                 "task": payload.task,
-                "provider": AI_PROVIDER_NAME,
-                "model": AI_MODEL,
+                "provider": ai_config["provider"],
+                "model": ai_config["model"],
                 "status": "real",
                 "message": "已由真实模型生成写作辅助内容",
                 "content": generated,
@@ -1067,8 +1267,8 @@ def run_ai_editor(
             generated = _build_local_ai_editor_content(payload.task, title, summary, source_text, tone)
             result = {
                 "task": payload.task,
-                "provider": AI_PROVIDER_NAME,
-                "model": AI_MODEL,
+                "provider": ai_config["provider"],
+                "model": ai_config["model"],
                 "status": "fallback",
                 "message": f"真实模型调用失败，已返回本地写作辅助：{exc}",
                 "content": generated,
@@ -1163,7 +1363,7 @@ def _build_local_ai_items(
 
 
 def _is_ai_configured() -> bool:
-    return bool(AI_API_KEY and AI_MODEL and AI_BASE_URL)
+    return bool(_current_ai_config()["configured"])
 
 
 def _normalize_ai_style(value: str | None) -> str:
@@ -1179,9 +1379,11 @@ def _run_real_ai_workbench(
     content: str | None,
     tags: list[str],
     tone: str,
+    ai_config: dict[str, Any],
 ) -> dict:
     prompt = _build_ai_prompt(payload.mode, topic, content, tags, tone)
     content_text = _run_configured_ai_chat(
+        ai_config,
         messages=[
             {
                 "role": "system",
@@ -1195,8 +1397,8 @@ def _run_real_ai_workbench(
     items = _parse_ai_items(content_text)
     return {
         "mode": payload.mode,
-        "provider": AI_PROVIDER_NAME,
-        "model": AI_MODEL,
+        "provider": ai_config["provider"],
+        "model": ai_config["model"],
         "status": "real",
         "message": "已由真实模型生成候选内容",
         "items": items,
@@ -1237,14 +1439,14 @@ def _ai_chat_url_for(base_url: str, api_style: str = "openai") -> str:
     return f"{cleaned}/chat/completions"
 
 
-def _run_configured_ai_chat(messages: list[dict[str, str]], temperature: float) -> str:
+def _run_configured_ai_chat(ai_config: dict[str, Any], messages: list[dict[str, str]], temperature: float) -> str:
     return _run_ai_chat_once(
-        base_url=AI_BASE_URL,
-        api_style=AI_API_STYLE,
-        model=AI_MODEL,
-        api_key=AI_API_KEY,
+        base_url=ai_config["baseUrl"],
+        api_style=ai_config["apiStyle"],
+        model=ai_config["model"],
+        api_key=ai_config["apiKey"],
         messages=messages,
-        timeout=AI_REQUEST_TIMEOUT,
+        timeout=float(ai_config["timeout"]),
         temperature=temperature,
     )
 
@@ -1474,9 +1676,11 @@ def _run_real_ai_editor(
     summary: str,
     source_text: str,
     tone: str,
+    ai_config: dict[str, Any],
 ) -> str:
     prompt = _build_ai_editor_prompt(task, title, summary, source_text, tone)
     generated = _run_configured_ai_chat(
+        ai_config,
         messages=[
             {
                 "role": "system",

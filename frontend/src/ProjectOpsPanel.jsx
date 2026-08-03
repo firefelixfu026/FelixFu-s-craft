@@ -150,6 +150,15 @@ function normalizeLiveServices(value) {
   }));
 }
 
+function normalizeContainers(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((container, index) => ({
+    name: safeText(container?.name, `容器 ${index + 1}`),
+    status: safeText(container?.status, 'attention'),
+    detail: safeText(container?.detail),
+  }));
+}
+
 function normalizeWorkflowRun(run) {
   return {
     id: safeText(run?.id, `${Date.now()}`),
@@ -216,6 +225,7 @@ function ProjectOpsPanel({ authToken }) {
   const command = selectedService.commands?.[selectedAction] || '暂未配置命令';
   const onlineCount = services.filter((service) => service.status === 'online').length;
   const liveServices = normalizeLiveServices(systemHealth?.services);
+  const containerServices = normalizeContainers(systemHealth?.containers);
   const checkedAt = parseServerTime(systemHealth?.checkedAt);
   const latestDeployRun = deploymentRuns.find((run) => run.name === 'Deploy') || deploymentRuns[0];
   const liveStatusCounts = liveServices.reduce(
@@ -274,7 +284,8 @@ function ProjectOpsPanel({ authToken }) {
       const normalizedServices = normalizeLiveServices(payload.services);
       setSystemHealth({
         ...payload,
-        services: normalizedServices
+        services: normalizedServices,
+        containers: normalizeContainers(payload.containers)
       });
       const healthyCount = normalizedServices.filter((service) => service.status === 'online').length;
       const nextStatus = healthyCount === normalizedServices.length ? 'online' : 'attention';
@@ -433,6 +444,24 @@ function ProjectOpsPanel({ authToken }) {
             <small>{service.detail}</small>
           </article>
         ))}
+      </div>
+
+      <div className="ops-events">
+        <div className="admin-panel-heading compact-heading">
+          <h3>容器状态</h3>
+          <span>由后端尝试读取 docker compose ps</span>
+        </div>
+        <div className="ops-live-grid">
+          {containerServices.length === 0 ? (
+            <p className="empty-state">完成真实检查后显示容器状态</p>
+          ) : containerServices.map((container) => (
+            <article className="ops-live-card" key={container.name}>
+              <span className={`ops-status ${statusClass(container.status)}`}>{statusLabel(container.status)}</span>
+              <strong>{container.name}</strong>
+              <small>{container.detail}</small>
+            </article>
+          ))}
+        </div>
       </div>
 
       <div className="ops-layout">

@@ -2017,14 +2017,128 @@ h3 {
   gap: 10px;
 }
 
+.ai-config-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .ai-test-form input,
-.ai-test-form select {
+.ai-test-form select,
+.ai-config-form input,
+.ai-config-form select {
   min-width: 0;
   height: 40px;
   padding: 0 12px;
   border: 1px solid #d8e0e9;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.ai-config-actions {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  gap: 10px;
+}
+
+.mini-workbench,
+.utility-panel {
+  min-width: 0;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.template-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  color: #102033;
+  text-align: left;
+  background: #f8fafc;
+}
+
+.template-card:hover {
+  border-color: #1f7a6d;
+}
+
+.template-card span,
+.template-card small {
+  color: #5b6878;
+  line-height: 1.45;
+}
+
+.template-card small {
+  font-weight: 800;
+}
+
+.corpus-textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  color: #102033;
+  background: #ffffff;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.corpus-row pre {
+  max-height: 180px;
+  overflow: auto;
+  margin: 8px 0 0;
+  padding: 10px;
+  border: 1px solid #e5eaf0;
+  border-radius: 8px;
+  color: #334155;
+  white-space: pre-wrap;
+  background: #ffffff;
+}
+
+.study-task-list {
+  display: grid;
+  gap: 10px;
+}
+
+.study-task {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.study-task input {
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+}
+
+.study-task span {
+  display: grid;
+  gap: 4px;
+}
+
+.study-task em {
+  color: #5b6878;
+  font-style: normal;
+}
+
+.study-task.done {
+  border-color: #b9e4d2;
+  background: #f1fbf6;
 }
 
 .account-profile {
@@ -3078,6 +3192,8 @@ h3 {
   .analytics-grid,
   .account-grid,
   .ai-test-form,
+  .ai-config-form,
+  .template-grid,
   .summer-plan-hero,
   .summer-goal-grid,
   .summer-module-grid {

@@ -3,6 +3,29 @@ import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import './styles.css';
 
+const FRONTEND_ERROR_LOG_KEY = 'felix_blog_frontend_error_logs';
+
+function recordFrontendError(error, info) {
+  try {
+    const current = JSON.parse(localStorage.getItem(FRONTEND_ERROR_LOG_KEY) || '[]');
+    const next = [
+      {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        message: error?.message || '未知错误',
+        stack: error?.stack || '',
+        componentStack: info?.componentStack || '',
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        createdAt: new Date().toISOString()
+      },
+      ...(Array.isArray(current) ? current : [])
+    ].slice(0, 20);
+    localStorage.setItem(FRONTEND_ERROR_LOG_KEY, JSON.stringify(next));
+  } catch {
+    // Error reporting should never make the recovery UI fail.
+  }
+}
+
 class AppErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -13,7 +36,8 @@ class AppErrorBoundary extends React.Component {
     return { hasError: true, message: error?.message || '未知错误' };
   }
 
-  componentDidCatch(error) {
+  componentDidCatch(error, info) {
+    recordFrontendError(error, info);
     console.error('App render failed', error);
   }
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   BookOpen,
@@ -78,6 +78,11 @@ const ADMIN_COMMENTS_PER_PAGE = 5;
 const IMAGE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_UPLOAD_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']);
 const ARTICLE_DRAFT_KEY = 'felix_blog_article_form_draft';
+const ARTICLE_DRAFT_HISTORY_KEY = 'felix_blog_article_draft_history';
+const FRONTEND_ERROR_LOG_KEY = 'felix_blog_frontend_error_logs';
+const BACKUP_CENTER_KEY = 'felix_blog_backup_records';
+const BOT_CORPUS_KEY = 'felix_blog_bot_corpus_samples';
+const STUDY_ASSISTANT_KEY = 'felix_blog_study_assistant';
 const SUMMER_PLAN_KEY = 'felix_blog_summer_plan';
 const AUTH_TOKEN_KEY = 'felix_blog_token';
 const AUTH_USER_KEY = 'felix_blog_user';
@@ -178,11 +183,148 @@ function readStoredActiveView() {
 function readStoredAdminPage() {
   if (typeof localStorage === 'undefined') return 'overview';
   const storedPage = localStorage.getItem(ADMIN_PAGE_KEY) || 'overview';
-  const knownPages = new Set(['overview', 'ops', 'releases', 'editor', 'articles', 'media', 'comments', 'security', 'ai']);
+  const knownPages = new Set(['overview', 'ops', 'releases', 'editor', 'articles', 'media', 'comments', 'security', 'ai', 'backups', 'corpus', 'study']);
   return knownPages.has(storedPage) ? storedPage : 'overview';
 }
 
+function readStoredJson(key, fallback) {
+  if (typeof localStorage === 'undefined') return fallback;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || 'null');
+    return parsed ?? fallback;
+  } catch {
+    localStorage.removeItem(key);
+    return fallback;
+  }
+}
+
+function writeStoredJson(key, value) {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+function readDraftHistory() {
+  const stored = readStoredJson(ARTICLE_DRAFT_HISTORY_KEY, []);
+  return Array.isArray(stored) ? stored.slice(0, 12) : [];
+}
+
+function readFrontendErrorLogs() {
+  const stored = readStoredJson(FRONTEND_ERROR_LOG_KEY, []);
+  return Array.isArray(stored) ? stored.slice(0, 20) : [];
+}
+
+function readBackupRecords() {
+  const stored = readStoredJson(BACKUP_CENTER_KEY, []);
+  return Array.isArray(stored) ? stored.slice(0, 16) : [];
+}
+
+function readBotCorpusSamples() {
+  const stored = readStoredJson(BOT_CORPUS_KEY, []);
+  return Array.isArray(stored) ? stored.slice(0, 12) : [];
+}
+
+function createDefaultStudyState() {
+  return {
+    tasks: [
+      { id: 'algo', title: '算法题复盘', detail: '整理今天卡住的题和关键思路', done: false },
+      { id: 'paper', title: '论文阅读', detail: '读 1 篇摘要、方法、实验', done: false },
+      { id: 'project', title: '项目推进', detail: '完成一个能截图展示的小功能', done: false },
+      { id: 'review', title: '知识回顾', detail: '把当天笔记写成可发布片段', done: false }
+    ]
+  };
+}
+
+function readStudyState() {
+  const stored = readStoredJson(STUDY_ASSISTANT_KEY, createDefaultStudyState());
+  return {
+    tasks: Array.isArray(stored.tasks) && stored.tasks.length ? stored.tasks : createDefaultStudyState().tasks
+  };
+}
+
+const writingTemplates = [
+  {
+    id: 'project-retro',
+    title: '项目复盘',
+    category: '项目复盘',
+    tags: '项目, 复盘, VibeCoding',
+    summary: '记录一个项目从想法、实现到上线的关键决策和下一步。',
+    content: `## 背景
+这个项目想解决什么问题？
+
+## 今天推进了什么
+-
+
+## 遇到的坑
+-
+
+## 学到的东西
+-
+
+## 下一步
+- `
+  },
+  {
+    id: 'paper-note',
+    title: '论文阅读',
+    category: '科研笔记',
+    tags: '论文, 科研, 方法',
+    summary: '用问题、方法、实验和启发四段式整理论文阅读笔记。',
+    content: `## 论文信息
+- 标题：
+- 方向：
+
+## 它想解决什么问题
+
+## 核心方法
+
+## 实验和结论
+
+## 对我的启发`
+  },
+  {
+    id: 'vuln-analysis',
+    title: '漏洞分析',
+    category: '安全学习',
+    tags: '安全, 漏洞, 复现',
+    summary: '记录一次漏洞学习或靶场复现，保留环境、触发点和修复建议。',
+    content: `## 目标和环境
+
+## 触发条件
+
+## 复现过程
+
+## 根因分析
+
+## 修复建议
+
+## 延伸阅读`
+  },
+  {
+    id: 'weekly-review',
+    title: '学习周报',
+    category: '学习笔记',
+    tags: '周报, 计划, 总结',
+    summary: '把一周学习、项目、阅读和下周计划压缩成可追踪记录。',
+    content: `## 本周完成
+-
+
+## 最有价值的一件事
+
+## 消耗时间最多的地方
+
+## 下周计划
+- `
+  }
+];
+
 const releaseRoadmap = [
+  {
+    version: 'v2.6',
+    title: '后台工具扩展',
+    date: '2026-08-03',
+    status: '已上线',
+    points: ['AI 配置支持前端保存、停用和删除', '写作模板库和草稿版本历史', '备份中心、群聊语料和学习助手', '前端错误日志和容器状态面板']
+  },
   {
     version: 'v2.5',
     title: '运维稳定性',
@@ -515,8 +657,18 @@ function App() {
     model: '',
     apiKey: ''
   });
+  const [aiConfigForm, setAiConfigForm] = useState({
+    providerName: 'OpenAI Compatible',
+    apiStyle: 'openai',
+    baseUrl: '',
+    model: '',
+    apiKey: '',
+    timeout: 25,
+    enabled: true
+  });
   const [aiTestMessage, setAiTestMessage] = useState('');
   const [isTestingAi, setIsTestingAi] = useState(false);
+  const [isSavingAiSettings, setIsSavingAiSettings] = useState(false);
   const [authToken, setAuthToken] = useState(readStoredAuthToken);
   const [currentUser, setCurrentUser] = useState(readStoredUser);
   const [authMode, setAuthMode] = useState('login');
@@ -775,10 +927,21 @@ function App() {
       if (response.ok) {
         const payload = await response.json();
         setAiSettings(payload);
+        setAiConfigForm((current) => ({
+          ...current,
+          providerName: payload.provider || current.providerName || 'OpenAI Compatible',
+          apiStyle: payload.apiStyle || current.apiStyle || 'openai',
+          baseUrl: payload.baseUrl || current.baseUrl || '',
+          model: payload.model || current.model || '',
+          apiKey: '',
+          timeout: payload.timeout || current.timeout || 25,
+          enabled: payload.enabled ?? current.enabled
+        }));
         setAiTestForm((current) => ({
           ...current,
           providerName: current.providerName || payload.provider || '',
           apiStyle: current.apiStyle || payload.apiStyle || 'openai',
+          baseUrl: current.baseUrl || payload.baseUrl || '',
           model: current.model || payload.model || ''
         }));
       }
@@ -835,6 +998,110 @@ function App() {
       setAiTestMessage('后端服务不可用，无法测试 AI 配置');
     } finally {
       setIsTestingAi(false);
+    }
+  }
+
+  async function testAiConfigSettings(event) {
+    event?.preventDefault();
+    if (currentUser?.role !== 'admin') return;
+    setIsTestingAi(true);
+    setAiTestMessage('正在用当前表单测试 AI...');
+    try {
+      const response = await fetch('/api/admin/ai/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify(aiConfigForm)
+      });
+      const payload = await response.json().catch(() => ({}));
+      setAiTestMessage(payload.message || (response.ok ? '测试完成' : '测试失败'));
+    } catch {
+      setAiTestMessage('后端服务不可用，无法测试 AI 配置');
+    } finally {
+      setIsTestingAi(false);
+    }
+  }
+
+  async function saveAiSettings(event) {
+    event?.preventDefault();
+    if (currentUser?.role !== 'admin') return;
+    setIsSavingAiSettings(true);
+    setAiTestMessage('正在保存 AI 配置...');
+    try {
+      const response = await fetch('/api/admin/ai/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify(aiConfigForm)
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setAiTestMessage(payload.detail || 'AI 配置保存失败');
+        return;
+      }
+      setAiSettings(payload);
+      setAiConfigForm((current) => ({ ...current, apiKey: '' }));
+      setAiTestMessage('AI 配置已保存，写作助手会优先使用真实模型');
+      await refreshAdminAuditLogs();
+    } catch {
+      setAiTestMessage('后端服务不可用，无法保存 AI 配置');
+    } finally {
+      setIsSavingAiSettings(false);
+    }
+  }
+
+  async function disableAiSettings() {
+    if (currentUser?.role !== 'admin') return;
+    setIsSavingAiSettings(true);
+    try {
+      const response = await fetch('/api/admin/ai/settings/disable', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok) {
+        setAiSettings(payload);
+        setAiConfigForm((current) => ({ ...current, enabled: false, apiKey: '' }));
+        setAiTestMessage('AI 已停用，写作助手会回到本地模板');
+        await refreshAdminAuditLogs();
+      } else {
+        setAiTestMessage(payload.detail || 'AI 停用失败');
+      }
+    } catch {
+      setAiTestMessage('后端服务不可用，无法停用 AI');
+    } finally {
+      setIsSavingAiSettings(false);
+    }
+  }
+
+  async function deleteAiSettings() {
+    if (currentUser?.role !== 'admin') return;
+    if (!window.confirm('确定删除后台保存的 AI 配置吗？删除后需要重新填写 API Key。')) return;
+    setIsSavingAiSettings(true);
+    try {
+      const response = await fetch('/api/admin/ai/settings', {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok) {
+        setAiSettings(payload);
+        setAiConfigForm({
+          providerName: 'OpenAI Compatible',
+          apiStyle: 'openai',
+          baseUrl: '',
+          model: '',
+          apiKey: '',
+          timeout: 25,
+          enabled: true
+        });
+        setAiTestMessage('AI 配置已删除');
+        await refreshAdminAuditLogs();
+      } else {
+        setAiTestMessage(payload.detail || 'AI 配置删除失败');
+      }
+    } catch {
+      setAiTestMessage('后端服务不可用，无法删除 AI 配置');
+    } finally {
+      setIsSavingAiSettings(false);
     }
   }
 
@@ -1770,6 +2037,7 @@ function App() {
             isLoadingUploadedImages={isLoadingUploadedImages}
             articleDraftNotice={articleDraftNotice}
             adminMessage={adminMessage}
+            setAdminMessage={setAdminMessage}
             adminStats={adminStats}
             adminAuditLogs={adminAuditLogs}
             isLoadingAuditLogs={isLoadingAuditLogs}
@@ -1778,9 +2046,16 @@ function App() {
             aiSettings={aiSettings}
             aiTestForm={aiTestForm}
             setAiTestForm={setAiTestForm}
+            aiConfigForm={aiConfigForm}
+            setAiConfigForm={setAiConfigForm}
             aiTestMessage={aiTestMessage}
             isTestingAi={isTestingAi}
+            isSavingAiSettings={isSavingAiSettings}
             testAiSettings={testAiSettings}
+            testAiConfigSettings={testAiConfigSettings}
+            saveAiSettings={saveAiSettings}
+            disableAiSettings={disableAiSettings}
+            deleteAiSettings={deleteAiSettings}
             refreshAiSettings={refreshAiSettings}
             aiGenerationHistory={aiGenerationHistory}
             submitArticleForm={submitArticleForm}
@@ -4031,6 +4306,7 @@ function AdminWorkspace({
   isLoadingUploadedImages,
   articleDraftNotice,
   adminMessage,
+  setAdminMessage,
   adminStats,
   adminAuditLogs,
   isLoadingAuditLogs,
@@ -4039,9 +4315,16 @@ function AdminWorkspace({
   aiSettings,
   aiTestForm,
   setAiTestForm,
+  aiConfigForm,
+  setAiConfigForm,
   aiTestMessage,
   isTestingAi,
+  isSavingAiSettings,
   testAiSettings,
+  testAiConfigSettings,
+  saveAiSettings,
+  disableAiSettings,
+  deleteAiSettings,
   refreshAiSettings,
   aiGenerationHistory,
   submitArticleForm,
@@ -4118,7 +4401,10 @@ function AdminWorkspace({
     { id: 'media', label: '图片', detail: '上传资源和插入正文', icon: ImageIcon, count: `${uploadedImages.length} 张` },
     { id: 'comments', label: '评论', detail: '筛选、通过、删除', icon: MessageCircle, count: pendingCommentCount ? `${pendingCommentCount} 待审` : `${adminComments.length} 条` },
     { id: 'security', label: '安全', detail: '操作日志和删除保护', icon: ShieldCheck, count: `${adminAuditLogs.length} 条` },
-    { id: 'ai', label: 'AI', detail: '模型配置和测试', icon: Bot, count: aiSettings?.configured ? '已配置' : '待配置' }
+    { id: 'ai', label: 'AI', detail: '模型配置、测试和模板', icon: Bot, count: aiSettings?.configured ? '已配置' : '待配置' },
+    { id: 'backups', label: '备份', detail: '备份记录和恢复清单', icon: Save, count: '本地记录' },
+    { id: 'corpus', label: '群聊语料', detail: '微信 bot 训练样本', icon: MessageCircle, count: '样本库' },
+    { id: 'study', label: '学习助手', detail: '目标、清单、复盘', icon: CheckCircle2, count: '每日' }
   ];
   const contentTextareaRef = useRef(null);
   const [aiInsertMode, setAiInsertMode] = useState('append');
@@ -4129,6 +4415,14 @@ function AdminWorkspace({
   const [articleManagerCategory, setArticleManagerCategory] = useState('all');
   const [imageManagerQuery, setImageManagerQuery] = useState('');
   const [imageManagerSort, setImageManagerSort] = useState('newest');
+  const [draftHistory, setDraftHistory] = useState(readDraftHistory);
+  const [frontendErrorLogs, setFrontendErrorLogs] = useState(readFrontendErrorLogs);
+  const [backupRecords, setBackupRecords] = useState(readBackupRecords);
+  const [backupNote, setBackupNote] = useState('');
+  const [botCorpusSamples, setBotCorpusSamples] = useState(readBotCorpusSamples);
+  const [corpusInput, setCorpusInput] = useState('');
+  const [studyState, setStudyState] = useState(readStudyState);
+  const [studyInput, setStudyInput] = useState('');
   const shouldShowAdminLayout = ['editor', 'articles', 'media', 'comments'].includes(activeAdminPage);
 
   useEffect(() => {
@@ -4215,6 +4509,33 @@ function AdminWorkspace({
       page: 'ai',
       tone: aiSettings?.configured ? 'ready' : 'attention',
       icon: Bot
+    },
+    {
+      id: 'backups',
+      title: backupRecords.length ? '备份有记录' : '建议做一次备份',
+      detail: backupRecords.length ? `最近记录：${new Date(backupRecords[0].createdAt).toLocaleString('zh-CN', { hour12: false })}` : '大改和上线前最好留一条备份记录',
+      action: '备份中心',
+      page: 'backups',
+      tone: backupRecords.length ? 'ready' : 'attention',
+      icon: Save
+    },
+    {
+      id: 'corpus',
+      title: '群聊 bot 语料',
+      detail: `已保存 ${botCorpusSamples.length} 组群聊样本，可继续贴聊天文本做风格分析`,
+      action: '整理语料',
+      page: 'corpus',
+      tone: botCorpusSamples.length ? 'ready' : 'neutral',
+      icon: MessageCircle
+    },
+    {
+      id: 'study',
+      title: '学习助手',
+      detail: `今日完成 ${studyState.tasks.filter((task) => task.done).length} / ${studyState.tasks.length} 项`,
+      action: '看清单',
+      page: 'study',
+      tone: studyState.tasks.every((task) => task.done) ? 'ready' : 'neutral',
+      icon: CheckCircle2
     }
   ];
 
@@ -4275,6 +4596,157 @@ function AdminWorkspace({
   function handleInsertUploadedImage(image) {
     insertImageMarkdown(image.url, image.filename);
     setActiveAdminPage('editor');
+  }
+
+  function saveDraftSnapshot(reason = '手动快照') {
+    if (!hasArticleDraftContent(articleForm)) {
+      setAdminMessage('当前文章还没有可保存的草稿内容');
+      return;
+    }
+    const snapshot = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      title: articleForm.title || '未命名草稿',
+      reason,
+      createdAt: new Date().toISOString(),
+      wordCount: (articleForm.content || '').trim().length,
+      editingArticleId,
+      form: { ...articleForm }
+    };
+    const next = [snapshot, ...draftHistory].slice(0, 12);
+    setDraftHistory(next);
+    writeStoredJson(ARTICLE_DRAFT_HISTORY_KEY, next);
+    setAdminMessage('已保存一份草稿版本');
+  }
+
+  function restoreDraftSnapshot(snapshot) {
+    Object.entries(snapshot.form || {}).forEach(([field, value]) => updateArticleForm(field, value));
+    setAdminMessage(`已恢复草稿版本：${snapshot.title}`);
+    openAdminPage('editor');
+  }
+
+  function applyWritingTemplate(template) {
+    if (!articleForm.title.trim()) updateArticleForm('title', template.title);
+    if (!articleForm.summary.trim()) updateArticleForm('summary', template.summary);
+    if (!articleForm.category.trim()) updateArticleForm('category', template.category);
+    const existingTags = articleForm.tags
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+    const templateTags = template.tags.split(',').map((tag) => tag.trim()).filter(Boolean);
+    updateArticleForm('tags', Array.from(new Set([...existingTags, ...templateTags])).join(', '));
+    insertContentSnippet(`${articleForm.content.trim() ? '\n\n' : ''}${template.content}`);
+    setAdminMessage(`已套用模板：${template.title}`);
+  }
+
+  function refreshFrontendErrorLogs() {
+    setFrontendErrorLogs(readFrontendErrorLogs());
+  }
+
+  function clearFrontendErrorLogs() {
+    writeStoredJson(FRONTEND_ERROR_LOG_KEY, []);
+    setFrontendErrorLogs([]);
+    setAdminMessage('前端错误日志已清空');
+  }
+
+  function recordBackup() {
+    const record = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      note: backupNote.trim() || '手动备份检查',
+      createdAt: new Date().toISOString(),
+      items: ['数据库', '上传图片', 'AI 配置', '部署脚本']
+    };
+    const next = [record, ...backupRecords].slice(0, 16);
+    setBackupRecords(next);
+    writeStoredJson(BACKUP_CENTER_KEY, next);
+    setBackupNote('');
+    setAdminMessage('已记录一次备份检查');
+  }
+
+  function deleteBackupRecord(recordId) {
+    const next = backupRecords.filter((record) => record.id !== recordId);
+    setBackupRecords(next);
+    writeStoredJson(BACKUP_CENTER_KEY, next);
+  }
+
+  function saveCorpusSample() {
+    const lines = corpusInput
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (lines.length < 2) {
+      setAdminMessage('至少粘贴两行群聊文本再保存样本');
+      return;
+    }
+    const speakers = Array.from(new Set(
+      lines
+        .map((line) => line.split(/[:：]/)[0]?.trim())
+        .filter((name) => name && name.length <= 12 && !/\d{4}[-/]\d{1,2}/.test(name))
+    )).slice(0, 8);
+    const anonymized = lines.slice(0, 8).map((line) => {
+      let nextLine = line;
+      speakers.forEach((speaker, index) => {
+        nextLine = nextLine.replaceAll(speaker, `群友${index + 1}`);
+      });
+      return nextLine;
+    });
+    const sample = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      createdAt: new Date().toISOString(),
+      lineCount: lines.length,
+      speakers,
+      preview: anonymized.join('\n'),
+      rawText: corpusInput
+    };
+    const next = [sample, ...botCorpusSamples].slice(0, 12);
+    setBotCorpusSamples(next);
+    writeStoredJson(BOT_CORPUS_KEY, next);
+    setCorpusInput('');
+    setAdminMessage('群聊语料样本已保存');
+  }
+
+  function deleteCorpusSample(sampleId) {
+    const next = botCorpusSamples.filter((sample) => sample.id !== sampleId);
+    setBotCorpusSamples(next);
+    writeStoredJson(BOT_CORPUS_KEY, next);
+  }
+
+  function updateStudyState(updater) {
+    setStudyState((current) => {
+      const next = updater(current);
+      writeStoredJson(STUDY_ASSISTANT_KEY, next);
+      return next;
+    });
+  }
+
+  function toggleStudyTask(taskId) {
+    updateStudyState((current) => ({
+      ...current,
+      tasks: current.tasks.map((task) => (task.id === taskId ? { ...task, done: !task.done } : task))
+    }));
+  }
+
+  function addStudyTask() {
+    const title = studyInput.trim();
+    if (!title) return;
+    updateStudyState((current) => ({
+      ...current,
+      tasks: [
+        ...current.tasks,
+        {
+          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          title,
+          detail: '自定义学习任务',
+          done: false
+        }
+      ]
+    }));
+    setStudyInput('');
+  }
+
+  function resetStudyTasks() {
+    const next = createDefaultStudyState();
+    setStudyState(next);
+    writeStoredJson(STUDY_ASSISTANT_KEY, next);
   }
 
   return (
@@ -4364,6 +4836,18 @@ function AdminWorkspace({
               <button className="ghost-button" type="button" onClick={() => openAdminPage('security')}>
                 <ShieldCheck size={17} />
                 <span>安全日志</span>
+              </button>
+              <button className="ghost-button" type="button" onClick={() => openAdminPage('backups')}>
+                <Save size={17} />
+                <span>备份中心</span>
+              </button>
+              <button className="ghost-button" type="button" onClick={() => openAdminPage('corpus')}>
+                <MessageCircle size={17} />
+                <span>群聊语料</span>
+              </button>
+              <button className="ghost-button" type="button" onClick={() => openAdminPage('study')}>
+                <CheckCircle2 size={17} />
+                <span>学习助手</span>
               </button>
             </div>
             <div className="admin-task-grid">
@@ -4503,16 +4987,89 @@ function AdminWorkspace({
       {activeAdminPage === 'ai' && (
       <section className="admin-panel ai-settings-panel">
         <div className="admin-panel-heading">
-          <h2>AI 设置和测试</h2>
+          <div>
+            <h2>AI 设置和测试</h2>
+            <span>保存后写作助手会直接使用真实模型；停用后回到本地模板</span>
+          </div>
           <button className="ghost-button" type="button" onClick={refreshAiSettings}>
             <RefreshCw size={16} />
             <span>读取配置</span>
           </button>
         </div>
         <div className={aiSettings?.configured ? 'ai-status ready' : 'ai-status'}>
-          <span>{aiSettings?.configured ? '真实模型已配置' : '真实模型未完整配置'}</span>
+          <span>{aiSettings?.configured ? '真实模型已启用' : aiSettings?.saved ? 'AI 已保存但未启用' : '真实模型未完整配置'}</span>
           <strong>{aiSettings?.provider || 'local-placeholder'} · {aiSettings?.model || '未配置'}</strong>
-          <p>{aiSettings?.note || '密钥不会从接口返回；请用一次性测试框验证真实模型。'}</p>
+          <p>{aiSettings?.note || '密钥不会从接口返回；保存后写作接口会优先使用后台配置。'}</p>
+          <small>{aiSettings?.apiKeyConfigured ? `已保存密钥 ${aiSettings.apiKeyTail || ''}` : '未保存密钥'} · {aiSettings?.source || '未配置'}</small>
+        </div>
+        <form className="ai-config-form" onSubmit={saveAiSettings}>
+          <input
+            value={aiConfigForm.providerName}
+            onChange={(event) => setAiConfigForm((current) => ({ ...current, providerName: event.target.value }))}
+            placeholder="Provider 名称"
+          />
+          <select
+            value={aiConfigForm.apiStyle}
+            onChange={(event) => setAiConfigForm((current) => ({ ...current, apiStyle: event.target.value }))}
+            aria-label="AI 接口类型"
+          >
+            <option value="openai">OpenAI 兼容</option>
+            <option value="codex">Codex 中转</option>
+          </select>
+          <input
+            value={aiConfigForm.baseUrl}
+            onChange={(event) => setAiConfigForm((current) => ({ ...current, baseUrl: event.target.value }))}
+            placeholder="Base URL，例如 https://api.openai.com/v1 或 Codex 中转地址"
+          />
+          <input
+            value={aiConfigForm.model}
+            onChange={(event) => setAiConfigForm((current) => ({ ...current, model: event.target.value }))}
+            placeholder="模型名"
+          />
+          <input
+            type="password"
+            value={aiConfigForm.apiKey}
+            onChange={(event) => setAiConfigForm((current) => ({ ...current, apiKey: event.target.value }))}
+            placeholder={aiSettings?.apiKeyConfigured ? '留空表示继续使用已保存密钥' : 'API Key'}
+          />
+          <input
+            type="number"
+            min="5"
+            max="120"
+            value={aiConfigForm.timeout}
+            onChange={(event) => setAiConfigForm((current) => ({ ...current, timeout: Number(event.target.value) || 25 }))}
+            placeholder="超时秒数"
+          />
+          <label className="checkbox-control">
+            <input
+              type="checkbox"
+              checked={aiConfigForm.enabled}
+              onChange={(event) => setAiConfigForm((current) => ({ ...current, enabled: event.target.checked }))}
+            />
+            <span>启用真实模型</span>
+          </label>
+          <div className="ai-config-actions">
+            <button className="primary-action" type="submit" disabled={isSavingAiSettings}>
+              <Save size={17} />
+              <span>{isSavingAiSettings ? '保存中' : '保存配置'}</span>
+            </button>
+            <button className="ghost-button" type="button" onClick={testAiConfigSettings} disabled={isTestingAi}>
+              <Bot size={17} />
+              <span>{isTestingAi ? '测试中' : '测试当前表单'}</span>
+            </button>
+            <button className="ghost-button" type="button" onClick={disableAiSettings} disabled={isSavingAiSettings}>
+              <X size={17} />
+              <span>停用</span>
+            </button>
+            <button className="danger-button" type="button" onClick={deleteAiSettings} disabled={isSavingAiSettings}>
+              <Trash2 size={17} />
+              <span>删除配置</span>
+            </button>
+          </div>
+        </form>
+        <div className="admin-panel-heading compact-heading">
+          <h3>一次性测试</h3>
+          <span>只验证，不保存</span>
         </div>
         <form className="ai-test-form" onSubmit={testAiSettings}>
           <input
@@ -4520,18 +5077,10 @@ function AdminWorkspace({
             onChange={(event) => setAiTestForm((current) => ({ ...current, providerName: event.target.value }))}
             placeholder="Provider 名称"
           />
-          <select
-            value={aiTestForm.apiStyle}
-            onChange={(event) => setAiTestForm((current) => ({ ...current, apiStyle: event.target.value }))}
-            aria-label="AI 接口类型"
-          >
-            <option value="openai">OpenAI 兼容</option>
-            <option value="codex">Codex 中转</option>
-          </select>
           <input
             value={aiTestForm.baseUrl}
             onChange={(event) => setAiTestForm((current) => ({ ...current, baseUrl: event.target.value }))}
-            placeholder="Base URL，例如 https://api.openai.com/v1 或 Codex 中转地址"
+            placeholder="Base URL"
           />
           <input
             value={aiTestForm.model}
@@ -4551,6 +5100,178 @@ function AdminWorkspace({
         </form>
         {aiTestMessage && <p className="admin-message">{aiTestMessage}</p>}
       </section>
+      )}
+
+      {activeAdminPage === 'backups' && (
+        <section className="admin-panel utility-panel">
+          <div className="admin-panel-heading">
+            <div>
+              <h2>备份中心</h2>
+              <span>大改、上线、迁移前先确认数据和配置有退路</span>
+            </div>
+            <button className="primary-action" type="button" onClick={recordBackup}>
+              <Save size={17} />
+              <span>记录备份</span>
+            </button>
+          </div>
+          <div className="release-metric-grid">
+            <div className="release-metric">
+              <span>备份记录</span>
+              <strong>{backupRecords.length}</strong>
+            </div>
+            <div className="release-metric">
+              <span>覆盖范围</span>
+              <strong>4 项</strong>
+            </div>
+            <div className="release-metric">
+              <span>最近记录</span>
+              <strong>{backupRecords[0] ? new Date(backupRecords[0].createdAt).toLocaleDateString('zh-CN') : '暂无'}</strong>
+            </div>
+          </div>
+          <div className="admin-filter-bar">
+            <input
+              value={backupNote}
+              onChange={(event) => setBackupNote(event.target.value)}
+              placeholder="这次备份的备注，例如：v2.6 上线前"
+              aria-label="备份备注"
+            />
+          </div>
+          <div className="security-rule-grid">
+            {[
+              ['数据库', '文章、评论、用户、AI 历史都在这里。'],
+              ['上传图片', '封面和正文图片使用 Docker volume 保存。'],
+              ['AI 配置', '后台保存的 AI Key 位于后端持久目录。'],
+              ['部署脚本', 'GitHub Actions 和服务器脚本决定上线结果。']
+            ].map(([title, detail]) => (
+              <article key={title}>
+                <strong>{title}</strong>
+                <span>{detail}</span>
+              </article>
+            ))}
+          </div>
+          <div className="ops-list">
+            {backupRecords.length === 0 ? (
+              <p className="empty-state">暂无备份记录。真正执行备份仍在服务器脚本里，这里先作为上线前检查账本。</p>
+            ) : backupRecords.map((record) => (
+              <article className="ops-list-row" key={record.id}>
+                <div>
+                  <strong>{record.note}</strong>
+                  <span>{new Date(record.createdAt).toLocaleString('zh-CN', { hour12: false })}</span>
+                  <span>{record.items.join('、')}</span>
+                </div>
+                <button className="ghost-button" type="button" onClick={() => deleteBackupRecord(record.id)}>
+                  <X size={16} />
+                  <span>删除</span>
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {activeAdminPage === 'corpus' && (
+        <section className="admin-panel utility-panel">
+          <div className="admin-panel-heading">
+            <div>
+              <h2>微信群 bot 语料工作台</h2>
+              <span>直接粘贴聊天文本，先做匿名预览和样本整理</span>
+            </div>
+            <button className="primary-action" type="button" onClick={saveCorpusSample}>
+              <Save size={17} />
+              <span>保存样本</span>
+            </button>
+          </div>
+          <textarea
+            className="corpus-textarea"
+            value={corpusInput}
+            onChange={(event) => setCorpusInput(event.target.value)}
+            rows={8}
+            placeholder={'群友A：这东西感觉能做\n群友B：但是它会不会突然跑偏\n群友C：先把语料喂进去看看'}
+          />
+          <div className="release-metric-grid">
+            <div className="release-metric">
+              <span>样本组</span>
+              <strong>{botCorpusSamples.length}</strong>
+            </div>
+            <div className="release-metric">
+              <span>总行数</span>
+              <strong>{botCorpusSamples.reduce((sum, sample) => sum + sample.lineCount, 0)}</strong>
+            </div>
+            <div className="release-metric">
+              <span>下一步</span>
+              <strong>风格标签</strong>
+            </div>
+          </div>
+          <div className="ops-list">
+            {botCorpusSamples.length === 0 ? (
+              <p className="empty-state">暂无语料样本。建议先贴一小段已脱敏聊天，验证 bot 能不能抓到群友跳脱的风格。</p>
+            ) : botCorpusSamples.map((sample) => (
+              <article className="ops-list-row corpus-row" key={sample.id}>
+                <div>
+                  <strong>{sample.lineCount} 行 · {sample.speakers.length || '未知'} 位说话人</strong>
+                  <span>{new Date(sample.createdAt).toLocaleString('zh-CN', { hour12: false })}</span>
+                  <pre>{sample.preview}</pre>
+                </div>
+                <button className="ghost-button" type="button" onClick={() => deleteCorpusSample(sample.id)}>
+                  <X size={16} />
+                  <span>删除</span>
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {activeAdminPage === 'study' && (
+        <section className="admin-panel utility-panel">
+          <div className="admin-panel-heading">
+            <div>
+              <h2>学习助手</h2>
+              <span>把暑假学习、科研阅读和项目推进放进同一个每日清单</span>
+            </div>
+            <button className="ghost-button" type="button" onClick={resetStudyTasks}>
+              <RefreshCw size={16} />
+              <span>重置默认</span>
+            </button>
+          </div>
+          <div className="release-metric-grid">
+            <div className="release-metric">
+              <span>今日完成</span>
+              <strong>{studyState.tasks.filter((task) => task.done).length} / {studyState.tasks.length}</strong>
+            </div>
+            <div className="release-metric">
+              <span>推荐节奏</span>
+              <strong>番茄钟</strong>
+            </div>
+            <div className="release-metric">
+              <span>输出目标</span>
+              <strong>可发布笔记</strong>
+            </div>
+          </div>
+          <div className="admin-filter-bar">
+            <input
+              value={studyInput}
+              onChange={(event) => setStudyInput(event.target.value)}
+              placeholder="添加今天的新学习任务"
+              aria-label="添加学习任务"
+            />
+            <button className="primary-action" type="button" onClick={addStudyTask}>
+              <PlusCircle size={17} />
+              <span>添加</span>
+            </button>
+          </div>
+          <div className="study-task-list">
+            {studyState.tasks.map((task) => (
+              <label className={task.done ? 'study-task done' : 'study-task'} key={task.id}>
+                <input type="checkbox" checked={task.done} onChange={() => toggleStudyTask(task.id)} />
+                <span>
+                  <strong>{task.title}</strong>
+                  <em>{task.detail}</em>
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
       )}
 
       {activeAdminPage === 'security' && (
@@ -4579,6 +5300,37 @@ function AdminWorkspace({
               <strong>后台接口权限</strong>
               <span>后台接口都需要管理员 Token。</span>
             </article>
+          </div>
+
+          <div className="admin-panel-heading compact-heading">
+            <div>
+              <h3>前端错误日志</h3>
+              <span>页面卡住后会记录到浏览器本地，方便回后台定位</span>
+            </div>
+            <div className="manager-actions">
+              <button className="ghost-button" type="button" onClick={refreshFrontendErrorLogs}>
+                <RefreshCw size={16} />
+                <span>读取</span>
+              </button>
+              <button className="ghost-button" type="button" onClick={clearFrontendErrorLogs}>
+                <X size={16} />
+                <span>清空</span>
+              </button>
+            </div>
+          </div>
+          <div className="ops-list">
+            {frontendErrorLogs.length === 0 ? (
+              <p className="empty-state">暂无前端错误记录</p>
+            ) : frontendErrorLogs.map((errorLog) => (
+              <article className="ops-list-row" key={errorLog.id || errorLog.createdAt}>
+                <div>
+                  <strong>{errorLog.message || '未知错误'}</strong>
+                  <span>{new Date(errorLog.createdAt).toLocaleString('zh-CN', { hour12: false })} · {errorLog.url || '当前页面'}</span>
+                  {errorLog.componentStack && <span>{String(errorLog.componentStack).split('\n').filter(Boolean)[0]}</span>}
+                </div>
+                <code>frontend</code>
+              </article>
+            ))}
           </div>
 
           <div className="ops-list">
@@ -4629,6 +5381,28 @@ function AdminWorkspace({
               </div>
             </div>
           )}
+
+          <section className="mini-workbench">
+            <div className="admin-panel-heading compact-heading">
+              <div>
+                <h3>写作模板库</h3>
+                <span>先铺结构，再交给 AI 润色或续写</span>
+              </div>
+              <button className="ghost-button" type="button" onClick={() => saveDraftSnapshot('套模板前快照')}>
+                <Save size={16} />
+                <span>保存快照</span>
+              </button>
+            </div>
+            <div className="template-grid">
+              {writingTemplates.map((template) => (
+                <button className="template-card" key={template.id} type="button" onClick={() => applyWritingTemplate(template)}>
+                  <strong>{template.title}</strong>
+                  <span>{template.summary}</span>
+                  <small>{template.category}</small>
+                </button>
+              ))}
+            </div>
+          </section>
 
           <label>
             <span>标题</span>
@@ -4938,6 +5712,28 @@ function AdminWorkspace({
                       <span>撤回</span>
                     </button>
                   )}
+                </article>
+              ))}
+            </div>
+          )}
+          <div className="admin-panel-heading compact-heading">
+            <h3>草稿版本历史</h3>
+            <span>{draftHistory.length} 份</span>
+          </div>
+          {draftHistory.length === 0 ? (
+            <p className="empty-state">可以在写作模板区手动保存快照</p>
+          ) : (
+            <div className="ai-history-list">
+              {draftHistory.map((snapshot) => (
+                <article className="ai-history-item" key={snapshot.id}>
+                  <div>
+                    <strong>{snapshot.title}</strong>
+                    <span>{snapshot.reason} · {snapshot.wordCount} 字 · {new Date(snapshot.createdAt).toLocaleString('zh-CN', { hour12: false })}</span>
+                  </div>
+                  <button className="ghost-button" type="button" onClick={() => restoreDraftSnapshot(snapshot)}>
+                    <RefreshCw size={16} />
+                    <span>恢复</span>
+                  </button>
                 </article>
               ))}
             </div>
