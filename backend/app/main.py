@@ -4,7 +4,7 @@ import os
 import re
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import Any, Literal
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -30,7 +30,7 @@ from app.auth import (
 )
 from app.database import SessionLocal, get_db, init_db
 from app.github_oauth import fetch_github_identity, get_github_authorize_url
-from app.models import AiGeneration, Article, Comment, ReactionCounter, Tag, User, UserReaction
+from app.models import AiGeneration, Article, Comment, ReactionCounter, SummerPlan, Tag, User, UserReaction
 from app.seed import REACTION_TYPES, seed_database
 
 
@@ -100,6 +100,57 @@ AI_NEWS = [
     },
 ]
 
+DEFAULT_SUMMER_PLAN: dict[str, Any] = {
+    "profile": {
+        "name": "付江樊",
+        "identity": "浙江大学准大二",
+        "range": "2026-08-04 至 2026-08-15",
+        "theme": "期末冲刺式预习 + 规律生活记录",
+    },
+    "goals": {
+        "study": "穿插预习高级数据结构与算法分析、计算机组成、大学物理（乙）Ⅱ、概率论与数理统计，按期末冲刺节奏推进。",
+        "body": "游泳、快走、室内燃脂轮换，保持体重、饮食、睡眠可追踪。",
+        "life": "保留游戏、看番、阅读时间，严格控制 B 站和小红书。"
+    },
+    "daily": [
+        {"id": "day-0804", "date": "8月4日", "study": "高级数据结构与算法分析：复杂度、堆、并查集预热", "exercise": "快走 40 分钟", "rest": "红与黑 30 页", "note": ""},
+        {"id": "day-0805", "date": "8月5日", "study": "计算机组成：数据表示、定点与浮点运算", "exercise": "室内燃脂 25 分钟", "rest": "葬送的芙莉莲 1 集", "note": ""},
+        {"id": "day-0806", "date": "8月6日", "study": "概率论与数理统计：随机变量、分布函数", "exercise": "游泳", "rest": "以撒的结合 45 分钟", "note": ""},
+        {"id": "day-0807", "date": "8月7日", "study": "大学物理（乙）Ⅱ：电场、电势、电容", "exercise": "快走 45 分钟", "rest": "红与黑 30 页", "note": ""},
+        {"id": "day-0808", "date": "8月8日", "study": "高级数据结构与算法分析：图论基础、最短路预习", "exercise": "室内燃脂 25 分钟", "rest": "第五人格 45 分钟", "note": ""},
+        {"id": "day-0809", "date": "8月9日", "study": "计算机组成：指令系统、CPU 数据通路", "exercise": "游泳", "rest": "葬送的芙莉莲 1 集", "note": ""},
+        {"id": "day-0810", "date": "8月10日", "study": "概率论与数理统计：期望、方差、常见分布", "exercise": "快走 40 分钟", "rest": "红与黑 30 页", "note": ""},
+        {"id": "day-0811", "date": "8月11日", "study": "大学物理（乙）Ⅱ：稳恒磁场、电磁感应", "exercise": "室内燃脂 30 分钟", "rest": "以撒的结合 45 分钟", "note": ""},
+        {"id": "day-0812", "date": "8月12日", "study": "高级数据结构与算法分析：平衡树、哈希、摊还分析", "exercise": "游泳", "rest": "葬送的芙莉莲 1 集", "note": ""},
+        {"id": "day-0813", "date": "8月13日", "study": "计算机组成：流水线、存储层次", "exercise": "快走 45 分钟", "rest": "第五人格 45 分钟", "note": ""},
+        {"id": "day-0814", "date": "8月14日", "study": "概率论与数理统计 + 大物：做一轮综合回顾", "exercise": "室内燃脂 25 分钟", "rest": "红与黑 30 页", "note": ""},
+        {"id": "day-0815", "date": "8月15日", "study": "四门课整理清单：下学期第一周预习交接", "exercise": "轻松快走 30 分钟", "rest": "自由复盘", "note": ""},
+    ],
+    "courses": [
+        {"id": "course-ads", "name": "高级数据结构与算法分析", "target": "先建立期末冲刺式目录感，能看懂主要题型", "progress": "0%"},
+        {"id": "course-co", "name": "计算机组成", "target": "理解数据表示、指令、CPU、存储层次主线", "progress": "0%"},
+        {"id": "course-physics", "name": "大学物理（乙）Ⅱ", "target": "电磁学核心概念先过一轮", "progress": "0%"},
+        {"id": "course-prob", "name": "概率论与数理统计", "target": "随机变量、分布、期望方差、统计基础预热", "progress": "0%"},
+    ],
+    "apps": [
+        {"id": "app-wechat", "name": "微信", "limit": "90 分钟", "actual": ""},
+        {"id": "app-bilibili", "name": "B 站", "limit": "30 分钟", "actual": ""},
+        {"id": "app-rednote", "name": "小红书", "limit": "20 分钟", "actual": ""},
+    ],
+    "expenses": [
+        {"id": "expense-1", "date": "8月4日", "item": "餐饮", "amount": "", "note": ""},
+    ],
+    "meals": [
+        {"id": "meal-1", "date": "8月4日", "breakfast": "", "lunch": "", "dinner": "", "snack": ""},
+    ],
+    "bodyMetrics": [
+        {"id": "body-1", "date": "8月4日", "weight": "", "waist": "", "exercise": "", "mood": ""},
+    ],
+    "sleep": [
+        {"id": "sleep-1", "date": "8月4日", "bed": "", "wake": "", "hours": "", "quality": ""},
+    ],
+}
+
 
 class CommentIn(BaseModel):
     content: str
@@ -123,6 +174,10 @@ class ArticleIn(BaseModel):
     status: Literal["published", "draft"] = "published"
     category: str = "学习笔记"
     pinned: bool = False
+
+
+class SummerPlanIn(BaseModel):
+    payload: dict[str, Any]
 
 
 class RegisterIn(BaseModel):
@@ -178,6 +233,29 @@ def health(db: Session = Depends(get_db)) -> dict[str, str | int]:
 @app.get("/api/profile")
 def get_profile() -> dict:
     return PROFILE
+
+
+@app.get("/api/summer-plan")
+def get_summer_plan(db: Session = Depends(get_db)) -> dict[str, Any]:
+    plan = db.get(SummerPlan, "current")
+    return plan.payload if plan else DEFAULT_SUMMER_PLAN
+
+
+@app.put("/api/admin/summer-plan")
+def update_summer_plan(
+    payload: SummerPlanIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict[str, Any]:
+    plan = db.get(SummerPlan, "current")
+    if not plan:
+        plan = SummerPlan(key="current", payload=payload.payload)
+        db.add(plan)
+    else:
+        plan.payload = payload.payload
+    db.commit()
+    db.refresh(plan)
+    return plan.payload
 
 
 @app.get("/api/articles")

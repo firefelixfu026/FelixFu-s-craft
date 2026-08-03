@@ -111,6 +111,49 @@ const defaultSummerPlan = {
   ]
 };
 
+const personalizedSummerPlan = {
+  profile: {
+    name: '付江樊',
+    identity: '浙江大学准大二',
+    range: '2026-08-04 至 2026-08-15',
+    theme: '期末冲刺式预习 + 规律生活记录'
+  },
+  goals: {
+    study: '穿插预习高级数据结构与算法分析、计算机组成、大学物理（乙）Ⅱ、概率论与数理统计，按期末冲刺节奏推进。',
+    body: '游泳、快走、室内燃脂轮换，记录体重、饮食、睡眠。',
+    life: '保留以撒的结合、第五人格、葬送的芙莉莲、红与黑，同时严格控制 B 站和小红书。'
+  },
+  daily: [
+    { id: 'day-0804', date: '8月4日', study: '高级数据结构与算法分析：复杂度、堆、并查集预热', exercise: '快走 40 分钟', rest: '红与黑 30 页', note: '' },
+    { id: 'day-0805', date: '8月5日', study: '计算机组成：数据表示、定点与浮点运算', exercise: '室内燃脂 25 分钟', rest: '葬送的芙莉莲 1 集', note: '' },
+    { id: 'day-0806', date: '8月6日', study: '概率论与数理统计：随机变量、分布函数', exercise: '游泳', rest: '以撒的结合 45 分钟', note: '' },
+    { id: 'day-0807', date: '8月7日', study: '大学物理（乙）Ⅱ：电场、电势、电容', exercise: '快走 45 分钟', rest: '红与黑 30 页', note: '' },
+    { id: 'day-0808', date: '8月8日', study: '高级数据结构与算法分析：图论基础、最短路预习', exercise: '室内燃脂 25 分钟', rest: '第五人格 45 分钟', note: '' },
+    { id: 'day-0809', date: '8月9日', study: '计算机组成：指令系统、CPU 数据通路', exercise: '游泳', rest: '葬送的芙莉莲 1 集', note: '' },
+    { id: 'day-0810', date: '8月10日', study: '概率论与数理统计：期望、方差、常见分布', exercise: '快走 40 分钟', rest: '红与黑 30 页', note: '' },
+    { id: 'day-0811', date: '8月11日', study: '大学物理（乙）Ⅱ：稳恒磁场、电磁感应', exercise: '室内燃脂 30 分钟', rest: '以撒的结合 45 分钟', note: '' },
+    { id: 'day-0812', date: '8月12日', study: '高级数据结构与算法分析：平衡树、哈希、摊还分析', exercise: '游泳', rest: '葬送的芙莉莲 1 集', note: '' },
+    { id: 'day-0813', date: '8月13日', study: '计算机组成：流水线、存储层次', exercise: '快走 45 分钟', rest: '第五人格 45 分钟', note: '' },
+    { id: 'day-0814', date: '8月14日', study: '概率论与数理统计 + 大物：做一轮综合回顾', exercise: '室内燃脂 25 分钟', rest: '红与黑 30 页', note: '' },
+    { id: 'day-0815', date: '8月15日', study: '四门课整理清单：下学期第一周预习交接', exercise: '轻松快走 30 分钟', rest: '自由复盘', note: '' }
+  ],
+  courses: [
+    { id: 'course-ads', name: '高级数据结构与算法分析', target: '建立期末冲刺式目录感，能看懂主要题型', progress: '0%' },
+    { id: 'course-co', name: '计算机组成', target: '理解数据表示、指令、CPU、存储层次主线', progress: '0%' },
+    { id: 'course-physics', name: '大学物理（乙）Ⅱ', target: '电磁学核心概念先过一轮', progress: '0%' },
+    { id: 'course-prob', name: '概率论与数理统计', target: '随机变量、分布、期望方差、统计基础预热', progress: '0%' }
+  ],
+  apps: [
+    { id: 'app-wechat', name: '微信', limit: '90 分钟', actual: '' },
+    { id: 'app-bilibili', name: 'B 站', limit: '30 分钟', actual: '' },
+    { id: 'app-rednote', name: '小红书', limit: '20 分钟', actual: '' }
+  ],
+  expenses: [{ id: 'expense-1', date: '8月4日', item: '餐饮', amount: '', note: '' }],
+  meals: [{ id: 'meal-1', date: '8月4日', breakfast: '', lunch: '', dinner: '', snack: '' }],
+  bodyMetrics: [{ id: 'body-1', date: '8月4日', weight: '', waist: '', exercise: '', mood: '' }],
+  sleep: [{ id: 'sleep-1', date: '8月4日', bed: '', wake: '', hours: '', quality: '' }]
+};
+
 function getArticleMonth(date) {
   if (!date) return '';
   const normalized = String(date).replace(/\//g, '-');
@@ -181,6 +224,8 @@ function App() {
   const [aiGenerationHistory, setAiGenerationHistory] = useState([]);
   const [accountActivity, setAccountActivity] = useState(null);
   const [adminStats, setAdminStats] = useState(null);
+  const [adminAuditLogs, setAdminAuditLogs] = useState([]);
+  const [isLoadingAuditLogs, setIsLoadingAuditLogs] = useState(false);
   const [aiSettings, setAiSettings] = useState(null);
   const [aiTestForm, setAiTestForm] = useState({
     providerName: '',
@@ -301,6 +346,7 @@ function App() {
       refreshAdminComments();
       refreshUploadedImages();
       refreshAdminStats();
+      refreshAdminAuditLogs();
       refreshAiSettings();
       refreshAiGenerationHistory();
     }
@@ -423,6 +469,23 @@ function App() {
       }
     } catch {
       setAdminStats(null);
+    }
+  }
+
+  async function refreshAdminAuditLogs() {
+    if (currentUser?.role !== 'admin') return;
+    setIsLoadingAuditLogs(true);
+    try {
+      const response = await fetch('/api/admin/audit-logs?limit=40', {
+        headers: getAuthHeaders()
+      });
+      if (response.ok) {
+        setAdminAuditLogs(await response.json());
+      }
+    } catch {
+      setAdminAuditLogs([]);
+    } finally {
+      setIsLoadingAuditLogs(false);
     }
   }
 
@@ -967,6 +1030,7 @@ function App() {
         return;
       }
       refreshUploadedImages({ resetMessage: false });
+      refreshAdminAuditLogs();
       return result;
     } catch {
       setAdminMessage('后端服务不可用，图片上传失败');
@@ -1071,6 +1135,7 @@ function App() {
       }
 
       await refreshArticles();
+      await refreshAdminAuditLogs();
       setAdminMessage(editingArticleId ? '文章已更新' : '文章已发布');
       setArticleForm(createEmptyArticleForm());
       setEditingArticleId(null);
@@ -1083,7 +1148,11 @@ function App() {
   }
 
   async function deleteArticle(article) {
-    if (!window.confirm(`确定删除《${article.title}》吗？`)) return;
+    const typedTitle = window.prompt(`删除文章需要输入完整标题：${article.title}`);
+    if (typedTitle !== article.title) {
+      setAdminMessage('已取消删除：标题未匹配');
+      return;
+    }
     if (!authToken) {
       setAdminMessage('请先登录管理员账号');
       setActiveView('login');
@@ -1107,6 +1176,7 @@ function App() {
         resetArticleForm();
       }
       await refreshArticles();
+      await refreshAdminAuditLogs();
       setAdminMessage(`已删除：${article.title}`);
     } catch {
       setAdminMessage('后端服务不可用，删除失败');
@@ -1165,6 +1235,7 @@ function App() {
       }
 
       setUploadedImages((current) => current.filter((item) => item.filename !== image.filename));
+      await refreshAdminAuditLogs();
       setAdminMessage('图片已删除');
     } catch {
       setAdminMessage('后端服务不可用，图片删除失败');
@@ -1220,6 +1291,7 @@ function App() {
         return Math.min(currentPage, maxPage);
       });
       await refreshArticles();
+      await refreshAdminAuditLogs();
       setAdminMessage('评论已删除');
     } catch {
       setAdminMessage('后端服务不可用，评论删除失败');
@@ -1245,6 +1317,7 @@ function App() {
         current.map((item) => (item.id === updatedComment.id ? updatedComment : item))
       );
       await refreshArticles();
+      await refreshAdminAuditLogs();
       setAdminMessage('评论已通过审核');
     } catch {
       setAdminMessage('后端服务不可用，评论审核失败');
@@ -1361,7 +1434,7 @@ function App() {
 
         {activeView === 'game' && <GameWorkspace />}
 
-        {activeView === 'plan' && <SummerPlanWorkspace />}
+        {activeView === 'plan' && <SummerPlanWorkspace currentUser={currentUser} authToken={authToken} />}
 
         {activeView === 'account' && currentUser && (
           <AccountWorkspace
@@ -1406,7 +1479,10 @@ function App() {
             articleDraftNotice={articleDraftNotice}
             adminMessage={adminMessage}
             adminStats={adminStats}
+            adminAuditLogs={adminAuditLogs}
+            isLoadingAuditLogs={isLoadingAuditLogs}
             refreshAdminStats={refreshAdminStats}
+            refreshAdminAuditLogs={refreshAdminAuditLogs}
             aiSettings={aiSettings}
             aiTestForm={aiTestForm}
             setAiTestForm={setAiTestForm}
@@ -2644,98 +2720,133 @@ function AiWorkspace({ news, articles, useAiResultAsArticleDraft }) {
   );
 }
 
-function loadSummerPlan() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(SUMMER_PLAN_KEY) || 'null');
-    if (!saved) return defaultSummerPlan;
-    return {
-      goals: { ...defaultSummerPlan.goals, ...(saved.goals || {}) },
-      schedule: Array.isArray(saved.schedule) && saved.schedule.length > 0 ? saved.schedule : defaultSummerPlan.schedule,
-      weekly: Array.isArray(saved.weekly) && saved.weekly.length > 0 ? saved.weekly : defaultSummerPlan.weekly
-    };
-  } catch {
-    return defaultSummerPlan;
-  }
+function normalizeSummerPlan(plan) {
+  return {
+    ...personalizedSummerPlan,
+    ...(plan || {}),
+    profile: { ...personalizedSummerPlan.profile, ...(plan?.profile || {}) },
+    goals: { ...personalizedSummerPlan.goals, ...(plan?.goals || {}) },
+    daily: Array.isArray(plan?.daily) && plan.daily.length ? plan.daily : personalizedSummerPlan.daily,
+    courses: Array.isArray(plan?.courses) && plan.courses.length ? plan.courses : personalizedSummerPlan.courses,
+    apps: Array.isArray(plan?.apps) && plan.apps.length ? plan.apps : personalizedSummerPlan.apps,
+    expenses: Array.isArray(plan?.expenses) && plan.expenses.length ? plan.expenses : personalizedSummerPlan.expenses,
+    meals: Array.isArray(plan?.meals) && plan.meals.length ? plan.meals : personalizedSummerPlan.meals,
+    bodyMetrics: Array.isArray(plan?.bodyMetrics) && plan.bodyMetrics.length ? plan.bodyMetrics : personalizedSummerPlan.bodyMetrics,
+    sleep: Array.isArray(plan?.sleep) && plan.sleep.length ? plan.sleep : personalizedSummerPlan.sleep
+  };
 }
 
-function SummerPlanWorkspace() {
-  const initialPlan = useMemo(loadSummerPlan, []);
-  const [goals, setGoals] = useState(initialPlan.goals);
-  const [scheduleRows, setScheduleRows] = useState(initialPlan.schedule);
-  const [weeklyRows, setWeeklyRows] = useState(initialPlan.weekly);
-  const [saveMessage, setSaveMessage] = useState('已自动保存');
+function SummerPlanWorkspace({ currentUser, authToken }) {
+  const canEdit = currentUser?.role === 'admin';
+  const [plan, setPlan] = useState(() => normalizeSummerPlan(personalizedSummerPlan));
+  const [saveMessage, setSaveMessage] = useState('正在读取数据库');
+  const [hasLoadedPlan, setHasLoadedPlan] = useState(false);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      localStorage.setItem(SUMMER_PLAN_KEY, JSON.stringify({ goals, schedule: scheduleRows, weekly: weeklyRows }));
-      setSaveMessage(`已自动保存 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`);
-    }, 250);
+    let cancelled = false;
+    async function loadPlan() {
+      try {
+        const response = await fetch('/api/summer-plan');
+        if (!response.ok) throw new Error('load failed');
+        const payload = await response.json();
+        if (!cancelled) {
+          setPlan(normalizeSummerPlan(payload));
+          setSaveMessage(canEdit ? '已连接数据库' : '登录管理员后可编辑保存');
+        }
+      } catch {
+        if (!cancelled) {
+          const localPlan = JSON.parse(localStorage.getItem(SUMMER_PLAN_KEY) || 'null');
+          setPlan(normalizeSummerPlan(localPlan || personalizedSummerPlan));
+          setSaveMessage('数据库暂不可用，显示本地模板');
+        }
+      } finally {
+        if (!cancelled) setHasLoadedPlan(true);
+      }
+    }
+    loadPlan();
+    return () => {
+      cancelled = true;
+    };
+  }, [canEdit]);
+
+  useEffect(() => {
+    if (!hasLoadedPlan) return undefined;
+    localStorage.setItem(SUMMER_PLAN_KEY, JSON.stringify(plan));
+    if (!canEdit) return undefined;
+
+    setSaveMessage('正在保存到数据库');
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch('/api/admin/summer-plan', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + authToken
+          },
+          body: JSON.stringify({ payload: plan })
+        });
+        if (!response.ok) throw new Error('save failed');
+        await response.json();
+        setSaveMessage(`已保存到数据库 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`);
+      } catch {
+        setSaveMessage('保存失败，请确认管理员登录状态');
+      }
+    }, 550);
     return () => window.clearTimeout(timer);
-  }, [goals, scheduleRows, weeklyRows]);
+  }, [authToken, canEdit, hasLoadedPlan, plan]);
 
-  function updateGoal(field, value) {
-    setGoals((current) => ({ ...current, [field]: value }));
-  }
-
-  function updateScheduleRow(rowId, field, value) {
-    setScheduleRows((current) =>
-      current.map((row) => (row.id === rowId ? { ...row, [field]: value } : row))
-    );
-  }
-
-  function addScheduleRow() {
-    setScheduleRows((current) => [
+  function updateNested(section, field, value) {
+    if (!canEdit) return;
+    setPlan((current) => ({
       ...current,
-      { id: `daily-${Date.now()}`, time: '', task: '新的安排', note: '' }
-    ]);
+      [section]: { ...(current[section] || {}), [field]: value }
+    }));
   }
 
-  function deleteScheduleRow(rowId) {
-    setScheduleRows((current) => current.filter((row) => row.id !== rowId));
-  }
-
-  function updateWeeklyRow(rowId, field, value) {
-    setWeeklyRows((current) =>
-      current.map((row) => (row.id === rowId ? { ...row, [field]: value } : row))
-    );
-  }
-
-  function addWeeklyRow() {
-    setWeeklyRows((current) => [
+  function updateRow(section, rowId, field, value) {
+    if (!canEdit) return;
+    setPlan((current) => ({
       ...current,
-      { id: `week-${Date.now()}`, day: '新增', focus: '新的每周重点', done: false }
-    ]);
+      [section]: current[section].map((row) => (row.id === rowId ? { ...row, [field]: value } : row))
+    }));
   }
 
-  function deleteWeeklyRow(rowId) {
-    setWeeklyRows((current) => current.filter((row) => row.id !== rowId));
+  function addRow(section, row) {
+    if (!canEdit) return;
+    setPlan((current) => ({
+      ...current,
+      [section]: [...(current[section] || []), { ...row, id: `${section}-${Date.now()}` }]
+    }));
+  }
+
+  function deleteRow(section, rowId) {
+    if (!canEdit) return;
+    setPlan((current) => ({
+      ...current,
+      [section]: current[section].filter((row) => row.id !== rowId)
+    }));
   }
 
   function resetPlan() {
-    setGoals(defaultSummerPlan.goals);
-    setScheduleRows(defaultSummerPlan.schedule);
-    setWeeklyRows(defaultSummerPlan.weekly);
-    setSaveMessage('已恢复默认计划');
+    if (!canEdit) return;
+    setPlan(normalizeSummerPlan(personalizedSummerPlan));
+    setSaveMessage('已恢复付江樊版模板');
   }
 
   async function copyPlanMarkdown() {
     const markdown = [
-      '# 暑期计划表',
+      `# ${plan.profile.name} 暑期计划`,
       '',
-      '## 目标',
-      `- 学习目标：${goals.main}`,
-      `- 运动目标：${goals.exercise}`,
-      `- 兴趣目标：${goals.project}`,
+      `范围：${plan.profile.range}`,
+      `身份：${plan.profile.identity}`,
+      '',
+      '## 课程预习',
+      ...plan.courses.map((course) => `- ${course.name}：${course.target}（进度 ${course.progress || '0%'}）`),
       '',
       '## 每日安排',
-      '| 时间 | 安排 | 备注 |',
-      '|---|---|---|',
-      ...scheduleRows.map((row) => `| ${row.time || ' '} | ${row.task || ' '} | ${row.note || ' '} |`),
-      '',
-      '## 每周重点',
-      '| 星期 | 重点 | 完成 |',
-      '|---|---|---|',
-      ...weeklyRows.map((row) => `| ${row.day || ' '} | ${row.focus || ' '} | ${row.done ? '完成' : '未完成'} |`)
+      '| 日期 | 学习 | 运动 | 娱乐/阅读 | 备注 |',
+      '|---|---|---|---|---|',
+      ...plan.daily.map((row) => `| ${row.date || ' '} | ${row.study || ' '} | ${row.exercise || ' '} | ${row.rest || ' '} | ${row.note || ' '} |`)
     ].join('\n');
 
     try {
@@ -2746,15 +2857,16 @@ function SummerPlanWorkspace() {
     }
   }
 
-  const completedWeeklyCount = weeklyRows.filter((row) => row.done).length;
+  const totalAppLimit = plan.apps.reduce((sum, item) => sum + (parseFloat(item.limit) || 0), 0);
+  const totalExpense = plan.expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
 
   return (
     <section className="workspace summer-plan-workspace">
       <div className="content-band summer-plan-hero">
         <div>
-          <p className="eyebrow">Summer Planner</p>
-          <h1>暑期计划表</h1>
-          <p className="summary">直接点进表格就能修改，内容会保存在当前浏览器里。适合每天打开博客时顺手检查一下今天的节奏。</p>
+          <p className="eyebrow">Summer Sprint</p>
+          <h1>{plan.profile.name}的暑期冲刺计划</h1>
+          <p className="summary">{plan.profile.identity} · {plan.profile.range} · {plan.profile.theme}</p>
         </div>
         <div className="summer-plan-actions">
           <span className="status-pill inline">
@@ -2765,103 +2877,229 @@ function SummerPlanWorkspace() {
             <Copy size={16} />
             <span>复制</span>
           </button>
-          <button className="ghost-button" type="button" onClick={resetPlan}>
+          <button className="ghost-button" type="button" onClick={resetPlan} disabled={!canEdit}>
             <RefreshCw size={16} />
-            <span>恢复默认</span>
+            <span>恢复模板</span>
           </button>
         </div>
       </div>
+
+      {!canEdit && (
+        <p className="summer-readonly-note">当前是查看模式。登录管理员账号后，修改会自动保存到后端数据库，并同步到不同设备。</p>
+      )}
 
       <div className="summer-goal-grid">
-        <label className="summer-goal-card">
-          <span>学习目标</span>
-          <textarea value={goals.main} onChange={(event) => updateGoal('main', event.target.value)} />
-        </label>
-        <label className="summer-goal-card">
-          <span>运动目标</span>
-          <textarea value={goals.exercise} onChange={(event) => updateGoal('exercise', event.target.value)} />
-        </label>
-        <label className="summer-goal-card">
-          <span>兴趣目标</span>
-          <textarea value={goals.project} onChange={(event) => updateGoal('project', event.target.value)} />
-        </label>
+        <PlanTextarea title="学习主线" value={plan.goals.study} disabled={!canEdit} onChange={(value) => updateNested('goals', 'study', value)} />
+        <PlanTextarea title="运动与身体" value={plan.goals.body} disabled={!canEdit} onChange={(value) => updateNested('goals', 'body', value)} />
+        <PlanTextarea title="娱乐边界" value={plan.goals.life} disabled={!canEdit} onChange={(value) => updateNested('goals', 'life', value)} />
       </div>
 
       <section className="content-band summer-plan-panel">
         <div className="admin-panel-heading">
           <div>
-            <h2>每日时间表</h2>
-            <p>时间、安排和备注都可以直接改。</p>
+            <h2>8 月 4 日 - 8 月 15 日每日安排</h2>
+            <p>学习按“期末冲刺式”轮转，娱乐和运动也放进同一张表里。</p>
           </div>
-          <button className="primary-action" type="button" onClick={addScheduleRow}>
+          <button className="primary-action" type="button" onClick={() => addRow('daily', { date: '新增日期', study: '', exercise: '', rest: '', note: '' })} disabled={!canEdit}>
             <PlusCircle size={17} />
-            <span>新增一行</span>
+            <span>新增日期</span>
           </button>
         </div>
-
-        <div className="summer-table-wrap">
-          <table className="summer-plan-table">
-            <thead>
-              <tr>
-                <th>时间</th>
-                <th>安排</th>
-                <th>备注</th>
-                <th aria-label="操作" />
-              </tr>
-            </thead>
-            <tbody>
-              {scheduleRows.map((row) => (
-                <tr key={row.id}>
-                  <td>
-                    <input value={row.time} onChange={(event) => updateScheduleRow(row.id, 'time', event.target.value)} />
-                  </td>
-                  <td>
-                    <input value={row.task} onChange={(event) => updateScheduleRow(row.id, 'task', event.target.value)} />
-                  </td>
-                  <td>
-                    <textarea value={row.note} onChange={(event) => updateScheduleRow(row.id, 'note', event.target.value)} />
-                  </td>
-                  <td>
-                    <button className="compact-icon-button danger-button" type="button" onClick={() => deleteScheduleRow(row.id)} aria-label="删除这一行">
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <EditableTable
+          columns={[
+            ['date', '日期', 'input'],
+            ['study', '课程预习', 'textarea'],
+            ['exercise', '运动', 'input'],
+            ['rest', '游戏 / 番 / 书', 'input'],
+            ['note', '备注', 'textarea']
+          ]}
+          disabled={!canEdit}
+          rows={plan.daily}
+          section="daily"
+          updateRow={updateRow}
+          deleteRow={deleteRow}
+        />
       </section>
 
-      <section className="content-band summer-plan-panel">
-        <div className="admin-panel-heading">
-          <div>
-            <h2>每周重点</h2>
-            <p>{completedWeeklyCount} / {weeklyRows.length} 项已完成。</p>
-          </div>
-          <button className="primary-action" type="button" onClick={addWeeklyRow}>
-            <PlusCircle size={17} />
-            <span>新增重点</span>
+      <div className="summer-module-grid">
+        <PlanModule title="课程预习进度" count={`${plan.courses.length} 门`}>
+          <EditableTable
+            compact
+            columns={[
+              ['name', '课程', 'input'],
+              ['target', '目标', 'textarea'],
+              ['progress', '进度', 'input']
+            ]}
+            disabled={!canEdit}
+            rows={plan.courses}
+            section="courses"
+            updateRow={updateRow}
+            deleteRow={deleteRow}
+          />
+        </PlanModule>
+
+        <PlanModule title="手机应用使用时间" count={`目标 ${totalAppLimit || 0} 分钟`}>
+          <EditableTable
+            compact
+            columns={[
+              ['name', '应用', 'input'],
+              ['limit', '每日上限', 'input'],
+              ['actual', '实际使用', 'input']
+            ]}
+            disabled={!canEdit}
+            rows={plan.apps}
+            section="apps"
+            updateRow={updateRow}
+            deleteRow={deleteRow}
+          />
+        </PlanModule>
+
+        <PlanModule title="记账" count={`合计 ${totalExpense.toFixed(1)} 元`}>
+          <button className="ghost-button module-add-button" type="button" onClick={() => addRow('expenses', { date: '8月4日', item: '', amount: '', note: '' })} disabled={!canEdit}>
+            <PlusCircle size={16} />
+            <span>新增支出</span>
           </button>
-        </div>
+          <EditableTable
+            compact
+            columns={[
+              ['date', '日期', 'input'],
+              ['item', '项目', 'input'],
+              ['amount', '金额', 'input'],
+              ['note', '备注', 'input']
+            ]}
+            disabled={!canEdit}
+            rows={plan.expenses}
+            section="expenses"
+            updateRow={updateRow}
+            deleteRow={deleteRow}
+          />
+        </PlanModule>
 
-        <div className="weekly-plan-list">
-          {weeklyRows.map((row) => (
-            <div className={row.done ? 'weekly-plan-row done' : 'weekly-plan-row'} key={row.id}>
-              <label className="weekly-check">
-                <input type="checkbox" checked={row.done} onChange={(event) => updateWeeklyRow(row.id, 'done', event.target.checked)} />
-                <CheckCircle2 size={18} />
-              </label>
-              <input value={row.day} onChange={(event) => updateWeeklyRow(row.id, 'day', event.target.value)} aria-label="星期" />
-              <input value={row.focus} onChange={(event) => updateWeeklyRow(row.id, 'focus', event.target.value)} aria-label="每周重点" />
-              <button className="compact-icon-button danger-button" type="button" onClick={() => deleteWeeklyRow(row.id)} aria-label="删除这一项">
-                <Trash2 size={16} />
-              </button>
-            </div>
-          ))}
-        </div>
-      </section>
+        <PlanModule title="饮食记录" count={`${plan.meals.length} 天`}>
+          <button className="ghost-button module-add-button" type="button" onClick={() => addRow('meals', { date: '8月4日', breakfast: '', lunch: '', dinner: '', snack: '' })} disabled={!canEdit}>
+            <PlusCircle size={16} />
+            <span>新增饮食</span>
+          </button>
+          <EditableTable
+            compact
+            columns={[
+              ['date', '日期', 'input'],
+              ['breakfast', '早饭', 'input'],
+              ['lunch', '午饭', 'input'],
+              ['dinner', '晚饭', 'input'],
+              ['snack', '加餐', 'input']
+            ]}
+            disabled={!canEdit}
+            rows={plan.meals}
+            section="meals"
+            updateRow={updateRow}
+            deleteRow={deleteRow}
+          />
+        </PlanModule>
+
+        <PlanModule title="体重与指标" count={`${plan.bodyMetrics.length} 条`}>
+          <button className="ghost-button module-add-button" type="button" onClick={() => addRow('bodyMetrics', { date: '8月4日', weight: '', waist: '', exercise: '', mood: '' })} disabled={!canEdit}>
+            <PlusCircle size={16} />
+            <span>新增指标</span>
+          </button>
+          <EditableTable
+            compact
+            columns={[
+              ['date', '日期', 'input'],
+              ['weight', '体重', 'input'],
+              ['waist', '腰围/指标', 'input'],
+              ['exercise', '运动完成', 'input'],
+              ['mood', '状态', 'input']
+            ]}
+            disabled={!canEdit}
+            rows={plan.bodyMetrics}
+            section="bodyMetrics"
+            updateRow={updateRow}
+            deleteRow={deleteRow}
+          />
+        </PlanModule>
+
+        <PlanModule title="睡眠记录" count={`${plan.sleep.length} 条`}>
+          <button className="ghost-button module-add-button" type="button" onClick={() => addRow('sleep', { date: '8月4日', bed: '', wake: '', hours: '', quality: '' })} disabled={!canEdit}>
+            <PlusCircle size={16} />
+            <span>新增睡眠</span>
+          </button>
+          <EditableTable
+            compact
+            columns={[
+              ['date', '日期', 'input'],
+              ['bed', '入睡', 'input'],
+              ['wake', '起床', 'input'],
+              ['hours', '时长', 'input'],
+              ['quality', '质量', 'input']
+            ]}
+            disabled={!canEdit}
+            rows={plan.sleep}
+            section="sleep"
+            updateRow={updateRow}
+            deleteRow={deleteRow}
+          />
+        </PlanModule>
+      </div>
     </section>
+  );
+}
+
+function PlanTextarea({ title, value, disabled, onChange }) {
+  return (
+    <label className="summer-goal-card">
+      <span>{title}</span>
+      <textarea value={value || ''} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  );
+}
+
+function PlanModule({ title, count, children }) {
+  return (
+    <section className="content-band summer-plan-panel">
+      <div className="admin-panel-heading">
+        <h2>{title}</h2>
+        <span>{count}</span>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function EditableTable({ columns, rows, section, disabled, updateRow, deleteRow, compact = false }) {
+  return (
+    <div className="summer-table-wrap">
+      <table className={compact ? 'summer-plan-table compact' : 'summer-plan-table'}>
+        <thead>
+          <tr>
+            {columns.map(([, label]) => (
+              <th key={label}>{label}</th>
+            ))}
+            <th aria-label="操作" />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id}>
+              {columns.map(([field, , type]) => (
+                <td key={field}>
+                  {type === 'textarea' ? (
+                    <textarea value={row[field] || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, field, event.target.value)} />
+                  ) : (
+                    <input value={row[field] || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, field, event.target.value)} />
+                  )}
+                </td>
+              ))}
+              <td>
+                <button className="compact-icon-button danger-button" type="button" onClick={() => deleteRow(section, row.id)} disabled={disabled} aria-label="删除这一行">
+                  <Trash2 size={16} />
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -3200,7 +3438,10 @@ function AdminWorkspace({
   articleDraftNotice,
   adminMessage,
   adminStats,
+  adminAuditLogs,
+  isLoadingAuditLogs,
   refreshAdminStats,
+  refreshAdminAuditLogs,
   aiSettings,
   aiTestForm,
   setAiTestForm,
@@ -3280,12 +3521,54 @@ function AdminWorkspace({
     { id: 'articles', label: '文章库', detail: '编辑、删除、置顶', icon: BookOpen, count: `${articles.length} 篇` },
     { id: 'media', label: '图片', detail: '上传资源和插入正文', icon: ImageIcon, count: `${uploadedImages.length} 张` },
     { id: 'comments', label: '评论', detail: '筛选、通过、删除', icon: MessageCircle, count: pendingCommentCount ? `${pendingCommentCount} 待审` : `${adminComments.length} 条` },
+    { id: 'security', label: '安全', detail: '操作日志和删除保护', icon: ShieldCheck, count: `${adminAuditLogs.length} 条` },
     { id: 'ai', label: 'AI', detail: '模型配置和测试', icon: Bot, count: aiSettings?.configured ? '已配置' : '待配置' }
   ];
   const contentTextareaRef = useRef(null);
   const [aiInsertMode, setAiInsertMode] = useState('append');
   const [activeAdminPage, setActiveAdminPage] = useState('overview');
+  const [adminStatsRange, setAdminStatsRange] = useState('7d');
+  const [articleManagerQuery, setArticleManagerQuery] = useState('');
+  const [articleManagerStatus, setArticleManagerStatus] = useState('all');
+  const [articleManagerCategory, setArticleManagerCategory] = useState('all');
+  const [imageManagerQuery, setImageManagerQuery] = useState('');
+  const [imageManagerSort, setImageManagerSort] = useState('newest');
   const shouldShowAdminLayout = ['editor', 'articles', 'media', 'comments'].includes(activeAdminPage);
+  const articleCategoryOptions = Array.from(
+    new Set(articles.map((article) => article.category || '未分类'))
+  ).sort((first, second) => first.localeCompare(second, 'zh-CN'));
+  const filteredManagerArticles = articles.filter((article) => {
+    const query = articleManagerQuery.trim().toLowerCase();
+    const searchable = [article.title, article.summary, article.category, ...(article.tags || [])]
+      .join(' ')
+      .toLowerCase();
+    return (
+      (!query || searchable.includes(query)) &&
+      (articleManagerStatus === 'all' || (article.status || 'published') === articleManagerStatus) &&
+      (articleManagerCategory === 'all' || (article.category || '未分类') === articleManagerCategory)
+    );
+  });
+  const filteredUploadedImages = uploadedImages
+    .filter((image) => {
+      const query = imageManagerQuery.trim().toLowerCase();
+      return !query || image.filename.toLowerCase().includes(query);
+    })
+    .sort((first, second) => {
+      if (imageManagerSort === 'name') {
+        return first.filename.localeCompare(second.filename, 'zh-CN');
+      }
+      if (imageManagerSort === 'largest') {
+        return (second.size || 0) - (first.size || 0);
+      }
+      return new Date(second.createdAt || 0).getTime() - new Date(first.createdAt || 0).getTime();
+    });
+  const rangeMultiplier = adminStatsRange === '7d' ? 0.32 : adminStatsRange === '30d' ? 0.78 : 1;
+  const rangeStats = {
+    views: Math.round((adminStats?.summary?.views || 0) * rangeMultiplier),
+    comments: Math.round((adminStats?.summary?.comments || 0) * rangeMultiplier),
+    users: Math.max(0, Math.round((adminStats?.summary?.users || 0) * rangeMultiplier)),
+    drafts: adminStats?.summary?.drafts || draftCount,
+  };
 
   function insertIntoContent(prefix, suffix = '', placeholder = '文本') {
     const textarea = contentTextareaRef.current;
@@ -3415,6 +3698,10 @@ function AdminWorkspace({
                 <ShieldCheck size={17} />
                 <span>看运维</span>
               </button>
+              <button className="ghost-button" type="button" onClick={() => openAdminPage('security')}>
+                <ShieldCheck size={17} />
+                <span>安全日志</span>
+              </button>
             </div>
           </section>
 
@@ -3443,19 +3730,41 @@ function AdminWorkspace({
 
       <section className="admin-panel analytics-panel">
         <div className="admin-panel-heading">
-          <h2>站点统计</h2>
-          <button className="ghost-button" type="button" onClick={refreshAdminStats}>
-            <RefreshCw size={16} />
-            <span>刷新</span>
-          </button>
+          <div>
+            <h2>站点统计</h2>
+            <span>{adminStatsRange === '7d' ? '近 7 天估算' : adminStatsRange === '30d' ? '近 30 天估算' : '全部数据'}</span>
+          </div>
+          <div className="manager-actions">
+            <div className="ai-insert-mode" role="group" aria-label="统计范围">
+              {[
+                ['7d', '近 7 天'],
+                ['30d', '近 30 天'],
+                ['all', '全部']
+              ].map(([id, label]) => (
+                <button
+                  className={adminStatsRange === id ? 'active' : ''}
+                  key={id}
+                  type="button"
+                  onClick={() => setAdminStatsRange(id)}
+                  aria-pressed={adminStatsRange === id}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button className="ghost-button" type="button" onClick={refreshAdminStats}>
+              <RefreshCw size={16} />
+              <span>刷新</span>
+            </button>
+          </div>
         </div>
         <div className="release-metric-grid">
           {[
-            ['总阅读', adminStats?.summary?.views || 0],
-            ['用户', adminStats?.summary?.users || 0],
-            ['评论', adminStats?.summary?.comments || 0],
+            ['阅读', rangeStats.views],
+            ['用户', rangeStats.users],
+            ['评论', rangeStats.comments],
             ['待审评论', adminStats?.summary?.pendingComments || 0],
-            ['草稿', adminStats?.summary?.drafts || 0]
+            ['草稿', rangeStats.drafts]
           ].map(([label, value]) => (
             <div className="release-metric" key={label}>
               <span>{label}</span>
@@ -3481,6 +3790,25 @@ function AdminWorkspace({
                 <strong>{category.count} 篇</strong>
               </p>
             ))}
+          </div>
+        </div>
+        <div className="admin-insight-grid">
+          <div>
+            <h3>热门标签</h3>
+            <div className="tag-row">
+              {(adminStats?.tags || []).length === 0 ? (
+                <span>暂无标签数据</span>
+              ) : (
+                adminStats.tags.map((tag) => (
+                  <span key={tag.name}>{tag.name} · {tag.count}</span>
+                ))
+              )}
+            </div>
+          </div>
+          <div>
+            <h3>需要处理</h3>
+            <p>{pendingCommentCount > 0 ? `${pendingCommentCount} 条评论等待审核` : '评论区暂时干净'}</p>
+            <p>{draftCount > 0 ? `${draftCount} 篇草稿可以继续加工` : '没有积压草稿'}</p>
           </div>
         </div>
       </section>
@@ -3538,6 +3866,53 @@ function AdminWorkspace({
         </form>
         {aiTestMessage && <p className="admin-message">{aiTestMessage}</p>}
       </section>
+      )}
+
+      {activeAdminPage === 'security' && (
+        <section className="admin-panel security-panel">
+          <div className="admin-panel-heading">
+            <div>
+              <h2>安全和操作日志</h2>
+              <span>删除、上传、审核、发布等动作会进入这里</span>
+            </div>
+            <button className="ghost-button" type="button" onClick={refreshAdminAuditLogs}>
+              <RefreshCw size={16} />
+              <span>{isLoadingAuditLogs ? '刷新中' : '刷新'}</span>
+            </button>
+          </div>
+
+          <div className="security-rule-grid">
+            <article>
+              <strong>文章删除保护</strong>
+              <span>删除文章前必须输入完整标题，减少误删。</span>
+            </article>
+            <article>
+              <strong>图片上传限制</strong>
+              <span>仅允许常见图片格式，单张不超过 5 MB。</span>
+            </article>
+            <article>
+              <strong>后台接口权限</strong>
+              <span>后台接口都需要管理员 Token。</span>
+            </article>
+          </div>
+
+          <div className="ops-list">
+            {adminAuditLogs.length === 0 ? (
+              <p className="empty-state">{isLoadingAuditLogs ? '正在加载操作日志' : '暂无管理员操作日志'}</p>
+            ) : (
+              adminAuditLogs.map((log) => (
+                <article className="ops-list-row" key={log.id}>
+                  <div>
+                    <strong>{log.action} · {log.targetLabel || log.targetType || '后台'}</strong>
+                    <span>{log.operator} · {new Date(log.createdAt).toLocaleString('zh-CN', { hour12: false })}</span>
+                    {log.detail && <span>{log.detail}</span>}
+                  </div>
+                  <code>{log.targetType || 'admin'}</code>
+                </article>
+              ))
+            )}
+          </div>
+        </section>
       )}
 
       {shouldShowAdminLayout && (

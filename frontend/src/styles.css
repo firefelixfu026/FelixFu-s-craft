@@ -2431,9 +2431,47 @@ h3 {
   box-shadow: 0 0 0 3px rgba(31, 122, 109, 0.12);
 }
 
+.summer-goal-card textarea:disabled,
+.summer-plan-table input:disabled,
+.summer-plan-table textarea:disabled {
+  color: #4b5968;
+  background: #f8fafc;
+  cursor: default;
+}
+
+.summer-readonly-note {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  color: #5b6878;
+  background: #ffffff;
+}
+
+.summer-module-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.summer-module-grid .summer-plan-panel {
+  min-width: 0;
+}
+
 .summer-plan-panel .admin-panel-heading p {
   margin: 4px 0 0;
   color: #6a7685;
+}
+
+.summer-plan-panel .admin-panel-heading > span {
+  color: #6a7685;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.module-add-button {
+  width: fit-content;
+  margin-bottom: 10px;
 }
 
 .summer-table-wrap {
@@ -2449,6 +2487,10 @@ h3 {
   border: 1px solid #d8e0e9;
   border-radius: 8px;
   overflow: hidden;
+}
+
+.summer-plan-table.compact {
+  min-width: 560px;
 }
 
 .summer-plan-table th,
@@ -2560,6 +2602,13 @@ h3 {
   background: #ffffff;
 }
 
+.compact-icon-button:disabled,
+.ghost-button:disabled,
+.primary-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -2626,7 +2675,8 @@ h3 {
   .account-grid,
   .ai-test-form,
   .summer-plan-hero,
-  .summer-goal-grid {
+  .summer-goal-grid,
+  .summer-module-grid {
     grid-template-columns: 1fr;
   }
 
