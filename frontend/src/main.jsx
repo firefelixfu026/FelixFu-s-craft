@@ -6,15 +6,25 @@ import './styles.css';
 class AppErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, message: '' };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, message: error?.message || '未知错误' };
   }
 
   componentDidCatch(error) {
     console.error('App render failed', error);
+  }
+
+  recoverHome() {
+    try {
+      localStorage.setItem('felix_blog_active_view', 'overview');
+      localStorage.setItem('felix_blog_admin_page', 'overview');
+    } catch {
+      // Ignore storage recovery failures and still reload the page.
+    }
+    window.location.reload();
   }
 
   render() {
@@ -23,7 +33,11 @@ class AppErrorBoundary extends React.Component {
         <main className="app-error-boundary">
           <section className="app-error-card">
             <h1>页面刚刚卡住了</h1>
-            <p>请刷新一次。如果仍然出现这个提示，后台错误已经被记录到浏览器控制台，方便继续定位。</p>
+            <p>可以先回到首页继续浏览。错误已经记录到浏览器控制台，方便继续定位。</p>
+            <p className="app-error-detail">{this.state.message}</p>
+            <button className="primary-action" type="button" onClick={() => this.recoverHome()}>
+              回到首页
+            </button>
           </section>
         </main>
       );

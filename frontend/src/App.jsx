@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   BookOpen,
@@ -176,7 +176,9 @@ function readStoredActiveView() {
 
 function readStoredAdminPage() {
   if (typeof localStorage === 'undefined') return 'overview';
-  return localStorage.getItem(ADMIN_PAGE_KEY) || 'overview';
+  const storedPage = localStorage.getItem(ADMIN_PAGE_KEY) || 'overview';
+  const knownPages = new Set(['overview', 'ops', 'editor', 'articles', 'media', 'comments', 'security', 'ai']);
+  return knownPages.has(storedPage) ? storedPage : 'overview';
 }
 
 const defaultSummerPlan = {
@@ -3756,6 +3758,55 @@ function LoginWorkspace({
   );
 }
 
+class AdminPanelErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, message: '' };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, message: error?.message || '页面加载失败' };
+  }
+
+  componentDidCatch(error) {
+    console.error('Admin panel render failed', error);
+    try {
+      localStorage.setItem(ADMIN_PAGE_KEY, 'overview');
+    } catch {
+      // Ignore storage recovery failures; the visible reset button still works.
+    }
+  }
+
+  componentDidUpdate(previousProps) {
+    if (previousProps.resetKey !== this.props.resetKey && this.state.hasError) {
+      this.setState({ hasError: false, message: '' });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <section className="admin-panel panel-error-card">
+          <div className="admin-panel-heading">
+            <div>
+              <h2>{this.props.title || '这个页面暂时打不开'}</h2>
+              <span>已自动保护其它后台页面，可以先回到总览继续操作。</span>
+            </div>
+          </div>
+          <p className="panel-error-detail">{this.state.message}</p>
+          <div className="panel-error-actions">
+            <button className="primary-action" type="button" onClick={this.props.onReset}>
+              回到总览
+            </button>
+          </div>
+        </section>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function AdminWorkspace({
   articles,
   articleForm,
@@ -4007,7 +4058,15 @@ function AdminWorkspace({
         })}
       </nav>
 
-      {activeAdminPage === 'ops' && <ProjectOpsPanel authToken={authToken} />}
+      {activeAdminPage === 'ops' && (
+        <AdminPanelErrorBoundary
+          resetKey={activeAdminPage}
+          title="运维页暂时打不开"
+          onReset={() => openAdminPage('overview')}
+        >
+          <ProjectOpsPanel authToken={authToken} />
+        </AdminPanelErrorBoundary>
+      )}
 
       {activeAdminPage === 'overview' && (
         <>

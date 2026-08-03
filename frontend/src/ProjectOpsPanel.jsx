@@ -77,6 +77,18 @@ const commandLabels = {
   logs: '日志'
 };
 
+function safeText(value, fallback = '暂无信息') {
+  if (value === null || value === undefined || value === '') return fallback;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return fallback;
+  }
+}
+
 function statusLabel(status) {
   return status === 'online' ? '在线' : status === 'attention' ? '关注' : '离线';
 }
@@ -85,19 +97,31 @@ function statusClass(status) {
   return status === 'online' ? 'ready' : status === 'attention' ? 'warning' : 'danger';
 }
 
-function formatDateTime(date) {
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  });
+function isValidDate(date) {
+  return date instanceof Date && Number.isFinite(date.getTime());
+}
+
+function formatDateTime(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!isValidDate(date)) return '时间未知';
+  try {
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+  } catch {
+    const pad = (part) => String(part).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  }
 }
 
 function formatDuration(from, to) {
+  if (!isValidDate(from) || !isValidDate(to)) return '上线时间待确认';
   const totalSeconds = Math.max(0, Math.floor((to.getTime() - from.getTime()) / 1000));
   const days = Math.floor(totalSeconds / 86400);
   const hours = Math.floor((totalSeconds % 86400) / 3600);
@@ -111,7 +135,17 @@ function formatDuration(from, to) {
 function parseServerTime(value) {
   if (!value) return null;
   const text = String(value);
-  return new Date(/[zZ]|[+-]\d\d:\d\d$/.test(text) ? text : `${text}Z`);
+  const parsed = new Date(/[zZ]|[+-]\d\d:\d\d$/.test(text) ? text : `${text}Z`);
+  return isValidDate(parsed) ? parsed : null;
+}
+
+function normalizeLiveServices(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((service, index) => ({
+    name: safeText(service?.name, `服务 ${index + 1}`),
+    status: safeText(service?.status, 'attention'),
+    detail: safeText(service?.detail),
+  }));
 }
 
 function ProjectOpsPanel({ authToken }) {
@@ -130,9 +164,9 @@ function ProjectOpsPanel({ authToken }) {
     () => services.find((service) => service.id === selectedServiceId) || services[0],
     [selectedServiceId]
   );
-  const command = selectedService.commands[selectedAction];
+  const command = selectedService.commands?.[selectedAction] || '暂未配置命令';
   const onlineCount = services.filter((service) => service.status === 'online').length;
-  const liveServices = Array.isArray(systemHealth?.services) ? systemHealth.services : [];
+  const liveServices = normalizeLiveServices(systemHealth?.services);
   const checkedAt = parseServerTime(systemHealth?.checkedAt);
 
   useEffect(() => {
@@ -155,7 +189,7 @@ function ProjectOpsPanel({ authToken }) {
       const payload = await response.json();
       setSystemHealth({
         ...payload,
-        services: Array.isArray(payload.services) ? payload.services : []
+        services: normalizeLiveServices(payload.services)
       });
       setEvents((current) => [
         ['真实健康检查完成', formatDateTime(parseServerTime(payload.checkedAt) || new Date())],
@@ -189,7 +223,7 @@ function ProjectOpsPanel({ authToken }) {
   function simulateAction(action) {
     setSelectedAction(action);
     setEvents((current) => [
-      [`已生成 ${selectedService.name} ${commandLabels[action]}操作`, selectedService.commands[action]],
+      [`已生成 ${selectedService.name} ${commandLabels[action]}操作`, selectedService.commands?.[action] || '暂未配置命令'],
       ...current.slice(0, 4)
     ]);
   }
