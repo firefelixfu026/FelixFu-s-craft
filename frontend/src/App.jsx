@@ -154,6 +154,21 @@ const personalizedSummerPlan = {
   sleep: [{ id: 'sleep-1', date: '8月4日', bed: '', wake: '', hours: '', quality: '' }]
 };
 
+const personalizedTimeSlots = [
+  { id: 'slot-0730', time: '07:30 - 08:00', activity: '起床、洗漱、早餐', focus: '不刷短视频，先把一天启动起来。', type: '生活' },
+  { id: 'slot-0800', time: '08:00 - 10:00', activity: '课程预习 1', focus: '高级数据结构与算法分析 / 计算机组成轮换，按期末冲刺式看目录、抓概念、做例题。', type: '学习' },
+  { id: 'slot-1000', time: '10:00 - 10:30', activity: '弹性时间', focus: '补水、走动、处理临时消息；有额外活动可以直接改这一格。', type: '弹性' },
+  { id: 'slot-1030', time: '10:30 - 12:00', activity: '课程预习 2', focus: '大学物理（乙）Ⅱ / 概率论与数理统计轮换，目标是先建立知识框架。', type: '学习' },
+  { id: 'slot-1200', time: '12:00 - 14:00', activity: '午餐 + 午休', focus: '吃饭、短休，不把 B 站和小红书刷成无底洞。', type: '生活' },
+  { id: 'slot-1400', time: '14:00 - 15:30', activity: '题目/笔记整理', focus: '上午内容收束：整理公式、数据结构模板、组成原理图、概率概念。', type: '学习' },
+  { id: 'slot-1530', time: '15:30 - 16:30', activity: '运动', focus: '游泳、快走、室内燃脂三选一；按身体状态调强度。', type: '运动' },
+  { id: 'slot-1630', time: '16:30 - 17:30', activity: '弹性时间', focus: '外出、家务、临时安排、补觉都放这里；也可挪给学习追进度。', type: '弹性' },
+  { id: 'slot-1730', time: '17:30 - 19:00', activity: '晚餐 + 记录', focus: '填饮食、体重/指标、记账；当天花销随手记。', type: '记录' },
+  { id: 'slot-1900', time: '19:00 - 20:30', activity: '轻学习 / 复盘', focus: '复盘今日预习，列明天任务；不适合硬刚时改成阅读。', type: '学习' },
+  { id: 'slot-2030', time: '20:30 - 21:30', activity: '娱乐时间', focus: '以撒的结合 / 第五人格 / 葬送的芙莉莲 / 红与黑，控制 B 站和小红书。', type: '娱乐' },
+  { id: 'slot-2130', time: '21:30 - 22:30', activity: '洗漱 + 睡眠准备', focus: '填睡眠记录，尽量 22:30 前进入休息状态。', type: '睡眠' }
+];
+
 function getArticleMonth(date) {
   if (!date) return '';
   const normalized = String(date).replace(/\//g, '-');
@@ -2720,13 +2735,20 @@ function AiWorkspace({ news, articles, useAiResultAsArticleDraft }) {
   );
 }
 
+function normalizeDailyRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return personalizedTimeSlots;
+  return rows.every((row) => Object.prototype.hasOwnProperty.call(row, 'time'))
+    ? rows
+    : personalizedTimeSlots;
+}
+
 function normalizeSummerPlan(plan) {
   return {
     ...personalizedSummerPlan,
     ...(plan || {}),
     profile: { ...personalizedSummerPlan.profile, ...(plan?.profile || {}) },
     goals: { ...personalizedSummerPlan.goals, ...(plan?.goals || {}) },
-    daily: Array.isArray(plan?.daily) && plan.daily.length ? plan.daily : personalizedSummerPlan.daily,
+    daily: normalizeDailyRows(plan?.daily),
     courses: Array.isArray(plan?.courses) && plan.courses.length ? plan.courses : personalizedSummerPlan.courses,
     apps: Array.isArray(plan?.apps) && plan.apps.length ? plan.apps : personalizedSummerPlan.apps,
     expenses: Array.isArray(plan?.expenses) && plan.expenses.length ? plan.expenses : personalizedSummerPlan.expenses,
@@ -2843,10 +2865,10 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
       '## 课程预习',
       ...plan.courses.map((course) => `- ${course.name}：${course.target}（进度 ${course.progress || '0%'}）`),
       '',
-      '## 每日安排',
-      '| 日期 | 学习 | 运动 | 娱乐/阅读 | 备注 |',
-      '|---|---|---|---|---|',
-      ...plan.daily.map((row) => `| ${row.date || ' '} | ${row.study || ' '} | ${row.exercise || ' '} | ${row.rest || ' '} | ${row.note || ' '} |`)
+      '## 每日时间段安排',
+      '| 时间段 | 要做什么 | 重点/说明 | 类型 |',
+      '|---|---|---|---|',
+      ...plan.daily.map((row) => `| ${row.time || ' '} | ${row.activity || ' '} | ${row.focus || ' '} | ${row.type || ' '} |`)
     ].join('\n');
 
     try {
@@ -2897,21 +2919,20 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
       <section className="content-band summer-plan-panel">
         <div className="admin-panel-heading">
           <div>
-            <h2>8 月 4 日 - 8 月 15 日每日安排</h2>
-            <p>学习按“期末冲刺式”轮转，娱乐和运动也放进同一张表里。</p>
+            <h2>每日时间段安排</h2>
+            <p>按时间段看一天该做什么，中间保留弹性时间；有额外活动时直接改对应格子。</p>
           </div>
-          <button className="primary-action" type="button" onClick={() => addRow('daily', { date: '新增日期', study: '', exercise: '', rest: '', note: '' })} disabled={!canEdit}>
+          <button className="primary-action" type="button" onClick={() => addRow('daily', { time: '新增时间段', activity: '临时活动', focus: '', type: '弹性' })} disabled={!canEdit}>
             <PlusCircle size={17} />
-            <span>新增日期</span>
+            <span>新增时间段</span>
           </button>
         </div>
         <EditableTable
           columns={[
-            ['date', '日期', 'input'],
-            ['study', '课程预习', 'textarea'],
-            ['exercise', '运动', 'input'],
-            ['rest', '游戏 / 番 / 书', 'input'],
-            ['note', '备注', 'textarea']
+            ['time', '时间段', 'input'],
+            ['activity', '要做什么', 'input'],
+            ['focus', '重点 / 说明', 'textarea'],
+            ['type', '类型', 'input']
           ]}
           disabled={!canEdit}
           rows={plan.daily}
