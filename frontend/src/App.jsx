@@ -216,9 +216,7 @@ function App() {
   const [reactionCounts, setReactionCounts] = useState({});
   const [commentDrafts, setCommentDrafts] = useState({});
   const [commentReplyTargets, setCommentReplyTargets] = useState({});
-  const [comments, setComments] = useState({
-    'react-fastapi-mvp': [{ id: 'local-1', authorName: '访客', content: '第一版先把前后端结构跑起来，后续再接数据库。' }]
-  });
+  const [comments, setComments] = useState({});
   const [commentPages, setCommentPages] = useState({});
   const [selectedArticleId, setSelectedArticleId] = useState(null);
   const [articleForm, setArticleForm] = useState(createEmptyArticleForm);
