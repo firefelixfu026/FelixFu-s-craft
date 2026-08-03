@@ -3273,8 +3273,19 @@ function AdminWorkspace({
     { label: '管理员登录', done: Boolean(currentUser?.role === 'admin') },
     { label: 'AI 写作辅助', done: true },
   ];
+  const adminPageItems = [
+    { id: 'overview', label: '总览', detail: '状态、统计、待办', icon: Star, count: `${publishedCount} 篇` },
+    { id: 'ops', label: '运维', detail: '服务、部署、脚本', icon: ShieldCheck, count: '控制台' },
+    { id: 'editor', label: '写文章', detail: editingArticleId ? '继续编辑当前文章' : '发布新内容', icon: FilePenLine, count: draftCount ? `${draftCount} 草稿` : 'Markdown' },
+    { id: 'articles', label: '文章库', detail: '编辑、删除、置顶', icon: BookOpen, count: `${articles.length} 篇` },
+    { id: 'media', label: '图片', detail: '上传资源和插入正文', icon: ImageIcon, count: `${uploadedImages.length} 张` },
+    { id: 'comments', label: '评论', detail: '筛选、通过、删除', icon: MessageCircle, count: pendingCommentCount ? `${pendingCommentCount} 待审` : `${adminComments.length} 条` },
+    { id: 'ai', label: 'AI', detail: '模型配置和测试', icon: Bot, count: aiSettings?.configured ? '已配置' : '待配置' }
+  ];
   const contentTextareaRef = useRef(null);
   const [aiInsertMode, setAiInsertMode] = useState('append');
+  const [activeAdminPage, setActiveAdminPage] = useState('overview');
+  const shouldShowAdminLayout = ['editor', 'articles', 'media', 'comments'].includes(activeAdminPage);
 
   function insertIntoContent(prefix, suffix = '', placeholder = '文本') {
     const textarea = contentTextareaRef.current;
@@ -3320,11 +3331,25 @@ function AdminWorkspace({
     runArticleAiTask(task, selectedText, aiInsertMode, { start, end });
   }
 
+  function openAdminPage(pageId) {
+    setActiveAdminPage(pageId);
+  }
+
+  function handleStartEditingArticle(article) {
+    startEditingArticle(article);
+    setActiveAdminPage('editor');
+  }
+
+  function handleInsertUploadedImage(image) {
+    insertImageMarkdown(image.url, image.filename);
+    setActiveAdminPage('editor');
+  }
+
   return (
     <section className="workspace">
       <div className="section-heading">
         <p className="eyebrow">管理后台</p>
-        <h1>文章发布、编辑和删除</h1>
+        <h1>管理工具台</h1>
       </div>
 
       <div className="admin-session">
@@ -3338,7 +3363,60 @@ function AdminWorkspace({
         </button>
       </div>
 
-      <ProjectOpsPanel />
+      <nav className="admin-page-nav" aria-label="后台页面">
+        {adminPageItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              className={activeAdminPage === item.id ? 'admin-page-card active' : 'admin-page-card'}
+              key={item.id}
+              type="button"
+              onClick={() => openAdminPage(item.id)}
+              aria-pressed={activeAdminPage === item.id}
+            >
+              <span className="admin-page-card-icon">
+                <Icon size={19} />
+              </span>
+              <span>
+                <strong>{item.label}</strong>
+                <em>{item.detail}</em>
+              </span>
+              <small>{item.count}</small>
+            </button>
+          );
+        })}
+      </nav>
+
+      {activeAdminPage === 'ops' && <ProjectOpsPanel />}
+
+      {activeAdminPage === 'overview' && (
+        <>
+          <section className="admin-panel admin-home-panel">
+            <div className="admin-panel-heading">
+              <div>
+                <h2>今天先看这里</h2>
+                <span>常用动作拆开了，不用在一屏里翻到眼花</span>
+              </div>
+            </div>
+            <div className="admin-home-actions">
+              <button className="primary-action" type="button" onClick={() => openAdminPage('editor')}>
+                <FilePenLine size={17} />
+                <span>写文章</span>
+              </button>
+              <button className="ghost-button" type="button" onClick={() => openAdminPage('articles')}>
+                <BookOpen size={17} />
+                <span>管理文章</span>
+              </button>
+              <button className="ghost-button" type="button" onClick={() => openAdminPage('comments')}>
+                <MessageCircle size={17} />
+                <span>处理评论</span>
+              </button>
+              <button className="ghost-button" type="button" onClick={() => openAdminPage('ops')}>
+                <ShieldCheck size={17} />
+                <span>看运维</span>
+              </button>
+            </div>
+          </section>
 
       <section className="admin-panel release-panel">
         <div className="admin-panel-heading">
@@ -3406,7 +3484,10 @@ function AdminWorkspace({
           </div>
         </div>
       </section>
+        </>
+      )}
 
+      {activeAdminPage === 'ai' && (
       <section className="admin-panel ai-settings-panel">
         <div className="admin-panel-heading">
           <h2>AI 设置和测试</h2>
@@ -3457,8 +3538,11 @@ function AdminWorkspace({
         </form>
         {aiTestMessage && <p className="admin-message">{aiTestMessage}</p>}
       </section>
+      )}
 
-      <div className="admin-layout">
+      {shouldShowAdminLayout && (
+      <div className={activeAdminPage === 'editor' ? 'admin-layout' : 'admin-layout admin-layout-single'}>
+        {activeAdminPage === 'editor' && (
         <form className="admin-panel admin-form" onSubmit={submitArticleForm}>
           <div className="admin-panel-heading">
             <h2>{editingArticleId ? '编辑文章' : '发布文章'}</h2>
@@ -3694,7 +3778,9 @@ function AdminWorkspace({
 
           {adminMessage && <p className="admin-message">{adminMessage}</p>}
         </form>
+        )}
 
+        {activeAdminPage === 'articles' && (
         <section className="admin-panel article-manager">
           <div className="admin-panel-heading">
             <h2>已有文章</h2>
@@ -3717,7 +3803,7 @@ function AdminWorkspace({
                   </div>
                 </div>
                 <div className="manager-actions">
-                  <button type="button" onClick={() => startEditingArticle(article)}>
+                  <button type="button" onClick={() => handleStartEditingArticle(article)}>
                     <PencilLine size={17} />
                     <span>编辑</span>
                   </button>
@@ -3730,7 +3816,9 @@ function AdminWorkspace({
             ))}
           </div>
         </section>
+        )}
 
+        {activeAdminPage === 'editor' && (
         <section className="admin-panel ai-history-panel">
           <div className="admin-panel-heading">
             <h2>AI 生成历史</h2>
@@ -3757,7 +3845,9 @@ function AdminWorkspace({
             </div>
           )}
         </section>
+        )}
 
+        {activeAdminPage === 'media' && (
         <section className="admin-panel image-manager">
           <div className="admin-panel-heading">
             <h2>图片管理</h2>
@@ -3788,7 +3878,7 @@ function AdminWorkspace({
                       <Copy size={16} />
                       <span>复制</span>
                     </button>
-                    <button type="button" onClick={() => insertImageMarkdown(image.url, image.filename)}>
+                    <button type="button" onClick={() => handleInsertUploadedImage(image)}>
                       <ImageIcon size={16} />
                       <span>插入</span>
                     </button>
@@ -3802,7 +3892,9 @@ function AdminWorkspace({
             )}
           </div>
         </section>
+        )}
 
+        {activeAdminPage === 'comments' && (
         <section className="admin-panel comment-manager">
           <div className="admin-panel-heading">
             <h2>评论管理</h2>
@@ -3920,7 +4012,9 @@ function AdminWorkspace({
             </div>
           )}
         </section>
+        )}
       </div>
+      )}
     </section>
   );
 }
