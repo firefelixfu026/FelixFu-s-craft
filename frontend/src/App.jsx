@@ -37,6 +37,7 @@ import {
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { aiNews as fallbackNews, articles as fallbackArticles, gameModule, profile as fallbackProfile } from './data.js';
+import ProjectOpsPanel from './ProjectOpsPanel.jsx';
 
 const createEmptyArticleForm = () => ({
   title: '',
@@ -53,6 +54,7 @@ const createEmptyArticleForm = () => ({
 
 const visitorNavItems = [
   { id: 'articles', label: '文章', icon: BookOpen },
+  { id: 'plan', label: '计划', icon: List },
   { id: 'game', label: '游戏', icon: Gamepad2 },
   { id: 'login', label: '登录', icon: LogIn }
 ];
@@ -60,6 +62,7 @@ const visitorNavItems = [
 const readerNavItems = [
   { id: 'overview', label: '首页', icon: UserRound },
   { id: 'articles', label: '文章', icon: BookOpen },
+  { id: 'plan', label: '计划', icon: List },
   { id: 'game', label: '游戏', icon: Gamepad2 }
 ];
 
@@ -74,9 +77,39 @@ const ADMIN_COMMENTS_PER_PAGE = 5;
 const IMAGE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_UPLOAD_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']);
 const ARTICLE_DRAFT_KEY = 'felix_blog_article_form_draft';
+const SUMMER_PLAN_KEY = 'felix_blog_summer_plan';
 const emptyReactionState = { like: false, favorite: false, downvote: false, question: false };
 const ALL_FILTER = '全部';
 const ALL_ARCHIVE = '全部';
+
+const defaultSummerPlan = {
+  goals: {
+    main: '完成暑假作业，复习薄弱科目，提前预习新学期内容。',
+    exercise: '每天至少运动 40 分钟，保持规律作息。',
+    project: '每周完成一个兴趣小项目或一次长阅读记录。'
+  },
+  schedule: [
+    { id: 'daily-1', time: '07:30 - 08:00', task: '起床、洗漱、早餐', note: '整理房间，打开清爽的一天。' },
+    { id: 'daily-2', time: '08:00 - 09:30', task: '语文 / 英语学习', note: '阅读、背单词、作文积累任选其二。' },
+    { id: 'daily-3', time: '09:45 - 11:15', task: '数学 / 理科学习', note: '主攻错题和薄弱章节。' },
+    { id: 'daily-4', time: '11:15 - 12:00', task: '整理笔记 / 阅读', note: '把上午学到的内容收一下口。' },
+    { id: 'daily-5', time: '12:00 - 14:00', task: '午餐、午休', note: '不刷太久手机，留一点安静时间。' },
+    { id: 'daily-6', time: '14:00 - 15:30', task: '暑假作业 / 预习', note: '每天推进固定页数或固定章节。' },
+    { id: 'daily-7', time: '15:30 - 16:30', task: '运动', note: '散步、打球、跑步、跳绳都可以。' },
+    { id: 'daily-8', time: '16:30 - 17:30', task: '兴趣时间', note: '画画、音乐、编程、手工或拍照。' },
+    { id: 'daily-9', time: '19:00 - 20:30', task: '今日任务收尾', note: '检查完成度，准备明天任务。' },
+    { id: 'daily-10', time: '21:30 - 22:00', task: '睡前阅读、洗漱', note: '22:00 尽量睡觉。' }
+  ],
+  weekly: [
+    { id: 'week-1', day: '周一', focus: '制定本周目标', done: false },
+    { id: 'week-2', day: '周二', focus: '数学 / 理科加强', done: false },
+    { id: 'week-3', day: '周三', focus: '英语阅读、听力或单词', done: false },
+    { id: 'week-4', day: '周四', focus: '语文阅读、作文积累', done: false },
+    { id: 'week-5', day: '周五', focus: '整理错题，查漏补缺', done: false },
+    { id: 'week-6', day: '周六', focus: '兴趣活动和户外运动', done: false },
+    { id: 'week-7', day: '周日', focus: '总结一周，准备下周', done: false }
+  ]
+};
 
 function getArticleMonth(date) {
   if (!date) return '';
@@ -183,7 +216,7 @@ function App() {
     }
 
     if (currentUser.role === 'admin') {
-      return [readerNavItems[0], readerNavItems[1], aiNavItem, readerNavItems[2], accountNavItem, adminNavItem];
+      return [readerNavItems[0], readerNavItems[1], readerNavItems[2], aiNavItem, readerNavItems[3], accountNavItem, adminNavItem];
     }
 
     return [...readerNavItems, accountNavItem];
@@ -304,7 +337,7 @@ function App() {
   useEffect(() => {
     if (!currentUser) {
       if (authToken) return;
-      if (!['articles', 'game', 'login'].includes(activeView)) {
+      if (!['articles', 'plan', 'game', 'login'].includes(activeView)) {
         setActiveView('articles');
       }
       return;
@@ -1327,6 +1360,8 @@ function App() {
         )}
 
         {activeView === 'game' && <GameWorkspace />}
+
+        {activeView === 'plan' && <SummerPlanWorkspace />}
 
         {activeView === 'account' && currentUser && (
           <AccountWorkspace
@@ -2609,6 +2644,227 @@ function AiWorkspace({ news, articles, useAiResultAsArticleDraft }) {
   );
 }
 
+function loadSummerPlan() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SUMMER_PLAN_KEY) || 'null');
+    if (!saved) return defaultSummerPlan;
+    return {
+      goals: { ...defaultSummerPlan.goals, ...(saved.goals || {}) },
+      schedule: Array.isArray(saved.schedule) && saved.schedule.length > 0 ? saved.schedule : defaultSummerPlan.schedule,
+      weekly: Array.isArray(saved.weekly) && saved.weekly.length > 0 ? saved.weekly : defaultSummerPlan.weekly
+    };
+  } catch {
+    return defaultSummerPlan;
+  }
+}
+
+function SummerPlanWorkspace() {
+  const initialPlan = useMemo(loadSummerPlan, []);
+  const [goals, setGoals] = useState(initialPlan.goals);
+  const [scheduleRows, setScheduleRows] = useState(initialPlan.schedule);
+  const [weeklyRows, setWeeklyRows] = useState(initialPlan.weekly);
+  const [saveMessage, setSaveMessage] = useState('已自动保存');
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      localStorage.setItem(SUMMER_PLAN_KEY, JSON.stringify({ goals, schedule: scheduleRows, weekly: weeklyRows }));
+      setSaveMessage(`已自动保存 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [goals, scheduleRows, weeklyRows]);
+
+  function updateGoal(field, value) {
+    setGoals((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateScheduleRow(rowId, field, value) {
+    setScheduleRows((current) =>
+      current.map((row) => (row.id === rowId ? { ...row, [field]: value } : row))
+    );
+  }
+
+  function addScheduleRow() {
+    setScheduleRows((current) => [
+      ...current,
+      { id: `daily-${Date.now()}`, time: '', task: '新的安排', note: '' }
+    ]);
+  }
+
+  function deleteScheduleRow(rowId) {
+    setScheduleRows((current) => current.filter((row) => row.id !== rowId));
+  }
+
+  function updateWeeklyRow(rowId, field, value) {
+    setWeeklyRows((current) =>
+      current.map((row) => (row.id === rowId ? { ...row, [field]: value } : row))
+    );
+  }
+
+  function addWeeklyRow() {
+    setWeeklyRows((current) => [
+      ...current,
+      { id: `week-${Date.now()}`, day: '新增', focus: '新的每周重点', done: false }
+    ]);
+  }
+
+  function deleteWeeklyRow(rowId) {
+    setWeeklyRows((current) => current.filter((row) => row.id !== rowId));
+  }
+
+  function resetPlan() {
+    setGoals(defaultSummerPlan.goals);
+    setScheduleRows(defaultSummerPlan.schedule);
+    setWeeklyRows(defaultSummerPlan.weekly);
+    setSaveMessage('已恢复默认计划');
+  }
+
+  async function copyPlanMarkdown() {
+    const markdown = [
+      '# 暑期计划表',
+      '',
+      '## 目标',
+      `- 学习目标：${goals.main}`,
+      `- 运动目标：${goals.exercise}`,
+      `- 兴趣目标：${goals.project}`,
+      '',
+      '## 每日安排',
+      '| 时间 | 安排 | 备注 |',
+      '|---|---|---|',
+      ...scheduleRows.map((row) => `| ${row.time || ' '} | ${row.task || ' '} | ${row.note || ' '} |`),
+      '',
+      '## 每周重点',
+      '| 星期 | 重点 | 完成 |',
+      '|---|---|---|',
+      ...weeklyRows.map((row) => `| ${row.day || ' '} | ${row.focus || ' '} | ${row.done ? '完成' : '未完成'} |`)
+    ].join('\n');
+
+    try {
+      await navigator.clipboard.writeText(markdown);
+      setSaveMessage('已复制 Markdown');
+    } catch {
+      setSaveMessage('复制失败，可以手动选中内容');
+    }
+  }
+
+  const completedWeeklyCount = weeklyRows.filter((row) => row.done).length;
+
+  return (
+    <section className="workspace summer-plan-workspace">
+      <div className="content-band summer-plan-hero">
+        <div>
+          <p className="eyebrow">Summer Planner</p>
+          <h1>暑期计划表</h1>
+          <p className="summary">直接点进表格就能修改，内容会保存在当前浏览器里。适合每天打开博客时顺手检查一下今天的节奏。</p>
+        </div>
+        <div className="summer-plan-actions">
+          <span className="status-pill inline">
+            <Save size={16} />
+            {saveMessage}
+          </span>
+          <button className="ghost-button" type="button" onClick={copyPlanMarkdown}>
+            <Copy size={16} />
+            <span>复制</span>
+          </button>
+          <button className="ghost-button" type="button" onClick={resetPlan}>
+            <RefreshCw size={16} />
+            <span>恢复默认</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="summer-goal-grid">
+        <label className="summer-goal-card">
+          <span>学习目标</span>
+          <textarea value={goals.main} onChange={(event) => updateGoal('main', event.target.value)} />
+        </label>
+        <label className="summer-goal-card">
+          <span>运动目标</span>
+          <textarea value={goals.exercise} onChange={(event) => updateGoal('exercise', event.target.value)} />
+        </label>
+        <label className="summer-goal-card">
+          <span>兴趣目标</span>
+          <textarea value={goals.project} onChange={(event) => updateGoal('project', event.target.value)} />
+        </label>
+      </div>
+
+      <section className="content-band summer-plan-panel">
+        <div className="admin-panel-heading">
+          <div>
+            <h2>每日时间表</h2>
+            <p>时间、安排和备注都可以直接改。</p>
+          </div>
+          <button className="primary-action" type="button" onClick={addScheduleRow}>
+            <PlusCircle size={17} />
+            <span>新增一行</span>
+          </button>
+        </div>
+
+        <div className="summer-table-wrap">
+          <table className="summer-plan-table">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>安排</th>
+                <th>备注</th>
+                <th aria-label="操作" />
+              </tr>
+            </thead>
+            <tbody>
+              {scheduleRows.map((row) => (
+                <tr key={row.id}>
+                  <td>
+                    <input value={row.time} onChange={(event) => updateScheduleRow(row.id, 'time', event.target.value)} />
+                  </td>
+                  <td>
+                    <input value={row.task} onChange={(event) => updateScheduleRow(row.id, 'task', event.target.value)} />
+                  </td>
+                  <td>
+                    <textarea value={row.note} onChange={(event) => updateScheduleRow(row.id, 'note', event.target.value)} />
+                  </td>
+                  <td>
+                    <button className="compact-icon-button danger-button" type="button" onClick={() => deleteScheduleRow(row.id)} aria-label="删除这一行">
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="content-band summer-plan-panel">
+        <div className="admin-panel-heading">
+          <div>
+            <h2>每周重点</h2>
+            <p>{completedWeeklyCount} / {weeklyRows.length} 项已完成。</p>
+          </div>
+          <button className="primary-action" type="button" onClick={addWeeklyRow}>
+            <PlusCircle size={17} />
+            <span>新增重点</span>
+          </button>
+        </div>
+
+        <div className="weekly-plan-list">
+          {weeklyRows.map((row) => (
+            <div className={row.done ? 'weekly-plan-row done' : 'weekly-plan-row'} key={row.id}>
+              <label className="weekly-check">
+                <input type="checkbox" checked={row.done} onChange={(event) => updateWeeklyRow(row.id, 'done', event.target.checked)} />
+                <CheckCircle2 size={18} />
+              </label>
+              <input value={row.day} onChange={(event) => updateWeeklyRow(row.id, 'day', event.target.value)} aria-label="星期" />
+              <input value={row.focus} onChange={(event) => updateWeeklyRow(row.id, 'focus', event.target.value)} aria-label="每周重点" />
+              <button className="compact-icon-button danger-button" type="button" onClick={() => deleteWeeklyRow(row.id)} aria-label="删除这一项">
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+    </section>
+  );
+}
+
 function GameWorkspace() {
   const [frameKey, setFrameKey] = useState(0);
 
@@ -3081,6 +3337,8 @@ function AdminWorkspace({
           <span>退出</span>
         </button>
       </div>
+
+      <ProjectOpsPanel />
 
       <section className="admin-panel release-panel">
         <div className="admin-panel-heading">
