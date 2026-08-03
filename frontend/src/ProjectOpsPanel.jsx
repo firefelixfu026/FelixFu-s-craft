@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 const SITE_LAUNCHED_AT = new Date('2026-07-04T00:00:00+08:00');
 const OPS_HISTORY_KEY = 'felix_blog_ops_check_history';
+const GITHUB_RUNS_URL = 'https://api.github.com/repos/firefelixfu026/the-piggy-home-of-felixfu/actions/runs?per_page=5';
 
 const services = [
   {
@@ -149,6 +150,33 @@ function normalizeLiveServices(value) {
   }));
 }
 
+function normalizeWorkflowRun(run) {
+  return {
+    id: safeText(run?.id, `${Date.now()}`),
+    name: safeText(run?.name, 'GitHub Actions'),
+    title: safeText(run?.display_title, '部署任务'),
+    status: safeText(run?.status, 'unknown'),
+    conclusion: safeText(run?.conclusion, 'running'),
+    branch: safeText(run?.head_branch, 'main'),
+    sha: safeText(run?.head_sha, '').slice(0, 7) || '未知',
+    url: safeText(run?.html_url, ''),
+    updatedAt: safeText(run?.updated_at, '')
+  };
+}
+
+function workflowStatusLabel(run) {
+  if (run.status !== 'completed') return '运行中';
+  if (run.conclusion === 'success') return '成功';
+  if (run.conclusion === 'failure') return '失败';
+  if (run.conclusion === 'cancelled') return '取消';
+  return run.conclusion;
+}
+
+function workflowStatusClass(run) {
+  if (run.status !== 'completed') return 'warning';
+  return run.conclusion === 'success' ? 'ready' : 'danger';
+}
+
 function readCheckHistory() {
   if (typeof localStorage === 'undefined') return [];
   try {
@@ -170,8 +198,11 @@ function ProjectOpsPanel({ authToken }) {
   const [selectedAction, setSelectedAction] = useState('logs');
   const [systemHealth, setSystemHealth] = useState(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+  const [isLoadingDeployments, setIsLoadingDeployments] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [checkHistory, setCheckHistory] = useState(readCheckHistory);
+  const [deploymentRuns, setDeploymentRuns] = useState([]);
+  const [deploymentMessage, setDeploymentMessage] = useState('等待读取 GitHub Actions');
   const [events, setEvents] = useState([
     ['后端 API 日志检查', '建议先看 backend 日志再处理 500 或登录异常'],
     ['数据库备份提醒', '大改、展示、迁移前先执行 backup-postgres.sh'],
@@ -186,6 +217,7 @@ function ProjectOpsPanel({ authToken }) {
   const onlineCount = services.filter((service) => service.status === 'online').length;
   const liveServices = normalizeLiveServices(systemHealth?.services);
   const checkedAt = parseServerTime(systemHealth?.checkedAt);
+  const latestDeployRun = deploymentRuns.find((run) => run.name === 'Deploy') || deploymentRuns[0];
   const liveStatusCounts = liveServices.reduce(
     (counts, service) => ({
       ...counts,
@@ -201,7 +233,31 @@ function ProjectOpsPanel({ authToken }) {
 
   useEffect(() => {
     refreshSystemHealth();
+    refreshDeploymentStatus();
   }, [authToken]);
+
+  async function refreshDeploymentStatus() {
+    setIsLoadingDeployments(true);
+    try {
+      const response = await fetch(GITHUB_RUNS_URL, {
+        headers: { Accept: 'application/vnd.github+json' }
+      });
+      if (!response.ok) {
+        setDeploymentMessage(`GitHub 返回 ${response.status}`);
+        return;
+      }
+      const payload = await response.json();
+      const runs = Array.isArray(payload.workflow_runs)
+        ? payload.workflow_runs.map(normalizeWorkflowRun)
+        : [];
+      setDeploymentRuns(runs);
+      setDeploymentMessage(runs.length ? '已读取最近部署' : '暂时没有部署记录');
+    } catch {
+      setDeploymentMessage('无法读取 GitHub Actions，可能是网络或访问频率限制');
+    } finally {
+      setIsLoadingDeployments(false);
+    }
+  }
 
   async function refreshSystemHealth() {
     if (!authToken) return;
@@ -328,6 +384,42 @@ function ProjectOpsPanel({ authToken }) {
         <div className="ops-metric">
           <span>上传上限</span>
           <strong>{systemHealth?.limits?.maxUploadMb ? `${systemHealth.limits.maxUploadMb} MB` : '待检查'}</strong>
+        </div>
+        <div className="ops-metric">
+          <span>线上提交</span>
+          <strong>{latestDeployRun?.sha || '待读取'}</strong>
+        </div>
+        <div className="ops-metric">
+          <span>最近部署</span>
+          <strong>{latestDeployRun ? workflowStatusLabel(latestDeployRun) : '待读取'}</strong>
+        </div>
+      </div>
+
+      <div className="ops-events">
+        <div className="admin-panel-heading compact-heading">
+          <h3>部署状态</h3>
+          <button className="ghost-button" type="button" onClick={refreshDeploymentStatus}>
+            {isLoadingDeployments ? '读取中' : '刷新部署'}
+          </button>
+        </div>
+        <div className="ops-list">
+          {deploymentRuns.length === 0 ? (
+            <p className="empty-state">{deploymentMessage}</p>
+          ) : deploymentRuns.map((run) => (
+            <article className="ops-list-row ops-deploy-row" key={run.id}>
+              <div>
+                <strong>{run.name} · {run.title}</strong>
+                <span>{run.branch} · {run.sha} · {formatDateTime(parseServerTime(run.updatedAt) || run.updatedAt)}</span>
+              </div>
+              {run.url ? (
+                <a className={`ops-status ${workflowStatusClass(run)}`} href={run.url} target="_blank" rel="noreferrer">
+                  {workflowStatusLabel(run)}
+                </a>
+              ) : (
+                <span className={`ops-status ${workflowStatusClass(run)}`}>{workflowStatusLabel(run)}</span>
+              )}
+            </article>
+          ))}
         </div>
       </div>
 

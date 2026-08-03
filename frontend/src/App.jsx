@@ -3878,16 +3878,44 @@ class AdminPanelErrorBoundary extends React.Component {
 
 function ReleaseWorkspace() {
   const [releasePage, setReleasePage] = useState(0);
+  const [releaseQuery, setReleaseQuery] = useState('');
+  const [releaseMajor, setReleaseMajor] = useState('all');
+  const [releaseStatus, setReleaseStatus] = useState('all');
   const latestRelease = releaseArchive[0];
   const shippedCount = releaseArchive.filter((release) => release.status === '已上线').length;
   const archivedCount = releaseArchive.filter((release) => release.status === '已归档').length;
   const totalPoints = releaseArchive.reduce((total, release) => total + release.points.length, 0);
-  const pageCount = Math.max(1, Math.ceil(releaseArchive.length / RELEASE_PAGE_SIZE));
+  const filteredReleases = releaseArchive.filter((release) => {
+    const query = releaseQuery.trim().toLowerCase();
+    const searchable = [release.version, release.title, release.status, ...release.points].join(' ').toLowerCase();
+    const major = release.version.split('.')[0];
+    return (
+      (!query || searchable.includes(query)) &&
+      (releaseMajor === 'all' || major === releaseMajor) &&
+      (releaseStatus === 'all' || release.status === releaseStatus)
+    );
+  });
+  const pageCount = Math.max(1, Math.ceil(filteredReleases.length / RELEASE_PAGE_SIZE));
   const safeReleasePage = Math.min(releasePage, pageCount - 1);
-  const visibleReleases = releaseArchive.slice(
+  const visibleReleases = filteredReleases.slice(
     safeReleasePage * RELEASE_PAGE_SIZE,
     safeReleasePage * RELEASE_PAGE_SIZE + RELEASE_PAGE_SIZE
   );
+
+  function updateReleaseQuery(value) {
+    setReleaseQuery(value);
+    setReleasePage(0);
+  }
+
+  function updateReleaseMajor(value) {
+    setReleaseMajor(value);
+    setReleasePage(0);
+  }
+
+  function updateReleaseStatus(value) {
+    setReleaseStatus(value);
+    setReleasePage(0);
+  }
 
   return (
     <section className="admin-panel release-page">
@@ -3922,28 +3950,51 @@ function ReleaseWorkspace() {
         </div>
       </div>
 
-      <div className="release-pager">
-        <button
-          className="ghost-button"
-          type="button"
-          onClick={() => setReleasePage((page) => Math.max(0, page - 1))}
-          disabled={safeReleasePage === 0}
-        >
-          上一页
-        </button>
-        <span>{safeReleasePage + 1} / {pageCount}</span>
-        <button
-          className="ghost-button"
-          type="button"
-          onClick={() => setReleasePage((page) => Math.min(pageCount - 1, page + 1))}
-          disabled={safeReleasePage === pageCount - 1}
-        >
-          下一页
-        </button>
+      <div className="release-toolbar">
+        <div className="admin-filter-bar release-filter-bar">
+          <input
+            value={releaseQuery}
+            onChange={(event) => updateReleaseQuery(event.target.value)}
+            placeholder="搜索版本、标题或改动点"
+          />
+          <select value={releaseMajor} onChange={(event) => updateReleaseMajor(event.target.value)}>
+            <option value="all">全部大版本</option>
+            <option value="v2">v2.x</option>
+            <option value="v1">v1.x</option>
+            <option value="v0">v0.x</option>
+          </select>
+          <select value={releaseStatus} onChange={(event) => updateReleaseStatus(event.target.value)}>
+            <option value="all">全部状态</option>
+            <option value="已上线">已上线</option>
+            <option value="已归档">已归档</option>
+          </select>
+        </div>
+
+        <div className="release-pager">
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => setReleasePage((page) => Math.max(0, page - 1))}
+            disabled={safeReleasePage === 0}
+          >
+            上一页
+          </button>
+          <span>{filteredReleases.length ? safeReleasePage + 1 : 0} / {pageCount}</span>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => setReleasePage((page) => Math.min(pageCount - 1, page + 1))}
+            disabled={safeReleasePage === pageCount - 1}
+          >
+            下一页
+          </button>
+        </div>
       </div>
 
       <div className="release-timeline">
-        {visibleReleases.map((release) => (
+        {visibleReleases.length === 0 ? (
+          <p className="empty-state">没有匹配的版本记录。</p>
+        ) : visibleReleases.map((release) => (
           <article className="release-version-card" key={release.version}>
             <div>
               <span className="release-version">{release.version}</span>
@@ -4119,6 +4170,53 @@ function AdminWorkspace({
     users: Math.max(0, Math.round((adminStats?.summary?.users || 0) * rangeMultiplier)),
     drafts: adminStats?.summary?.drafts || draftCount,
   };
+  const adminTaskItems = [
+    {
+      id: 'comments',
+      title: pendingCommentCount ? '处理待审评论' : '评论区正常',
+      detail: pendingCommentCount ? `还有 ${pendingCommentCount} 条评论等待审核` : '当前没有待审评论',
+      action: pendingCommentCount ? '去处理' : '查看评论',
+      page: 'comments',
+      tone: pendingCommentCount ? 'attention' : 'ready',
+      icon: MessageCircle
+    },
+    {
+      id: 'drafts',
+      title: draftCount ? '继续草稿' : '新文章准备',
+      detail: draftCount ? `还有 ${draftCount} 篇草稿可以继续推进` : '可以从模板或空白文章开始写',
+      action: draftCount ? '看文章库' : '写文章',
+      page: draftCount ? 'articles' : 'editor',
+      tone: draftCount ? 'attention' : 'ready',
+      icon: FilePenLine
+    },
+    {
+      id: 'ops',
+      title: '运行状态检查',
+      detail: '进入运维页执行真实检查，确认 API、数据库和上传目录状态',
+      action: '检查运维',
+      page: 'ops',
+      tone: 'neutral',
+      icon: ShieldCheck
+    },
+    {
+      id: 'releases',
+      title: '更新档案',
+      detail: `版本清单已收录 ${releaseArchive.length} 条记录，可搜索和分页回看`,
+      action: '看版本',
+      page: 'releases',
+      tone: 'neutral',
+      icon: Code2
+    },
+    {
+      id: 'ai',
+      title: aiSettings?.configured ? 'AI 已配置' : 'AI 待配置',
+      detail: aiSettings?.configured ? '可以直接测试模型和使用写作辅助' : '配置后可启用真实模型辅助写作',
+      action: '打开 AI',
+      page: 'ai',
+      tone: aiSettings?.configured ? 'ready' : 'attention',
+      icon: Bot
+    }
+  ];
 
   function insertIntoContent(prefix, suffix = '', placeholder = '文本') {
     const textarea = contentTextareaRef.current;
@@ -4267,6 +4365,28 @@ function AdminWorkspace({
                 <ShieldCheck size={17} />
                 <span>安全日志</span>
               </button>
+            </div>
+            <div className="admin-task-grid">
+              {adminTaskItems.map((task) => {
+                const Icon = task.icon;
+                return (
+                  <button
+                    className={`admin-task-card ${task.tone}`}
+                    key={task.id}
+                    type="button"
+                    onClick={() => openAdminPage(task.page)}
+                  >
+                    <span className="admin-task-icon">
+                      <Icon size={18} />
+                    </span>
+                    <span>
+                      <strong>{task.title}</strong>
+                      <em>{task.detail}</em>
+                    </span>
+                    <small>{task.action}</small>
+                  </button>
+                );
+              })}
             </div>
           </section>
 

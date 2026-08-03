@@ -1387,6 +1387,70 @@ h3 {
   gap: 10px;
 }
 
+.admin-task-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-task-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  min-height: 112px;
+  padding: 12px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  color: #102033;
+  text-align: left;
+  background: #f8fafc;
+}
+
+.admin-task-card.ready {
+  border-color: #b9e4d2;
+  background: #f1fbf6;
+}
+
+.admin-task-card.attention {
+  border-color: #f4d08b;
+  background: #fff8e6;
+}
+
+.admin-task-card:hover {
+  border-color: #1f7a6d;
+}
+
+.admin-task-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  color: #1f7a6d;
+  background: #dff4ed;
+}
+
+.admin-task-card strong,
+.admin-task-card em,
+.admin-task-card small {
+  display: block;
+}
+
+.admin-task-card em {
+  margin-top: 5px;
+  color: #5b6878;
+  font-style: normal;
+  line-height: 1.45;
+}
+
+.admin-task-card small {
+  grid-column: 1 / -1;
+  color: #1f7a6d;
+  font-weight: 800;
+}
+
 .admin-filter-bar {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(150px, 0.35fr));
@@ -1748,6 +1812,10 @@ h3 {
   font-size: 12px;
 }
 
+.ops-deploy-row a {
+  text-decoration: none;
+}
+
 .release-panel {
   margin-bottom: 18px;
 }
@@ -1819,6 +1887,17 @@ h3 {
 .release-timeline {
   display: grid;
   gap: 12px;
+}
+
+.release-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.release-filter-bar {
+  grid-template-columns: minmax(240px, 1fr) repeat(2, minmax(140px, 0.25fr));
 }
 
 .release-pager {
@@ -2972,6 +3051,19 @@ h3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .admin-task-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .release-toolbar,
+  .release-filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .release-pager {
+    justify-content: flex-start;
+  }
+
   .ops-metric-grid,
   .ops-live-grid,
   .ops-bottom-grid,
@@ -3056,6 +3148,10 @@ h3 {
   }
 
   .release-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-task-grid {
     grid-template-columns: 1fr;
   }
 
