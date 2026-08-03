@@ -169,6 +169,107 @@ const personalizedTimeSlots = [
   { id: 'slot-2130', time: '21:30 - 22:30', activity: '洗漱 + 睡眠准备', focus: '填睡眠记录，尽量 22:30 前进入休息状态。', type: '睡眠' }
 ];
 
+const personalizedDailyPlans = [
+  createDailyPlan('2026-08-04', '8月4日', '启动日：数据结构 + 大物框架', {
+    'slot-0800': { activity: '高级数据结构与算法分析', focus: '复杂度、堆、并查集预热；先建立期末冲刺目录。' },
+    'slot-1030': { activity: '大学物理（乙）Ⅱ', focus: '电场、电势、电容先过概念和公式。' },
+    'slot-1400': { activity: '数据结构题目整理', focus: '整理复杂度常见坑，写 3-5 道基础题。' },
+    'slot-1530': { activity: '快走', focus: '40 分钟，低压力启动。' },
+    'slot-2030': { activity: '红与黑', focus: '阅读 30 页，B 站和小红书只保留应用限时。' }
+  }),
+  createDailyPlan('2026-08-05', '8月5日', '计组启动 + 概率基础', {
+    'slot-0800': { activity: '计算机组成', focus: '数据表示、定点数、浮点数和补码。' },
+    'slot-1030': { activity: '概率论与数理统计', focus: '随机变量、分布函数、离散/连续分布。' },
+    'slot-1400': { activity: '计组笔记整理', focus: '把数制转换、补码、浮点表示整理成速查表。' },
+    'slot-1530': { activity: '室内燃脂', focus: '25 分钟，控制强度但要出汗。' },
+    'slot-2030': { activity: '葬送的芙莉莲', focus: '看 1 集，结束后填睡眠记录。' }
+  }),
+  createDailyPlan('2026-08-06', '8月6日', '概率推进 + 数据结构图论', {
+    'slot-0800': { activity: '概率论与数理统计', focus: '期望、方差、常见分布，先抓公式适用条件。' },
+    'slot-1030': { activity: '高级数据结构与算法分析', focus: '图论基础、BFS/DFS、最短路预习。' },
+    'slot-1400': { activity: '概率题目训练', focus: '做随机变量与期望方差例题，整理错因。' },
+    'slot-1530': { activity: '游泳', focus: '以恢复和舒展为主。' },
+    'slot-2030': { activity: '以撒的结合', focus: '45 分钟内收住，避免顺手刷视频。' }
+  }),
+  createDailyPlan('2026-08-07', '8月7日', '大物电磁 + 计组指令', {
+    'slot-0800': { activity: '大学物理（乙）Ⅱ', focus: '稳恒电流、磁场基础和典型公式。' },
+    'slot-1030': { activity: '计算机组成', focus: '指令系统、寻址方式、CPU 数据通路。' },
+    'slot-1400': { activity: '大物公式卡片', focus: '把电场/磁场公式按场景归类。' },
+    'slot-1530': { activity: '快走', focus: '45 分钟，顺便复盘上午知识点。' },
+    'slot-2030': { activity: '红与黑', focus: '阅读 30 页，做一句话摘要。' }
+  }),
+  createDailyPlan('2026-08-08', '8月8日', '数据结构强化日', {
+    'slot-0800': { activity: '高级数据结构与算法分析', focus: '平衡树、哈希、摊还分析先看概念。' },
+    'slot-1030': { activity: '高级数据结构与算法分析', focus: '图论最短路和数据结构应用题型。' },
+    'slot-1400': { activity: '算法题练习', focus: '做 2-3 道图论/并查集/堆相关题。' },
+    'slot-1530': { activity: '室内燃脂', focus: '25 分钟，结束后记录体重和状态。' },
+    'slot-2030': { activity: '第五人格', focus: '45 分钟，结束即停。' }
+  }),
+  createDailyPlan('2026-08-09', '8月9日', '计组主线日', {
+    'slot-0800': { activity: '计算机组成', focus: 'CPU 数据通路、控制器、流水线概念。' },
+    'slot-1030': { activity: '计算机组成', focus: '存储层次、Cache 基础和命中率理解。' },
+    'slot-1400': { activity: '计组结构图整理', focus: '画 CPU/存储层次结构图，建立整体感。' },
+    'slot-1530': { activity: '游泳', focus: '放松肩颈，控制疲劳。' },
+    'slot-2030': { activity: '葬送的芙莉莲', focus: '看 1 集，顺手记今天花销。' }
+  }),
+  createDailyPlan('2026-08-10', '8月10日', '概率统计推进日', {
+    'slot-0800': { activity: '概率论与数理统计', focus: '二维随机变量、边缘分布、条件分布。' },
+    'slot-1030': { activity: '概率论与数理统计', focus: '大数定律、中心极限定理先看直觉。' },
+    'slot-1400': { activity: '概率错题整理', focus: '做 3-5 道分布与期望相关题。' },
+    'slot-1530': { activity: '快走', focus: '40 分钟，保持稳定运动量。' },
+    'slot-2030': { activity: '红与黑', focus: '阅读 30 页，睡前不刷信息流。' }
+  }),
+  createDailyPlan('2026-08-11', '8月11日', '大物电磁推进日', {
+    'slot-0800': { activity: '大学物理（乙）Ⅱ', focus: '电磁感应、法拉第定律、楞次定律。' },
+    'slot-1030': { activity: '大学物理（乙）Ⅱ', focus: '典型题型：感应电动势、磁通量变化。' },
+    'slot-1400': { activity: '大物题目训练', focus: '把公式代入和方向判断分开练。' },
+    'slot-1530': { activity: '室内燃脂', focus: '30 分钟，练完补水。' },
+    'slot-2030': { activity: '以撒的结合', focus: '45 分钟；如果白天进度落后，改为红与黑。' }
+  }),
+  createDailyPlan('2026-08-12', '8月12日', '算法 + 计组交叉复盘', {
+    'slot-0800': { activity: '高级数据结构与算法分析', focus: '平衡树、哈希、图算法回顾。' },
+    'slot-1030': { activity: '计算机组成', focus: '流水线和存储层次复盘。' },
+    'slot-1400': { activity: '综合笔记整理', focus: '把数据结构模板和计组结构图归档。' },
+    'slot-1530': { activity: '游泳', focus: '中等强度，避免过累。' },
+    'slot-2030': { activity: '葬送的芙莉莲', focus: '看 1 集，记录当天应用使用时间。' }
+  }),
+  createDailyPlan('2026-08-13', '8月13日', '概率 + 大物交叉复盘', {
+    'slot-0800': { activity: '概率论与数理统计', focus: '常见分布、期望方差、CLT 回顾。' },
+    'slot-1030': { activity: '大学物理（乙）Ⅱ', focus: '电磁学公式和题型串联。' },
+    'slot-1400': { activity: '综合题目训练', focus: '概率和大物各做一组基础题。' },
+    'slot-1530': { activity: '快走', focus: '45 分钟，轻松一点。' },
+    'slot-2030': { activity: '第五人格', focus: '45 分钟，结束后填睡眠计划。' }
+  }),
+  createDailyPlan('2026-08-14', '8月14日', '四门课总复盘', {
+    'slot-0800': { activity: '四门课清单复盘', focus: '列出每门课“已懂/半懂/没懂”三栏。' },
+    'slot-1030': { activity: '薄弱点补齐', focus: '优先补最影响开学听课的概念。' },
+    'slot-1400': { activity: '下学期第一周准备', focus: '整理资料、课程文件夹、预习目录。' },
+    'slot-1530': { activity: '室内燃脂', focus: '25 分钟，轻量收尾。' },
+    'slot-2030': { activity: '红与黑 / 自由娱乐', focus: '优先阅读；如果完成度高再游戏。' }
+  }),
+  createDailyPlan('2026-08-15', '8月15日', '收尾日：整理与调整', {
+    'slot-0800': { activity: '暑期计划收尾', focus: '总结 8/4-8/15 完成情况和遗留问题。' },
+    'slot-1030': { activity: '开学预习交接', focus: '给四门课写下一步任务清单。' },
+    'slot-1400': { activity: '自由调整 / 补漏', focus: '哪里欠账补哪里；没有欠账就整理博客记录。' },
+    'slot-1530': { activity: '轻松快走', focus: '30 分钟，恢复为主。' },
+    'slot-2030': { activity: '自由复盘', focus: '可以看番/阅读/游戏，但把应用时长记上。' }
+  })
+];
+
+function createDailyPlan(date, label, theme, overrides = {}) {
+  return {
+    id: date,
+    date,
+    label,
+    theme,
+    slots: personalizedTimeSlots.map((slot) => ({
+      ...slot,
+      ...(overrides[slot.id] || {}),
+      id: `${date}-${slot.id}`
+    }))
+  };
+}
+
 function getArticleMonth(date) {
   if (!date) return '';
   const normalized = String(date).replace(/\//g, '-');
@@ -2744,13 +2845,43 @@ function normalizeDailyRows(rows) {
     : personalizedTimeSlots;
 }
 
+function normalizeDailyPlans(plan) {
+  const source = Array.isArray(plan?.dailyPlans) && plan.dailyPlans.length
+    ? plan.dailyPlans
+    : personalizedDailyPlans;
+
+  return source.map((day, dayIndex) => {
+    const fallback = personalizedDailyPlans[dayIndex] || personalizedDailyPlans[0];
+    const date = day?.date || fallback.date || day?.id || `day-${dayIndex + 1}`;
+    const rawSlots = Array.isArray(day?.slots) && day.slots.length ? day.slots : fallback.slots;
+    const slots = normalizeDailyRows(rawSlots).map((slot, slotIndex) => ({
+      ...(fallback.slots?.[slotIndex] || {}),
+      ...slot,
+      id: slot.id || fallback.slots?.[slotIndex]?.id || `${date}-slot-${slotIndex + 1}`
+    }));
+
+    return {
+      ...fallback,
+      ...(day || {}),
+      id: day?.id || date,
+      date,
+      label: day?.label || fallback.label || date,
+      theme: day?.theme || fallback.theme || '',
+      slots
+    };
+  });
+}
+
 function normalizeSummerPlan(plan) {
+  const dailyPlans = normalizeDailyPlans(plan);
+
   return {
     ...personalizedSummerPlan,
     ...(plan || {}),
     profile: { ...personalizedSummerPlan.profile, ...(plan?.profile || {}) },
     goals: { ...personalizedSummerPlan.goals, ...(plan?.goals || {}) },
-    daily: normalizeDailyRows(plan?.daily),
+    daily: dailyPlans[0]?.slots || normalizeDailyRows(plan?.daily),
+    dailyPlans,
     courses: Array.isArray(plan?.courses) && plan.courses.length ? plan.courses : personalizedSummerPlan.courses,
     apps: Array.isArray(plan?.apps) && plan.apps.length ? plan.apps : personalizedSummerPlan.apps,
     expenses: Array.isArray(plan?.expenses) && plan.expenses.length ? plan.expenses : personalizedSummerPlan.expenses,
@@ -2763,8 +2894,11 @@ function normalizeSummerPlan(plan) {
 function SummerPlanWorkspace({ currentUser, authToken }) {
   const canEdit = currentUser?.role === 'admin';
   const [plan, setPlan] = useState(() => normalizeSummerPlan(personalizedSummerPlan));
+  const [selectedPlanDate, setSelectedPlanDate] = useState(personalizedDailyPlans[0].date);
   const [saveMessage, setSaveMessage] = useState('正在读取数据库');
   const [hasLoadedPlan, setHasLoadedPlan] = useState(false);
+  const dayPlans = Array.isArray(plan.dailyPlans) && plan.dailyPlans.length ? plan.dailyPlans : personalizedDailyPlans;
+  const selectedDayPlan = dayPlans.find((day) => day.date === selectedPlanDate) || dayPlans[0];
 
   useEffect(() => {
     let cancelled = false;
@@ -2819,6 +2953,12 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
     return () => window.clearTimeout(timer);
   }, [authToken, canEdit, hasLoadedPlan, plan]);
 
+  useEffect(() => {
+    if (!dayPlans.some((day) => day.date === selectedPlanDate)) {
+      setSelectedPlanDate(dayPlans[0]?.date || personalizedDailyPlans[0].date);
+    }
+  }, [dayPlans, selectedPlanDate]);
+
   function updateNested(section, field, value) {
     if (!canEdit) return;
     setPlan((current) => ({
@@ -2851,9 +2991,46 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
     }));
   }
 
+  function updateDailySlot(dayDate, rowId, field, value) {
+    if (!canEdit) return;
+    setPlan((current) => {
+      const dailyPlans = (current.dailyPlans || personalizedDailyPlans).map((day) => (
+        day.date === dayDate
+          ? { ...day, slots: day.slots.map((row) => (row.id === rowId ? { ...row, [field]: value } : row)) }
+          : day
+      ));
+      return { ...current, dailyPlans, daily: dailyPlans[0]?.slots || current.daily };
+    });
+  }
+
+  function addDailySlot(dayDate, row) {
+    if (!canEdit) return;
+    setPlan((current) => {
+      const dailyPlans = (current.dailyPlans || personalizedDailyPlans).map((day) => (
+        day.date === dayDate
+          ? { ...day, slots: [...(day.slots || []), { ...row, id: `${dayDate}-slot-${Date.now()}` }] }
+          : day
+      ));
+      return { ...current, dailyPlans, daily: dailyPlans[0]?.slots || current.daily };
+    });
+  }
+
+  function deleteDailySlot(dayDate, rowId) {
+    if (!canEdit) return;
+    setPlan((current) => {
+      const dailyPlans = (current.dailyPlans || personalizedDailyPlans).map((day) => (
+        day.date === dayDate
+          ? { ...day, slots: (day.slots || []).filter((row) => row.id !== rowId) }
+          : day
+      ));
+      return { ...current, dailyPlans, daily: dailyPlans[0]?.slots || current.daily };
+    });
+  }
+
   function resetPlan() {
     if (!canEdit) return;
     setPlan(normalizeSummerPlan(personalizedSummerPlan));
+    setSelectedPlanDate(personalizedDailyPlans[0].date);
     setSaveMessage('已恢复付江樊版模板');
   }
 
@@ -2868,9 +3045,13 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
       ...plan.courses.map((course) => `- ${course.name}：${course.target}（进度 ${course.progress || '0%'}）`),
       '',
       '## 每日时间段安排',
-      '| 时间段 | 要做什么 | 重点/说明 | 类型 |',
-      '|---|---|---|---|',
-      ...plan.daily.map((row) => `| ${row.time || ' '} | ${row.activity || ' '} | ${row.focus || ' '} | ${row.type || ' '} |`)
+      ...dayPlans.flatMap((day) => [
+        `### ${day.label} · ${day.theme}`,
+        '| 时间段 | 要做什么 | 重点/说明 | 类型 |',
+        '|---|---|---|---|',
+        ...(day.slots || []).map((row) => `| ${row.time || ' '} | ${row.activity || ' '} | ${row.focus || ' '} | ${row.type || ' '} |`),
+        ''
+      ])
     ].join('\n');
 
     try {
@@ -2922,12 +3103,35 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
         <div className="admin-panel-heading">
           <div>
             <h2>每日时间段安排</h2>
-            <p>按时间段看一天该做什么，中间保留弹性时间；有额外活动时直接改对应格子。</p>
+            <p>先选择日期，再按时间段看当天该做什么；每一天都可以单独修改。</p>
           </div>
-          <button className="primary-action" type="button" onClick={() => addRow('daily', { time: '新增时间段', activity: '临时活动', focus: '', type: '弹性' })} disabled={!canEdit}>
+          <button className="primary-action" type="button" onClick={() => addDailySlot(selectedDayPlan.date, { time: '新增时间段', activity: '临时活动', focus: '', type: '弹性' })} disabled={!canEdit}>
             <PlusCircle size={17} />
             <span>新增时间段</span>
           </button>
+        </div>
+        <div className="summer-date-picker">
+          <label>
+            <span>选择日期</span>
+            <select value={selectedDayPlan.date} onChange={(event) => setSelectedPlanDate(event.target.value)}>
+              {dayPlans.map((day) => (
+                <option key={day.date} value={day.date}>{day.label} · {day.theme}</option>
+              ))}
+            </select>
+          </label>
+          <div className="summer-date-tabs" aria-label="暑期计划日期">
+            {dayPlans.map((day) => (
+              <button
+                className={`summer-date-tab${day.date === selectedDayPlan.date ? ' active' : ''}`}
+                key={day.date}
+                type="button"
+                onClick={() => setSelectedPlanDate(day.date)}
+              >
+                <strong>{day.label}</strong>
+                <span>{day.theme}</span>
+              </button>
+            ))}
+          </div>
         </div>
         <EditableTable
           columns={[
@@ -2937,10 +3141,10 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
             ['type', '类型', 'input']
           ]}
           disabled={!canEdit}
-          rows={plan.daily}
-          section="daily"
-          updateRow={updateRow}
-          deleteRow={deleteRow}
+          rows={selectedDayPlan.slots || []}
+          section={selectedDayPlan.date}
+          updateRow={updateDailySlot}
+          deleteRow={deleteDailySlot}
         />
       </section>
 

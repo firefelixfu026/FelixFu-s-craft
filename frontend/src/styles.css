@@ -2552,6 +2552,80 @@ h3 {
   margin-bottom: 10px;
 }
 
+.summer-date-picker {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.summer-date-picker label {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 360px);
+  gap: 10px;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  color: #334155;
+  font-weight: 800;
+}
+
+.summer-date-picker select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: #18212f;
+  background: #ffffff;
+  outline: 0;
+}
+
+.summer-date-picker select:focus {
+  border-color: #1f7a6d;
+  box-shadow: 0 0 0 3px rgba(31, 122, 109, 0.12);
+}
+
+.summer-date-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.summer-date-tab {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  min-height: 64px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #334155;
+  background: #ffffff;
+  text-align: left;
+}
+
+.summer-date-tab:hover {
+  border-color: #1f7a6d;
+}
+
+.summer-date-tab.active {
+  border-color: #1f7a6d;
+  color: #ffffff;
+  background: #1f7a6d;
+}
+
+.summer-date-tab strong,
+.summer-date-tab span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summer-date-tab span {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
 .summer-table-wrap {
   width: 100%;
   overflow-x: auto;

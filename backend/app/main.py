@@ -166,6 +166,114 @@ DEFAULT_SUMMER_PLAN["daily"] = [
     {"id": "slot-2130", "time": "21:30 - 22:30", "activity": "洗漱 + 睡眠准备", "focus": "填睡眠记录，尽量 22:30 前进入休息状态。", "type": "睡眠"},
 ]
 
+BASE_SUMMER_TIME_SLOTS = DEFAULT_SUMMER_PLAN["daily"]
+
+
+def _summer_day_plan(date: str, label: str, theme: str, overrides: dict[str, dict[str, str]]) -> dict[str, Any]:
+    return {
+        "id": date,
+        "date": date,
+        "label": label,
+        "theme": theme,
+        "slots": [
+            {
+                **slot,
+                **overrides.get(slot["id"], {}),
+                "id": f"{date}-{slot['id']}",
+            }
+            for slot in BASE_SUMMER_TIME_SLOTS
+        ],
+    }
+
+
+DEFAULT_SUMMER_PLAN["dailyPlans"] = [
+    _summer_day_plan("2026-08-04", "8月4日", "启动日：数据结构 + 大物框架", {
+        "slot-0800": {"activity": "高级数据结构与算法分析", "focus": "复杂度、堆、并查集预热；先建立期末冲刺目录。"},
+        "slot-1030": {"activity": "大学物理（乙）Ⅱ", "focus": "电场、电势、电容先过概念和公式。"},
+        "slot-1400": {"activity": "数据结构题目整理", "focus": "整理复杂度常见坑，写 3-5 道基础题。"},
+        "slot-1530": {"activity": "快走", "focus": "40 分钟，低压力启动。"},
+        "slot-2030": {"activity": "红与黑", "focus": "阅读 30 页，B 站和小红书只保留应用限时。"},
+    }),
+    _summer_day_plan("2026-08-05", "8月5日", "计组启动 + 概率基础", {
+        "slot-0800": {"activity": "计算机组成", "focus": "数据表示、定点数、浮点数和补码。"},
+        "slot-1030": {"activity": "概率论与数理统计", "focus": "随机变量、分布函数、离散/连续分布。"},
+        "slot-1400": {"activity": "计组笔记整理", "focus": "把数制转换、补码、浮点表示整理成速查表。"},
+        "slot-1530": {"activity": "室内燃脂", "focus": "25 分钟，控制强度但要出汗。"},
+        "slot-2030": {"activity": "葬送的芙莉莲", "focus": "看 1 集，结束后填睡眠记录。"},
+    }),
+    _summer_day_plan("2026-08-06", "8月6日", "概率推进 + 数据结构图论", {
+        "slot-0800": {"activity": "概率论与数理统计", "focus": "期望、方差、常见分布，先抓公式适用条件。"},
+        "slot-1030": {"activity": "高级数据结构与算法分析", "focus": "图论基础、BFS/DFS、最短路预习。"},
+        "slot-1400": {"activity": "概率题目训练", "focus": "做随机变量与期望方差例题，整理错因。"},
+        "slot-1530": {"activity": "游泳", "focus": "以恢复和舒展为主。"},
+        "slot-2030": {"activity": "以撒的结合", "focus": "45 分钟内收住，避免顺手刷视频。"},
+    }),
+    _summer_day_plan("2026-08-07", "8月7日", "大物电磁 + 计组指令", {
+        "slot-0800": {"activity": "大学物理（乙）Ⅱ", "focus": "稳恒电流、磁场基础和典型公式。"},
+        "slot-1030": {"activity": "计算机组成", "focus": "指令系统、寻址方式、CPU 数据通路。"},
+        "slot-1400": {"activity": "大物公式卡片", "focus": "把电场/磁场公式按场景归类。"},
+        "slot-1530": {"activity": "快走", "focus": "45 分钟，顺便复盘上午知识点。"},
+        "slot-2030": {"activity": "红与黑", "focus": "阅读 30 页，做一句话摘要。"},
+    }),
+    _summer_day_plan("2026-08-08", "8月8日", "数据结构强化日", {
+        "slot-0800": {"activity": "高级数据结构与算法分析", "focus": "平衡树、哈希、摊还分析先看概念。"},
+        "slot-1030": {"activity": "高级数据结构与算法分析", "focus": "图论最短路和数据结构应用题型。"},
+        "slot-1400": {"activity": "算法题练习", "focus": "做 2-3 道图论/并查集/堆相关题。"},
+        "slot-1530": {"activity": "室内燃脂", "focus": "25 分钟，结束后记录体重和状态。"},
+        "slot-2030": {"activity": "第五人格", "focus": "45 分钟，结束即停。"},
+    }),
+    _summer_day_plan("2026-08-09", "8月9日", "计组主线日", {
+        "slot-0800": {"activity": "计算机组成", "focus": "CPU 数据通路、控制器、流水线概念。"},
+        "slot-1030": {"activity": "计算机组成", "focus": "存储层次、Cache 基础和命中率理解。"},
+        "slot-1400": {"activity": "计组结构图整理", "focus": "画 CPU/存储层次结构图，建立整体感。"},
+        "slot-1530": {"activity": "游泳", "focus": "放松肩颈，控制疲劳。"},
+        "slot-2030": {"activity": "葬送的芙莉莲", "focus": "看 1 集，顺手记今天花销。"},
+    }),
+    _summer_day_plan("2026-08-10", "8月10日", "概率统计推进日", {
+        "slot-0800": {"activity": "概率论与数理统计", "focus": "二维随机变量、边缘分布、条件分布。"},
+        "slot-1030": {"activity": "概率论与数理统计", "focus": "大数定律、中心极限定理先看直觉。"},
+        "slot-1400": {"activity": "概率错题整理", "focus": "做 3-5 道分布与期望相关题。"},
+        "slot-1530": {"activity": "快走", "focus": "40 分钟，保持稳定运动量。"},
+        "slot-2030": {"activity": "红与黑", "focus": "阅读 30 页，睡前不刷信息流。"},
+    }),
+    _summer_day_plan("2026-08-11", "8月11日", "大物电磁推进日", {
+        "slot-0800": {"activity": "大学物理（乙）Ⅱ", "focus": "电磁感应、法拉第定律、楞次定律。"},
+        "slot-1030": {"activity": "大学物理（乙）Ⅱ", "focus": "典型题型：感应电动势、磁通量变化。"},
+        "slot-1400": {"activity": "大物题目训练", "focus": "把公式代入和方向判断分开练。"},
+        "slot-1530": {"activity": "室内燃脂", "focus": "30 分钟，练完补水。"},
+        "slot-2030": {"activity": "以撒的结合", "focus": "45 分钟；如果白天进度落后，改为红与黑。"},
+    }),
+    _summer_day_plan("2026-08-12", "8月12日", "算法 + 计组交叉复盘", {
+        "slot-0800": {"activity": "高级数据结构与算法分析", "focus": "平衡树、哈希、图算法回顾。"},
+        "slot-1030": {"activity": "计算机组成", "focus": "流水线和存储层次复盘。"},
+        "slot-1400": {"activity": "综合笔记整理", "focus": "把数据结构模板和计组结构图归档。"},
+        "slot-1530": {"activity": "游泳", "focus": "中等强度，避免过累。"},
+        "slot-2030": {"activity": "葬送的芙莉莲", "focus": "看 1 集，记录当天应用使用时间。"},
+    }),
+    _summer_day_plan("2026-08-13", "8月13日", "概率 + 大物交叉复盘", {
+        "slot-0800": {"activity": "概率论与数理统计", "focus": "常见分布、期望方差、CLT 回顾。"},
+        "slot-1030": {"activity": "大学物理（乙）Ⅱ", "focus": "电磁学公式和题型串联。"},
+        "slot-1400": {"activity": "综合题目训练", "focus": "概率和大物各做一组基础题。"},
+        "slot-1530": {"activity": "快走", "focus": "45 分钟，轻松一点。"},
+        "slot-2030": {"activity": "第五人格", "focus": "45 分钟，结束后填睡眠计划。"},
+    }),
+    _summer_day_plan("2026-08-14", "8月14日", "四门课总复盘", {
+        "slot-0800": {"activity": "四门课清单复盘", "focus": "列出每门课“已懂/半懂/没懂”三栏。"},
+        "slot-1030": {"activity": "薄弱点补齐", "focus": "优先补最影响开学听课的概念。"},
+        "slot-1400": {"activity": "下学期第一周准备", "focus": "整理资料、课程文件夹、预习目录。"},
+        "slot-1530": {"activity": "室内燃脂", "focus": "25 分钟，轻量收尾。"},
+        "slot-2030": {"activity": "红与黑 / 自由娱乐", "focus": "优先阅读；如果完成度高再游戏。"},
+    }),
+    _summer_day_plan("2026-08-15", "8月15日", "收尾日：整理与调整", {
+        "slot-0800": {"activity": "暑期计划收尾", "focus": "总结 8/4-8/15 完成情况和遗留问题。"},
+        "slot-1030": {"activity": "开学预习交接", "focus": "给四门课写下一步任务清单。"},
+        "slot-1400": {"activity": "自由调整 / 补漏", "focus": "哪里欠账补哪里；没有欠账就整理博客记录。"},
+        "slot-1530": {"activity": "轻松快走", "focus": "30 分钟，恢复为主。"},
+        "slot-2030": {"activity": "自由复盘", "focus": "可以看番/阅读/游戏，但把应用时长记上。"},
+    }),
+]
+DEFAULT_SUMMER_PLAN["daily"] = DEFAULT_SUMMER_PLAN["dailyPlans"][0]["slots"]
+
 
 class CommentIn(BaseModel):
     content: str
