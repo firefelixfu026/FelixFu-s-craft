@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 const SITE_LAUNCHED_AT = new Date('2026-07-04T00:00:00+08:00');
+const OPS_HISTORY_KEY = 'felix_blog_ops_check_history';
 
 const services = [
   {
@@ -148,12 +149,29 @@ function normalizeLiveServices(value) {
   }));
 }
 
+function readCheckHistory() {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const stored = JSON.parse(localStorage.getItem(OPS_HISTORY_KEY) || '[]');
+    return Array.isArray(stored) ? stored.slice(0, 8) : [];
+  } catch {
+    localStorage.removeItem(OPS_HISTORY_KEY);
+    return [];
+  }
+}
+
+function writeCheckHistory(history) {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(OPS_HISTORY_KEY, JSON.stringify(history.slice(0, 8)));
+}
+
 function ProjectOpsPanel({ authToken }) {
   const [selectedServiceId, setSelectedServiceId] = useState('backend');
   const [selectedAction, setSelectedAction] = useState('logs');
   const [systemHealth, setSystemHealth] = useState(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const [checkHistory, setCheckHistory] = useState(readCheckHistory);
   const [events, setEvents] = useState([
     ['后端 API 日志检查', '建议先看 backend 日志再处理 500 或登录异常'],
     ['数据库备份提醒', '大改、展示、迁移前先执行 backup-postgres.sh'],
@@ -168,6 +186,13 @@ function ProjectOpsPanel({ authToken }) {
   const onlineCount = services.filter((service) => service.status === 'online').length;
   const liveServices = normalizeLiveServices(systemHealth?.services);
   const checkedAt = parseServerTime(systemHealth?.checkedAt);
+  const liveStatusCounts = liveServices.reduce(
+    (counts, service) => ({
+      ...counts,
+      [service.status]: (counts[service.status] || 0) + 1
+    }),
+    {}
+  );
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -185,17 +210,25 @@ function ProjectOpsPanel({ authToken }) {
       const response = await fetch('/api/admin/system/health', {
         headers: { Authorization: `Bearer ${authToken}` }
       });
-      if (!response.ok) return;
+      if (!response.ok) {
+        recordCheck('attention', '真实健康检查未完成', `接口返回 ${response.status}`);
+        return;
+      }
       const payload = await response.json();
+      const normalizedServices = normalizeLiveServices(payload.services);
       setSystemHealth({
         ...payload,
-        services: normalizeLiveServices(payload.services)
+        services: normalizedServices
       });
+      const healthyCount = normalizedServices.filter((service) => service.status === 'online').length;
+      const nextStatus = healthyCount === normalizedServices.length ? 'online' : 'attention';
+      recordCheck(nextStatus, '真实健康检查完成', `${healthyCount} / ${normalizedServices.length} 项在线`, normalizedServices);
       setEvents((current) => [
         ['真实健康检查完成', formatDateTime(parseServerTime(payload.checkedAt) || new Date())],
         ...current.slice(0, 4)
       ]);
     } catch {
+      recordCheck('attention', '真实健康检查失败', '当前无法读取 /api/admin/system/health');
       setEvents((current) => [
         ['真实健康检查失败', '当前无法读取 /api/admin/system/health'],
         ...current.slice(0, 4)
@@ -226,6 +259,25 @@ function ProjectOpsPanel({ authToken }) {
       [`已生成 ${selectedService.name} ${commandLabels[action]}操作`, selectedService.commands?.[action] || '暂未配置命令'],
       ...current.slice(0, 4)
     ]);
+  }
+
+  function recordCheck(status, title, detail, servicesSnapshot = []) {
+    const nextItem = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      status,
+      title: safeText(title),
+      detail: safeText(detail),
+      checkedAt: new Date().toISOString(),
+      services: servicesSnapshot.map((service) => ({
+        name: safeText(service.name),
+        status: safeText(service.status, 'attention')
+      }))
+    };
+    setCheckHistory((current) => {
+      const next = [nextItem, ...current].slice(0, 8);
+      writeCheckHistory(next);
+      return next;
+    });
   }
 
   return (
@@ -268,6 +320,14 @@ function ProjectOpsPanel({ authToken }) {
         <div className="ops-metric ops-clock-metric">
           <span>最近检查</span>
           <strong>{checkedAt ? formatDateTime(checkedAt) : '尚未检查'}</strong>
+        </div>
+        <div className="ops-metric">
+          <span>真实状态</span>
+          <strong>{liveServices.length ? `${liveStatusCounts.online || 0} / ${liveServices.length}` : '待检查'}</strong>
+        </div>
+        <div className="ops-metric">
+          <span>上传上限</span>
+          <strong>{systemHealth?.limits?.maxUploadMb ? `${systemHealth.limits.maxUploadMb} MB` : '待检查'}</strong>
         </div>
       </div>
 
@@ -366,6 +426,27 @@ function ProjectOpsPanel({ authToken }) {
             ))}
           </div>
         </section>
+      </div>
+
+      <div className="ops-events">
+        <div className="admin-panel-heading compact-heading">
+          <h3>检查记录</h3>
+          <span>{checkHistory.length ? `${checkHistory.length} 条` : '等待第一次检查'}</span>
+        </div>
+        <div className="ops-list">
+          {checkHistory.length === 0 ? (
+            <p className="empty-state">点击真实检查后，这里会留下最近的检查结果。</p>
+          ) : checkHistory.map((item) => (
+            <article className="ops-list-row ops-history-row" key={item.id}>
+              <div>
+                <strong>{item.title}</strong>
+                <span>{item.detail}</span>
+                <small>{formatDateTime(parseServerTime(item.checkedAt) || item.checkedAt)}</small>
+              </div>
+              <span className={`ops-status ${statusClass(item.status)}`}>{statusLabel(item.status)}</span>
+            </article>
+          ))}
+        </div>
       </div>
 
       <div className="ops-events">

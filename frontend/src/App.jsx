@@ -177,9 +177,47 @@ function readStoredActiveView() {
 function readStoredAdminPage() {
   if (typeof localStorage === 'undefined') return 'overview';
   const storedPage = localStorage.getItem(ADMIN_PAGE_KEY) || 'overview';
-  const knownPages = new Set(['overview', 'ops', 'editor', 'articles', 'media', 'comments', 'security', 'ai']);
+  const knownPages = new Set(['overview', 'ops', 'releases', 'editor', 'articles', 'media', 'comments', 'security', 'ai']);
   return knownPages.has(storedPage) ? storedPage : 'overview';
 }
+
+const releaseRoadmap = [
+  {
+    version: 'v2.5',
+    title: '运维稳定性',
+    date: '2026-08-03',
+    status: '已上线',
+    points: ['运维页局部错误保护', '真实健康检查数据兜底', '检查记录面板', '全局卡住页自救按钮']
+  },
+  {
+    version: 'v2.4',
+    title: '后台体验整理',
+    date: '2026-08-03',
+    status: '已上线',
+    points: ['后台页面拆分', '管理入口卡片化', '刷新后保留后台位置', '移动端后台布局优化']
+  },
+  {
+    version: 'v2.3',
+    title: '登录会话',
+    date: '2026-08-03',
+    status: '已上线',
+    points: ['本地保存登录信息', 'Cookie 同步登录令牌', '刷新页面不再反复登录', '过期后自动清理']
+  },
+  {
+    version: 'v2.2',
+    title: '内容管理',
+    date: '2026-08-03',
+    status: '已上线',
+    points: ['删除默认样例文章', '文章编辑与删除入口整理', '图片资源管理', '评论审核面板']
+  },
+  {
+    version: 'v2.1',
+    title: 'AI 和发布基础',
+    date: '2026-08-03',
+    status: '已上线',
+    points: ['AI 写作辅助入口', '发布状态总览', '站点统计卡片', '安全日志入口']
+  }
+];
 
 const defaultSummerPlan = {
   goals: {
@@ -3808,6 +3846,64 @@ class AdminPanelErrorBoundary extends React.Component {
   }
 }
 
+function ReleaseWorkspace() {
+  const latestRelease = releaseRoadmap[0];
+  const shippedCount = releaseRoadmap.filter((release) => release.status === '已上线').length;
+  const totalPoints = releaseRoadmap.reduce((total, release) => total + release.points.length, 0);
+
+  return (
+    <section className="admin-panel release-page">
+      <div className="admin-panel-heading">
+        <div>
+          <h2>版本清单</h2>
+          <span>从 v2.1 到 v2.5 的后台改造记录</span>
+        </div>
+        <span className="release-badge">{latestRelease.version}</span>
+      </div>
+
+      <div className="release-metric-grid">
+        <div className="release-metric">
+          <span>当前版本</span>
+          <strong>{latestRelease.version}</strong>
+        </div>
+        <div className="release-metric">
+          <span>已上线版本</span>
+          <strong>{shippedCount} 个</strong>
+        </div>
+        <div className="release-metric">
+          <span>改动点</span>
+          <strong>{totalPoints} 项</strong>
+        </div>
+        <div className="release-metric">
+          <span>最近更新</span>
+          <strong>{latestRelease.date}</strong>
+        </div>
+      </div>
+
+      <div className="release-timeline">
+        {releaseRoadmap.map((release) => (
+          <article className="release-version-card" key={release.version}>
+            <div>
+              <span className="release-version">{release.version}</span>
+              <h3>{release.title}</h3>
+              <small>{release.date}</small>
+            </div>
+            <span className="ops-status ready">{release.status}</span>
+            <ul>
+              {release.points.map((point) => (
+                <li key={point}>
+                  <CheckCircle2 size={15} />
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function AdminWorkspace({
   articles,
   articleForm,
@@ -3901,6 +3997,7 @@ function AdminWorkspace({
   const adminPageItems = [
     { id: 'overview', label: '总览', detail: '状态、统计、待办', icon: Star, count: `${publishedCount} 篇` },
     { id: 'ops', label: '运维', detail: '服务、部署、脚本', icon: ShieldCheck, count: '控制台' },
+    { id: 'releases', label: '版本', detail: '更新记录和路线', icon: Code2, count: releaseRoadmap[0].version },
     { id: 'editor', label: '写文章', detail: editingArticleId ? '继续编辑当前文章' : '发布新内容', icon: FilePenLine, count: draftCount ? `${draftCount} 草稿` : 'Markdown' },
     { id: 'articles', label: '文章库', detail: '编辑、删除、置顶', icon: BookOpen, count: `${articles.length} 篇` },
     { id: 'media', label: '图片', detail: '上传资源和插入正文', icon: ImageIcon, count: `${uploadedImages.length} 张` },
@@ -4070,6 +4167,8 @@ function AdminWorkspace({
         </AdminPanelErrorBoundary>
       )}
 
+      {activeAdminPage === 'releases' && <ReleaseWorkspace />}
+
       {activeAdminPage === 'overview' && (
         <>
           <section className="admin-panel admin-home-panel">
@@ -4095,6 +4194,10 @@ function AdminWorkspace({
               <button className="ghost-button" type="button" onClick={() => openAdminPage('ops')}>
                 <ShieldCheck size={17} />
                 <span>看运维</span>
+              </button>
+              <button className="ghost-button" type="button" onClick={() => openAdminPage('releases')}>
+                <Code2 size={17} />
+                <span>版本清单</span>
               </button>
               <button className="ghost-button" type="button" onClick={() => openAdminPage('security')}>
                 <ShieldCheck size={17} />

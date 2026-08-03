@@ -1741,6 +1741,13 @@ h3 {
   line-height: 1.5;
 }
 
+.ops-history-row small {
+  display: block;
+  margin-top: 5px;
+  color: #8190a3;
+  font-size: 12px;
+}
+
 .release-panel {
   margin-bottom: 18px;
 }
@@ -1791,6 +1798,77 @@ h3 {
 .release-checks span.ready {
   color: #155f53;
   background: #dff4ed;
+}
+
+.release-page {
+  gap: 16px;
+}
+
+.release-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: #155f53;
+  background: #dff4ed;
+  font-weight: 800;
+}
+
+.release-timeline {
+  display: grid;
+  gap: 12px;
+}
+
+.release-version-card {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.3fr) auto minmax(260px, 1fr);
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.release-version-card h3 {
+  margin: 6px 0 4px;
+  color: #102033;
+}
+
+.release-version-card small {
+  color: #8190a3;
+}
+
+.release-version {
+  color: #1f7a6d;
+  font-weight: 900;
+}
+
+.release-version-card ul {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.release-version-card li {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  min-width: 0;
+  color: #415168;
+  line-height: 1.5;
+}
+
+.release-version-card li svg {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  color: #1f7a6d;
 }
 
 .analytics-grid,
@@ -2879,6 +2957,7 @@ h3 {
   .ops-live-grid,
   .ops-bottom-grid,
   .ops-layout,
+  .release-version-card,
   .admin-filter-bar,
   .admin-insight-grid,
   .security-rule-grid {
