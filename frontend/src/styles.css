@@ -140,6 +140,11 @@ button {
   margin-bottom: 28px;
 }
 
+.topbar-compact {
+  justify-content: flex-end;
+  margin-bottom: 18px;
+}
+
 .search-box {
   display: flex;
   align-items: center;

@@ -1893,6 +1893,7 @@ function App() {
   }
 
   const isRestoringSession = Boolean(authToken && !currentUser);
+  const showGlobalSearch = activeView === 'articles';
 
   return (
     <div className="app-shell">
@@ -1945,16 +1946,18 @@ function App() {
       </aside>
 
       <main className="main-content">
-        <header className="topbar">
-          <div className="search-box">
-            <Search size={18} />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索标题、正文或标签"
-              aria-label="搜索标题、正文或标签"
-            />
-          </div>
+        <header className={showGlobalSearch ? 'topbar' : 'topbar topbar-compact'}>
+          {showGlobalSearch && (
+            <div className="search-box">
+              <Search size={18} />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索标题、正文或标签"
+                aria-label="搜索标题、正文或标签"
+              />
+            </div>
+          )}
           <div className="status-pill">
             <Zap size={16} />
             <span>本地 MVP</span>
