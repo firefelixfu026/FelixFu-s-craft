@@ -3453,13 +3453,35 @@ function calculateCompletionRate(tasks = []) {
   return Math.round((score / countedTasks.length) * 100);
 }
 
-function getSevenDayCompletion(completionDays, selectedDate) {
+function getCompletionRowsForDay(completionDay, dailyPlans) {
+  const dayPlan = dailyPlans.find((day) => day.date === completionDay.date) || dailyPlans[0];
+  const storedTasks = Array.isArray(completionDay.tasks) ? completionDay.tasks : [];
+  return (dayPlan.slots || []).map((slot, index) => {
+    const id = `${completionDay.date}-done-${slot.id}`;
+    const stored = storedTasks.find((task) => task.id === id || task.planSlotId === slot.id)
+      || storedTasks.find((task) => task.time === slot.time)
+      || storedTasks[index]
+      || {};
+    const status = completionStatusOptions.includes(stored.status) ? stored.status : '未开始';
+    return {
+      id,
+      planSlotId: slot.id,
+      time: slot.time,
+      planned: slot.activity,
+      actual: stored.actual || '',
+      status,
+      note: stored.note || ''
+    };
+  });
+}
+
+function getSevenDayCompletion(completionDays, selectedDate, dailyPlans) {
   const selectedIndex = Math.max(0, completionDays.findIndex((day) => day.date === selectedDate));
   const endIndex = Math.min(completionDays.length, Math.max(7, selectedIndex + 1));
   const startIndex = Math.max(0, endIndex - 7);
   return completionDays.slice(startIndex, endIndex).map((day) => ({
     label: day.label,
-    actual: calculateCompletionRate(day.tasks),
+    actual: calculateCompletionRate(getCompletionRowsForDay(day, dailyPlans)),
     limit: 100
   }));
 }
@@ -3544,8 +3566,9 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
   const appChartData = getSevenDayAppUsage(appUsageDays, selectedAppUsageDay.date);
   const completionDays = Array.isArray(plan.completionDays) && plan.completionDays.length ? plan.completionDays : personalizedCompletionDays;
   const selectedCompletionDay = completionDays.find((day) => day.date === selectedCompletionDate) || completionDays[0];
-  const completionRate = calculateCompletionRate(selectedCompletionDay.tasks);
-  const completionChartData = getSevenDayCompletion(completionDays, selectedCompletionDay.date);
+  const selectedCompletionRows = getCompletionRowsForDay(selectedCompletionDay, dayPlans);
+  const completionRate = calculateCompletionRate(selectedCompletionRows);
+  const completionChartData = getSevenDayCompletion(completionDays, selectedCompletionDay.date, dayPlans);
 
   useEffect(() => {
     let cancelled = false;
@@ -3724,35 +3747,17 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
 
   function updateCompletionTask(dayDate, rowId, field, value) {
     if (!canEdit) return;
+    if (field === 'time' || field === 'planned') return;
     setPlan((current) => ({
       ...current,
       completionDays: (current.completionDays || personalizedCompletionDays).map((day) => (
         day.date === dayDate
-          ? { ...day, tasks: day.tasks.map((row) => (row.id === rowId ? { ...row, [field]: value } : row)) }
-          : day
-      ))
-    }));
-  }
-
-  function addCompletionTask(dayDate, row) {
-    if (!canEdit) return;
-    setPlan((current) => ({
-      ...current,
-      completionDays: (current.completionDays || personalizedCompletionDays).map((day) => (
-        day.date === dayDate
-          ? { ...day, tasks: [...(day.tasks || []), { ...row, id: `${dayDate}-done-${Date.now()}` }] }
-          : day
-      ))
-    }));
-  }
-
-  function deleteCompletionTask(dayDate, rowId) {
-    if (!canEdit) return;
-    setPlan((current) => ({
-      ...current,
-      completionDays: (current.completionDays || personalizedCompletionDays).map((day) => (
-        day.date === dayDate
-          ? { ...day, tasks: (day.tasks || []).filter((row) => row.id !== rowId) }
+          ? {
+              ...day,
+              tasks: (day.tasks || []).some((row) => row.id === rowId)
+                ? (day.tasks || []).map((row) => (row.id === rowId ? { ...row, [field]: value } : row))
+                : [...(day.tasks || []), { id: rowId, actual: '', status: '未开始', note: '', [field]: value }]
+            }
           : day
       ))
     }));
@@ -3886,10 +3891,6 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
         <PlanModule title="完成记录与完成度" count={`今日完成度 ${completionRate}%`} wide>
           <div className="module-toolbar">
             <DateSelector days={completionDays} value={selectedCompletionDay.date} onChange={setSelectedCompletionDate} label="选择完成日期" />
-            <button className="ghost-button module-add-button" type="button" onClick={() => addCompletionTask(selectedCompletionDay.date, { time: '新增时间段', planned: '临时任务', actual: '', status: '未开始', note: '' })} disabled={!canEdit}>
-              <PlusCircle size={16} />
-              <span>新增完成项</span>
-            </button>
           </div>
           <div className="completion-summary-grid">
             <div>
@@ -3898,7 +3899,7 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
             </div>
             <div>
               <span>完成 / 部分 / 未完成</span>
-              <strong>{summarizeCompletion(selectedCompletionDay.tasks)}</strong>
+              <strong>{summarizeCompletion(selectedCompletionRows)}</strong>
             </div>
           </div>
           <div className="usage-chart-grid">
@@ -3907,10 +3908,9 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
           </div>
           <CompletionTable
             disabled={!canEdit}
-            rows={selectedCompletionDay.tasks || []}
+            rows={selectedCompletionRows}
             section={selectedCompletionDay.date}
             updateRow={updateCompletionTask}
-            deleteRow={deleteCompletionTask}
           />
         </PlanModule>
 
@@ -4212,7 +4212,7 @@ function CompletionBarChart({ data }) {
   );
 }
 
-function CompletionTable({ rows, section, disabled, updateRow, deleteRow }) {
+function CompletionTable({ rows, section, disabled, updateRow }) {
   return (
     <div className="summer-table-wrap">
       <table className="summer-plan-table completion-table">
@@ -4223,14 +4223,13 @@ function CompletionTable({ rows, section, disabled, updateRow, deleteRow }) {
             <th>我实际做了什么</th>
             <th>状态</th>
             <th>备注</th>
-            <th aria-label="操作" />
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td><input value={row.time || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'time', event.target.value)} /></td>
-              <td><textarea value={row.planned || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'planned', event.target.value)} /></td>
+              <td><input className="readonly-plan-cell" value={row.time || ''} readOnly /></td>
+              <td><textarea className="readonly-plan-cell" value={row.planned || ''} readOnly /></td>
               <td><textarea value={row.actual || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'actual', event.target.value)} /></td>
               <td>
                 <select value={row.status || '未开始'} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'status', event.target.value)}>
@@ -4240,11 +4239,6 @@ function CompletionTable({ rows, section, disabled, updateRow, deleteRow }) {
                 </select>
               </td>
               <td><textarea value={row.note || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'note', event.target.value)} /></td>
-              <td>
-                <button className="compact-icon-button danger-button" type="button" onClick={() => deleteRow(section, row.id)} disabled={disabled} aria-label="删除这一行">
-                  <Trash2 size={16} />
-                </button>
-              </td>
             </tr>
           ))}
         </tbody>

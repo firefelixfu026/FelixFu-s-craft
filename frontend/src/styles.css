@@ -3160,6 +3160,18 @@ h3 {
   min-width: 1120px;
 }
 
+.completion-table th:last-child,
+.completion-table td:last-child {
+  width: auto;
+  text-align: left;
+}
+
+.readonly-plan-cell {
+  color: #334155 !important;
+  background: #f8fafc !important;
+  cursor: default;
+}
+
 .summer-plan-table th,
 .summer-plan-table td {
   padding: 10px;
