@@ -275,6 +275,26 @@ DEFAULT_SUMMER_PLAN["dailyPlans"] = [
     }),
 ]
 DEFAULT_SUMMER_PLAN["daily"] = DEFAULT_SUMMER_PLAN["dailyPlans"][0]["slots"]
+DEFAULT_SUMMER_PLAN["completionDays"] = [
+    {
+        "id": day["date"],
+        "date": day["date"],
+        "label": day["label"],
+        "theme": day["theme"],
+        "tasks": [
+            {
+                "id": f"{day['date']}-done-{slot['id']}",
+                "time": slot["time"],
+                "planned": slot["activity"],
+                "actual": "",
+                "status": "未开始",
+                "note": "",
+            }
+            for slot in day["slots"]
+        ],
+    }
+    for day in DEFAULT_SUMMER_PLAN["dailyPlans"]
+]
 DEFAULT_SUMMER_PLAN["appUsageDays"] = [
     {
         "id": day["date"],

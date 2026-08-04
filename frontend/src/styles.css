@@ -2840,6 +2840,7 @@ h3 {
 .summer-goal-card textarea,
 .summer-plan-table input,
 .summer-plan-table textarea,
+.summer-plan-table select,
 .weekly-plan-row input[type='text'],
 .weekly-plan-row > input {
   width: 100%;
@@ -2861,6 +2862,7 @@ h3 {
 .summer-goal-card textarea:focus,
 .summer-plan-table input:focus,
 .summer-plan-table textarea:focus,
+.summer-plan-table select:focus,
 .weekly-plan-row input:focus {
   border-color: #1f7a6d;
   box-shadow: 0 0 0 3px rgba(31, 122, 109, 0.12);
@@ -2868,7 +2870,8 @@ h3 {
 
 .summer-goal-card textarea:disabled,
 .summer-plan-table input:disabled,
-.summer-plan-table textarea:disabled {
+.summer-plan-table textarea:disabled,
+.summer-plan-table select:disabled {
   color: #4b5968;
   background: #f8fafc;
   cursor: default;
@@ -2985,6 +2988,33 @@ h3 {
   height: auto;
 }
 
+.completion-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.completion-summary-grid > div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.completion-summary-grid span {
+  color: #6a7685;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.completion-summary-grid strong {
+  color: #102033;
+  font-size: 24px;
+}
+
 .chart-axis {
   stroke: #cbd5e1;
   stroke-width: 1.5;
@@ -3010,6 +3040,18 @@ h3 {
 
 .chart-bar-actual {
   fill: #1f7a6d;
+}
+
+.completion-line {
+  stroke: #2563eb;
+}
+
+.completion-point {
+  stroke: #2563eb;
+}
+
+.completion-bar {
+  fill: #2563eb;
 }
 
 .chart-label {
@@ -3114,6 +3156,10 @@ h3 {
   min-width: 980px;
 }
 
+.summer-plan-panel.wide .completion-table {
+  min-width: 1120px;
+}
+
 .summer-plan-table th,
 .summer-plan-table td {
   padding: 10px;
@@ -3148,6 +3194,11 @@ h3 {
   padding: 0 10px;
 }
 
+.summer-plan-table select {
+  min-height: 38px;
+  padding: 0 10px;
+}
+
 .summer-plan-table textarea {
   min-height: 54px;
   padding: 9px 10px;
@@ -3157,6 +3208,10 @@ h3 {
 
 .summer-plan-panel.wide .summer-plan-table textarea {
   min-height: 78px;
+}
+
+.completion-table textarea {
+  min-height: 92px;
 }
 
 .weekly-plan-list {
@@ -3324,6 +3379,7 @@ h3 {
   .summer-plan-hero,
   .summer-goal-grid,
   .summer-module-grid,
+  .completion-summary-grid,
   .usage-chart-grid {
     grid-template-columns: 1fr;
   }

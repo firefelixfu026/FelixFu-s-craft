@@ -591,6 +591,23 @@ const personalizedAppUsageDays = personalizedDailyPlans.map((day) => ({
   }))
 }));
 
+const completionStatusOptions = ['未开始', '完成', '部分完成', '未完成', '不计入'];
+
+const personalizedCompletionDays = personalizedDailyPlans.map((day) => ({
+  id: day.date,
+  date: day.date,
+  label: day.label,
+  theme: day.theme,
+  tasks: day.slots.map((slot) => ({
+    id: `${day.date}-done-${slot.id}`,
+    time: slot.time,
+    planned: slot.activity,
+    actual: '',
+    status: '未开始',
+    note: ''
+  }))
+}));
+
 function parseMinutes(value) {
   if (value === null || value === undefined) return 0;
   const text = String(value).trim();
@@ -3384,6 +3401,69 @@ function normalizeAppUsageDays(plan) {
   }));
 }
 
+function normalizeCompletionTasks(tasks, fallbackTasks = personalizedCompletionDays[0].tasks, dayDate = '') {
+  const source = Array.isArray(tasks) && tasks.length ? tasks : fallbackTasks;
+  return source.map((task, index) => {
+    const fallback = fallbackTasks[index] || personalizedCompletionDays[0].tasks[index] || {};
+    const status = completionStatusOptions.includes(task?.status) ? task.status : '未开始';
+    return {
+      id: task?.id || (dayDate ? `${dayDate}-done-${index + 1}` : `done-${index + 1}`),
+      time: task?.time ?? fallback.time ?? '',
+      planned: task?.planned ?? task?.activity ?? fallback.planned ?? '',
+      actual: task?.actual ?? '',
+      status,
+      note: task?.note ?? ''
+    };
+  });
+}
+
+function normalizeCompletionDays(plan) {
+  if (Array.isArray(plan?.completionDays) && plan.completionDays.length) {
+    return plan.completionDays.map((day, index) => {
+      const fallback = personalizedCompletionDays[index] || personalizedCompletionDays[0];
+      const date = day?.date || fallback.date || day?.id || `completion-day-${index + 1}`;
+      return {
+        ...fallback,
+        ...(day || {}),
+        id: day?.id || date,
+        date,
+        label: day?.label || fallback.label || date,
+        theme: day?.theme || fallback.theme || '',
+        tasks: normalizeCompletionTasks(day?.tasks, fallback.tasks, date)
+      };
+    });
+  }
+
+  return personalizedCompletionDays.map((day) => ({
+    ...day,
+    tasks: normalizeCompletionTasks(null, day.tasks, day.date)
+  }));
+}
+
+function completionStatusScore(status) {
+  if (status === '完成') return 1;
+  if (status === '部分完成') return 0.5;
+  return 0;
+}
+
+function calculateCompletionRate(tasks = []) {
+  const countedTasks = tasks.filter((task) => task.status !== '不计入');
+  if (!countedTasks.length) return 0;
+  const score = countedTasks.reduce((sum, task) => sum + completionStatusScore(task.status), 0);
+  return Math.round((score / countedTasks.length) * 100);
+}
+
+function getSevenDayCompletion(completionDays, selectedDate) {
+  const selectedIndex = Math.max(0, completionDays.findIndex((day) => day.date === selectedDate));
+  const endIndex = Math.min(completionDays.length, Math.max(7, selectedIndex + 1));
+  const startIndex = Math.max(0, endIndex - 7);
+  return completionDays.slice(startIndex, endIndex).map((day) => ({
+    label: day.label,
+    actual: calculateCompletionRate(day.tasks),
+    limit: 100
+  }));
+}
+
 function normalizeBodyRows(rows) {
   const source = Array.isArray(rows) && rows.length ? rows : personalizedSummerPlan.bodyMetrics;
   return source.map(({ waist, ...row }, index) => ({
@@ -3429,6 +3509,7 @@ function getSevenDayAppUsage(appUsageDays, selectedDate) {
 function normalizeSummerPlan(plan) {
   const dailyPlans = normalizeDailyPlans(plan);
   const appUsageDays = normalizeAppUsageDays(plan);
+  const completionDays = normalizeCompletionDays(plan);
 
   return {
     ...personalizedSummerPlan,
@@ -3438,6 +3519,7 @@ function normalizeSummerPlan(plan) {
     daily: dailyPlans[0]?.slots || normalizeDailyRows(plan?.daily),
     dailyPlans,
     appUsageDays,
+    completionDays,
     courses: Array.isArray(plan?.courses) && plan.courses.length ? plan.courses : personalizedSummerPlan.courses,
     apps: appUsageDays[0]?.apps || normalizeAppRows(plan?.apps),
     expenses: Array.isArray(plan?.expenses) && plan.expenses.length ? plan.expenses : personalizedSummerPlan.expenses,
@@ -3452,6 +3534,7 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
   const [plan, setPlan] = useState(() => normalizeSummerPlan(personalizedSummerPlan));
   const [selectedPlanDate, setSelectedPlanDate] = useState(personalizedDailyPlans[0].date);
   const [selectedAppDate, setSelectedAppDate] = useState(personalizedAppUsageDays[0].date);
+  const [selectedCompletionDate, setSelectedCompletionDate] = useState(personalizedCompletionDays[0].date);
   const [saveMessage, setSaveMessage] = useState('正在读取数据库');
   const [hasLoadedPlan, setHasLoadedPlan] = useState(false);
   const dayPlans = Array.isArray(plan.dailyPlans) && plan.dailyPlans.length ? plan.dailyPlans : personalizedDailyPlans;
@@ -3459,6 +3542,10 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
   const appUsageDays = Array.isArray(plan.appUsageDays) && plan.appUsageDays.length ? plan.appUsageDays : personalizedAppUsageDays;
   const selectedAppUsageDay = appUsageDays.find((day) => day.date === selectedAppDate) || appUsageDays[0];
   const appChartData = getSevenDayAppUsage(appUsageDays, selectedAppUsageDay.date);
+  const completionDays = Array.isArray(plan.completionDays) && plan.completionDays.length ? plan.completionDays : personalizedCompletionDays;
+  const selectedCompletionDay = completionDays.find((day) => day.date === selectedCompletionDate) || completionDays[0];
+  const completionRate = calculateCompletionRate(selectedCompletionDay.tasks);
+  const completionChartData = getSevenDayCompletion(completionDays, selectedCompletionDay.date);
 
   useEffect(() => {
     let cancelled = false;
@@ -3524,6 +3611,12 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
       setSelectedAppDate(appUsageDays[0]?.date || personalizedAppUsageDays[0].date);
     }
   }, [appUsageDays, selectedAppDate]);
+
+  useEffect(() => {
+    if (!completionDays.some((day) => day.date === selectedCompletionDate)) {
+      setSelectedCompletionDate(completionDays[0]?.date || personalizedCompletionDays[0].date);
+    }
+  }, [completionDays, selectedCompletionDate]);
 
   function updateNested(section, field, value) {
     if (!canEdit) return;
@@ -3629,11 +3722,48 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
     });
   }
 
+  function updateCompletionTask(dayDate, rowId, field, value) {
+    if (!canEdit) return;
+    setPlan((current) => ({
+      ...current,
+      completionDays: (current.completionDays || personalizedCompletionDays).map((day) => (
+        day.date === dayDate
+          ? { ...day, tasks: day.tasks.map((row) => (row.id === rowId ? { ...row, [field]: value } : row)) }
+          : day
+      ))
+    }));
+  }
+
+  function addCompletionTask(dayDate, row) {
+    if (!canEdit) return;
+    setPlan((current) => ({
+      ...current,
+      completionDays: (current.completionDays || personalizedCompletionDays).map((day) => (
+        day.date === dayDate
+          ? { ...day, tasks: [...(day.tasks || []), { ...row, id: `${dayDate}-done-${Date.now()}` }] }
+          : day
+      ))
+    }));
+  }
+
+  function deleteCompletionTask(dayDate, rowId) {
+    if (!canEdit) return;
+    setPlan((current) => ({
+      ...current,
+      completionDays: (current.completionDays || personalizedCompletionDays).map((day) => (
+        day.date === dayDate
+          ? { ...day, tasks: (day.tasks || []).filter((row) => row.id !== rowId) }
+          : day
+      ))
+    }));
+  }
+
   function resetPlan() {
     if (!canEdit) return;
     setPlan(normalizeSummerPlan(personalizedSummerPlan));
     setSelectedPlanDate(personalizedDailyPlans[0].date);
     setSelectedAppDate(personalizedAppUsageDays[0].date);
+    setSelectedCompletionDate(personalizedCompletionDays[0].date);
     setSaveMessage('已恢复付江樊版模板');
   }
 
@@ -3753,6 +3883,37 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
       </section>
 
       <div className="summer-module-grid">
+        <PlanModule title="完成记录与完成度" count={`今日完成度 ${completionRate}%`} wide>
+          <div className="module-toolbar">
+            <DateSelector days={completionDays} value={selectedCompletionDay.date} onChange={setSelectedCompletionDate} label="选择完成日期" />
+            <button className="ghost-button module-add-button" type="button" onClick={() => addCompletionTask(selectedCompletionDay.date, { time: '新增时间段', planned: '临时任务', actual: '', status: '未开始', note: '' })} disabled={!canEdit}>
+              <PlusCircle size={16} />
+              <span>新增完成项</span>
+            </button>
+          </div>
+          <div className="completion-summary-grid">
+            <div>
+              <span>今日完成度</span>
+              <strong>{completionRate}%</strong>
+            </div>
+            <div>
+              <span>完成 / 部分 / 未完成</span>
+              <strong>{summarizeCompletion(selectedCompletionDay.tasks)}</strong>
+            </div>
+          </div>
+          <div className="usage-chart-grid">
+            <CompletionLineChart data={completionChartData} />
+            <CompletionBarChart data={completionChartData} />
+          </div>
+          <CompletionTable
+            disabled={!canEdit}
+            rows={selectedCompletionDay.tasks || []}
+            section={selectedCompletionDay.date}
+            updateRow={updateCompletionTask}
+            deleteRow={deleteCompletionTask}
+          />
+        </PlanModule>
+
         <PlanModule title="课程预习进度" count={`${plan.courses.length} 门`}>
           <EditableTable
             compact
@@ -3915,6 +4076,13 @@ function DateSelector({ days, value, onChange, label }) {
   );
 }
 
+function summarizeCompletion(tasks = []) {
+  const done = tasks.filter((task) => task.status === '完成').length;
+  const partial = tasks.filter((task) => task.status === '部分完成').length;
+  const missed = tasks.filter((task) => task.status === '未完成').length;
+  return `${done} / ${partial} / ${missed}`;
+}
+
 function UsageLineChart({ data }) {
   const width = 560;
   const height = 220;
@@ -3977,6 +4145,110 @@ function UsageBarChart({ data }) {
           );
         })}
       </svg>
+    </div>
+  );
+}
+
+function CompletionLineChart({ data }) {
+  const width = 560;
+  const height = 220;
+  const padding = 34;
+  const points = data.map((item, index) => {
+    const x = padding + (index * (width - padding * 2)) / Math.max(1, data.length - 1);
+    const y = height - padding - (item.actual / 100) * (height - padding * 2);
+    return { ...item, x, y };
+  });
+  const path = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+
+  return (
+    <div className="usage-chart-card">
+      <div className="usage-chart-heading">
+        <h3>完成度折线图</h3>
+        <span>最近 7 日</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="七日任务完成度折线图">
+        <line className="chart-axis" x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} />
+        <line className="chart-axis" x1={padding} y1={padding} x2={padding} y2={height - padding} />
+        <path className="chart-line completion-line" d={path} />
+        {points.map((point) => (
+          <g key={point.label}>
+            <circle className="chart-point completion-point" cx={point.x} cy={point.y} r="4" />
+            <text className="chart-label" x={point.x} y={height - 10} textAnchor="middle">{point.label.replace('8月', '8/').replace('日', '')}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function CompletionBarChart({ data }) {
+  const width = 560;
+  const height = 220;
+  const padding = 34;
+  const barWidth = (width - padding * 2) / Math.max(1, data.length) * 0.52;
+
+  return (
+    <div className="usage-chart-card">
+      <div className="usage-chart-heading">
+        <h3>完成度柱状图</h3>
+        <span>百分比</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="七日任务完成度柱状图">
+        <line className="chart-axis" x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} />
+        {data.map((item, index) => {
+          const groupWidth = (width - padding * 2) / Math.max(1, data.length);
+          const x = padding + index * groupWidth + (groupWidth - barWidth) / 2;
+          const barHeight = (item.actual / 100) * (height - padding * 2);
+          return (
+            <g key={item.label}>
+              <rect className="chart-bar-limit" x={x} y={padding} width={barWidth} height={height - padding * 2} rx="5" />
+              <rect className="chart-bar-actual completion-bar" x={x} y={height - padding - barHeight} width={barWidth} height={barHeight} rx="5" />
+              <text className="chart-label" x={x + barWidth / 2} y={height - 10} textAnchor="middle">{item.label.replace('8月', '8/').replace('日', '')}</text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function CompletionTable({ rows, section, disabled, updateRow, deleteRow }) {
+  return (
+    <div className="summer-table-wrap">
+      <table className="summer-plan-table completion-table">
+        <thead>
+          <tr>
+            <th>时间段</th>
+            <th>计划做什么</th>
+            <th>我实际做了什么</th>
+            <th>状态</th>
+            <th>备注</th>
+            <th aria-label="操作" />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id}>
+              <td><input value={row.time || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'time', event.target.value)} /></td>
+              <td><textarea value={row.planned || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'planned', event.target.value)} /></td>
+              <td><textarea value={row.actual || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'actual', event.target.value)} /></td>
+              <td>
+                <select value={row.status || '未开始'} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'status', event.target.value)}>
+                  {completionStatusOptions.map((status) => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
+              </td>
+              <td><textarea value={row.note || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'note', event.target.value)} /></td>
+              <td>
+                <button className="compact-icon-button danger-button" type="button" onClick={() => deleteRow(section, row.id)} disabled={disabled} aria-label="删除这一行">
+                  <Trash2 size={16} />
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
