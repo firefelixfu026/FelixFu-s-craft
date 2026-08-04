@@ -459,8 +459,8 @@ const personalizedSummerPlan = {
   ],
   expenses: [{ id: 'expense-1', date: '8月4日', item: '餐饮', amount: '', note: '' }],
   meals: [{ id: 'meal-1', date: '8月4日', breakfast: '', lunch: '', dinner: '', snack: '' }],
-  bodyMetrics: [{ id: 'body-1', date: '8月4日', weight: '', waist: '', exercise: '', mood: '' }],
-  sleep: [{ id: 'sleep-1', date: '8月4日', bed: '', wake: '', hours: '', quality: '' }]
+  bodyMetrics: [{ id: 'body-1', date: '8月4日', weight: '', exercise: '', mood: '' }],
+  sleep: [{ id: 'sleep-1', date: '8月4-5日', bed: '', wake: '', hours: '', quality: '' }]
 };
 
 const personalizedTimeSlots = [
@@ -472,7 +472,7 @@ const personalizedTimeSlots = [
   { id: 'slot-1400', time: '14:00 - 15:30', activity: '题目/笔记整理', focus: '上午内容收束：整理公式、数据结构模板、组成原理图、概率概念。', type: '学习' },
   { id: 'slot-1530', time: '15:30 - 16:30', activity: '运动', focus: '游泳、快走、室内燃脂三选一；按身体状态调强度。', type: '运动' },
   { id: 'slot-1630', time: '16:30 - 17:30', activity: '弹性时间', focus: '外出、家务、临时安排、补觉都放这里；也可挪给学习追进度。', type: '弹性' },
-  { id: 'slot-1730', time: '17:30 - 19:00', activity: '晚餐 + 记录', focus: '填饮食、体重/指标、记账；当天花销随手记。', type: '记录' },
+  { id: 'slot-1730', time: '17:30 - 19:00', activity: '晚餐 + 记录', focus: '填饮食、体重/状态、记账；当天花销随手记。', type: '记录' },
   { id: 'slot-1900', time: '19:00 - 20:30', activity: '轻学习 / 复盘', focus: '复盘今日预习，列明天任务；不适合硬刚时改成阅读。', type: '学习' },
   { id: 'slot-2030', time: '20:30 - 21:30', activity: '娱乐时间', focus: '以撒的结合 / 第五人格 / 葬送的芙莉莲 / 红与黑，控制 B 站和小红书。', type: '娱乐' },
   { id: 'slot-2130', time: '21:30 - 22:30', activity: '洗漱 + 睡眠准备', focus: '填睡眠记录，尽量 22:30 前进入休息状态。', type: '睡眠' }
@@ -577,6 +577,28 @@ function createDailyPlan(date, label, theme, overrides = {}) {
       id: `${date}-${slot.id}`
     }))
   };
+}
+
+const personalizedAppUsageDays = personalizedDailyPlans.map((day) => ({
+  id: day.date,
+  date: day.date,
+  label: day.label,
+  theme: day.theme,
+  apps: personalizedSummerPlan.apps.map((app) => ({
+    ...app,
+    id: `${day.date}-${app.id}`,
+    actual: ''
+  }))
+}));
+
+function parseMinutes(value) {
+  if (value === null || value === undefined) return 0;
+  const text = String(value).trim();
+  if (!text) return 0;
+  const number = parseFloat(text);
+  if (!Number.isFinite(number)) return 0;
+  if (/小时|hour|hr|h/i.test(text)) return number * 60;
+  return number;
 }
 
 function getArticleMonth(date) {
@@ -3322,8 +3344,88 @@ function normalizeDailyPlans(plan) {
   });
 }
 
+function normalizeAppRows(rows, fallbackRows = personalizedSummerPlan.apps, dayDate = '') {
+  const source = Array.isArray(rows) && rows.length ? rows : fallbackRows;
+  return source.map((row, index) => {
+    const fallback = fallbackRows[index] || personalizedSummerPlan.apps[index] || personalizedSummerPlan.apps[0];
+    const stableName = row?.name || fallback.name || `应用 ${index + 1}`;
+    return {
+      id: row?.id || (dayDate ? `${dayDate}-app-${index + 1}` : `app-${index + 1}`),
+      name: stableName,
+      limit: row?.limit ?? fallback.limit ?? '',
+      actual: row?.actual ?? ''
+    };
+  });
+}
+
+function normalizeAppUsageDays(plan) {
+  if (Array.isArray(plan?.appUsageDays) && plan.appUsageDays.length) {
+    return plan.appUsageDays.map((day, index) => {
+      const fallback = personalizedAppUsageDays[index] || personalizedAppUsageDays[0];
+      const date = day?.date || fallback.date || day?.id || `app-day-${index + 1}`;
+      return {
+        ...fallback,
+        ...(day || {}),
+        id: day?.id || date,
+        date,
+        label: day?.label || fallback.label || date,
+        theme: day?.theme || fallback.theme || '',
+        apps: normalizeAppRows(day?.apps, fallback.apps, date)
+      };
+    });
+  }
+
+  return personalizedAppUsageDays.map((day, index) => ({
+    ...day,
+    apps: normalizeAppRows(index === 0 ? plan?.apps : null, day.apps, day.date)
+  }));
+}
+
+function normalizeBodyRows(rows) {
+  const source = Array.isArray(rows) && rows.length ? rows : personalizedSummerPlan.bodyMetrics;
+  return source.map(({ waist, ...row }, index) => ({
+    id: row.id || `body-${index + 1}`,
+    date: row.date || '8月4日',
+    weight: row.weight || '',
+    exercise: row.exercise || '',
+    mood: row.mood || ''
+  }));
+}
+
+function normalizeSleepRows(rows) {
+  const source = Array.isArray(rows) && rows.length ? rows : personalizedSummerPlan.sleep;
+  return source.map((row, index) => ({
+    ...row,
+    id: row.id || `sleep-${index + 1}`,
+    date: normalizeSleepDateRange(row.date || '8月4-5日')
+  }));
+}
+
+function normalizeSleepDateRange(date) {
+  const value = String(date || '').trim();
+  if (!value) return '8月4-5日';
+  if (value.includes('-')) return value;
+  const match = value.match(/^(\d{1,2})月(\d{1,2})日$/);
+  if (!match) return value;
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  return `${month}月${day}-${day + 1}日`;
+}
+
+function getSevenDayAppUsage(appUsageDays, selectedDate) {
+  const selectedIndex = Math.max(0, appUsageDays.findIndex((day) => day.date === selectedDate));
+  const endIndex = Math.min(appUsageDays.length, Math.max(7, selectedIndex + 1));
+  const startIndex = Math.max(0, endIndex - 7);
+  return appUsageDays.slice(startIndex, endIndex).map((day) => {
+    const actual = day.apps.reduce((sum, app) => sum + parseMinutes(app.actual), 0);
+    const limit = day.apps.reduce((sum, app) => sum + parseMinutes(app.limit), 0);
+    return { label: day.label, actual, limit };
+  });
+}
+
 function normalizeSummerPlan(plan) {
   const dailyPlans = normalizeDailyPlans(plan);
+  const appUsageDays = normalizeAppUsageDays(plan);
 
   return {
     ...personalizedSummerPlan,
@@ -3332,12 +3434,13 @@ function normalizeSummerPlan(plan) {
     goals: { ...personalizedSummerPlan.goals, ...(plan?.goals || {}) },
     daily: dailyPlans[0]?.slots || normalizeDailyRows(plan?.daily),
     dailyPlans,
+    appUsageDays,
     courses: Array.isArray(plan?.courses) && plan.courses.length ? plan.courses : personalizedSummerPlan.courses,
-    apps: Array.isArray(plan?.apps) && plan.apps.length ? plan.apps : personalizedSummerPlan.apps,
+    apps: appUsageDays[0]?.apps || normalizeAppRows(plan?.apps),
     expenses: Array.isArray(plan?.expenses) && plan.expenses.length ? plan.expenses : personalizedSummerPlan.expenses,
     meals: Array.isArray(plan?.meals) && plan.meals.length ? plan.meals : personalizedSummerPlan.meals,
-    bodyMetrics: Array.isArray(plan?.bodyMetrics) && plan.bodyMetrics.length ? plan.bodyMetrics : personalizedSummerPlan.bodyMetrics,
-    sleep: Array.isArray(plan?.sleep) && plan.sleep.length ? plan.sleep : personalizedSummerPlan.sleep
+    bodyMetrics: normalizeBodyRows(plan?.bodyMetrics),
+    sleep: normalizeSleepRows(plan?.sleep)
   };
 }
 
@@ -3345,10 +3448,14 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
   const canEdit = currentUser?.role === 'admin';
   const [plan, setPlan] = useState(() => normalizeSummerPlan(personalizedSummerPlan));
   const [selectedPlanDate, setSelectedPlanDate] = useState(personalizedDailyPlans[0].date);
+  const [selectedAppDate, setSelectedAppDate] = useState(personalizedAppUsageDays[0].date);
   const [saveMessage, setSaveMessage] = useState('正在读取数据库');
   const [hasLoadedPlan, setHasLoadedPlan] = useState(false);
   const dayPlans = Array.isArray(plan.dailyPlans) && plan.dailyPlans.length ? plan.dailyPlans : personalizedDailyPlans;
   const selectedDayPlan = dayPlans.find((day) => day.date === selectedPlanDate) || dayPlans[0];
+  const appUsageDays = Array.isArray(plan.appUsageDays) && plan.appUsageDays.length ? plan.appUsageDays : personalizedAppUsageDays;
+  const selectedAppUsageDay = appUsageDays.find((day) => day.date === selectedAppDate) || appUsageDays[0];
+  const appChartData = getSevenDayAppUsage(appUsageDays, selectedAppUsageDay.date);
 
   useEffect(() => {
     let cancelled = false;
@@ -3408,6 +3515,12 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
       setSelectedPlanDate(dayPlans[0]?.date || personalizedDailyPlans[0].date);
     }
   }, [dayPlans, selectedPlanDate]);
+
+  useEffect(() => {
+    if (!appUsageDays.some((day) => day.date === selectedAppDate)) {
+      setSelectedAppDate(appUsageDays[0]?.date || personalizedAppUsageDays[0].date);
+    }
+  }, [appUsageDays, selectedAppDate]);
 
   function updateNested(section, field, value) {
     if (!canEdit) return;
@@ -3477,10 +3590,47 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
     });
   }
 
+  function updateAppUsage(dayDate, rowId, field, value) {
+    if (!canEdit) return;
+    setPlan((current) => {
+      const appUsageDays = (current.appUsageDays || personalizedAppUsageDays).map((day) => (
+        day.date === dayDate
+          ? { ...day, apps: day.apps.map((row) => (row.id === rowId ? { ...row, [field]: value } : row)) }
+          : day
+      ));
+      return { ...current, appUsageDays, apps: appUsageDays[0]?.apps || current.apps };
+    });
+  }
+
+  function addAppUsage(dayDate, row) {
+    if (!canEdit) return;
+    setPlan((current) => {
+      const appUsageDays = (current.appUsageDays || personalizedAppUsageDays).map((day) => (
+        day.date === dayDate
+          ? { ...day, apps: [...(day.apps || []), { ...row, id: `${dayDate}-app-${Date.now()}` }] }
+          : day
+      ));
+      return { ...current, appUsageDays, apps: appUsageDays[0]?.apps || current.apps };
+    });
+  }
+
+  function deleteAppUsage(dayDate, rowId) {
+    if (!canEdit) return;
+    setPlan((current) => {
+      const appUsageDays = (current.appUsageDays || personalizedAppUsageDays).map((day) => (
+        day.date === dayDate
+          ? { ...day, apps: (day.apps || []).filter((row) => row.id !== rowId) }
+          : day
+      ));
+      return { ...current, appUsageDays, apps: appUsageDays[0]?.apps || current.apps };
+    });
+  }
+
   function resetPlan() {
     if (!canEdit) return;
     setPlan(normalizeSummerPlan(personalizedSummerPlan));
     setSelectedPlanDate(personalizedDailyPlans[0].date);
+    setSelectedAppDate(personalizedAppUsageDays[0].date);
     setSaveMessage('已恢复付江樊版模板');
   }
 
@@ -3512,7 +3662,8 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
     }
   }
 
-  const totalAppLimit = plan.apps.reduce((sum, item) => sum + (parseFloat(item.limit) || 0), 0);
+  const totalAppLimit = (selectedAppUsageDay.apps || []).reduce((sum, item) => sum + parseMinutes(item.limit), 0);
+  const totalAppActual = (selectedAppUsageDay.apps || []).reduce((sum, item) => sum + parseMinutes(item.actual), 0);
   const totalExpense = plan.expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
 
   return (
@@ -3615,34 +3766,43 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
           />
         </PlanModule>
 
-        <PlanModule title="手机应用使用时间" count={`目标 ${totalAppLimit || 0} 分钟`}>
+        <PlanModule title="手机应用使用时间" count={`今日 ${totalAppActual || 0} / 目标 ${totalAppLimit || 0} 分钟`} wide>
+          <div className="module-toolbar">
+            <DateSelector days={appUsageDays} value={selectedAppUsageDay.date} onChange={setSelectedAppDate} label="选择记录日期" />
+            <button className="ghost-button module-add-button" type="button" onClick={() => addAppUsage(selectedAppUsageDay.date, { name: '新增应用', limit: '', actual: '' })} disabled={!canEdit}>
+              <PlusCircle size={16} />
+              <span>新增应用</span>
+            </button>
+          </div>
+          <div className="usage-chart-grid">
+            <UsageLineChart data={appChartData} />
+            <UsageBarChart data={appChartData} />
+          </div>
           <EditableTable
-            compact
             columns={[
               ['name', '应用', 'input'],
               ['limit', '每日上限', 'input'],
               ['actual', '实际使用', 'input']
             ]}
             disabled={!canEdit}
-            rows={plan.apps}
-            section="apps"
-            updateRow={updateRow}
-            deleteRow={deleteRow}
+            rows={selectedAppUsageDay.apps || []}
+            section={selectedAppUsageDay.date}
+            updateRow={updateAppUsage}
+            deleteRow={deleteAppUsage}
           />
         </PlanModule>
 
-        <PlanModule title="记账" count={`合计 ${totalExpense.toFixed(1)} 元`}>
+        <PlanModule title="记账" count={`合计 ${totalExpense.toFixed(1)} 元`} wide>
           <button className="ghost-button module-add-button" type="button" onClick={() => addRow('expenses', { date: '8月4日', item: '', amount: '', note: '' })} disabled={!canEdit}>
             <PlusCircle size={16} />
             <span>新增支出</span>
           </button>
           <EditableTable
-            compact
             columns={[
               ['date', '日期', 'input'],
               ['item', '项目', 'input'],
               ['amount', '金额', 'input'],
-              ['note', '备注', 'input']
+              ['note', '备注', 'textarea']
             ]}
             disabled={!canEdit}
             rows={plan.expenses}
@@ -3652,19 +3812,18 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
           />
         </PlanModule>
 
-        <PlanModule title="饮食记录" count={`${plan.meals.length} 天`}>
+        <PlanModule title="饮食记录" count={`${plan.meals.length} 天`} wide>
           <button className="ghost-button module-add-button" type="button" onClick={() => addRow('meals', { date: '8月4日', breakfast: '', lunch: '', dinner: '', snack: '' })} disabled={!canEdit}>
             <PlusCircle size={16} />
             <span>新增饮食</span>
           </button>
           <EditableTable
-            compact
             columns={[
               ['date', '日期', 'input'],
-              ['breakfast', '早饭', 'input'],
-              ['lunch', '午饭', 'input'],
-              ['dinner', '晚饭', 'input'],
-              ['snack', '加餐', 'input']
+              ['breakfast', '早饭', 'textarea'],
+              ['lunch', '午饭', 'textarea'],
+              ['dinner', '晚饭', 'textarea'],
+              ['snack', '加餐', 'textarea']
             ]}
             disabled={!canEdit}
             rows={plan.meals}
@@ -3674,19 +3833,17 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
           />
         </PlanModule>
 
-        <PlanModule title="体重与指标" count={`${plan.bodyMetrics.length} 条`}>
-          <button className="ghost-button module-add-button" type="button" onClick={() => addRow('bodyMetrics', { date: '8月4日', weight: '', waist: '', exercise: '', mood: '' })} disabled={!canEdit}>
+        <PlanModule title="体重与状态" count={`${plan.bodyMetrics.length} 条`} wide>
+          <button className="ghost-button module-add-button" type="button" onClick={() => addRow('bodyMetrics', { date: '8月4日', weight: '', exercise: '', mood: '' })} disabled={!canEdit}>
             <PlusCircle size={16} />
-            <span>新增指标</span>
+            <span>新增记录</span>
           </button>
           <EditableTable
-            compact
             columns={[
               ['date', '日期', 'input'],
               ['weight', '体重', 'input'],
-              ['waist', '腰围/指标', 'input'],
-              ['exercise', '运动完成', 'input'],
-              ['mood', '状态', 'input']
+              ['exercise', '运动完成', 'textarea'],
+              ['mood', '状态', 'textarea']
             ]}
             disabled={!canEdit}
             rows={plan.bodyMetrics}
@@ -3696,19 +3853,18 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
           />
         </PlanModule>
 
-        <PlanModule title="睡眠记录" count={`${plan.sleep.length} 条`}>
-          <button className="ghost-button module-add-button" type="button" onClick={() => addRow('sleep', { date: '8月4日', bed: '', wake: '', hours: '', quality: '' })} disabled={!canEdit}>
+        <PlanModule title="睡眠记录" count={`${plan.sleep.length} 条`} wide>
+          <button className="ghost-button module-add-button" type="button" onClick={() => addRow('sleep', { date: '8月4-5日', bed: '', wake: '', hours: '', quality: '' })} disabled={!canEdit}>
             <PlusCircle size={16} />
             <span>新增睡眠</span>
           </button>
           <EditableTable
-            compact
             columns={[
-              ['date', '日期', 'input'],
+              ['date', '日期范围', 'input'],
               ['bed', '入睡', 'input'],
               ['wake', '起床', 'input'],
               ['hours', '时长', 'input'],
-              ['quality', '质量', 'input']
+              ['quality', '质量', 'textarea']
             ]}
             disabled={!canEdit}
             rows={plan.sleep}
@@ -3731,15 +3887,94 @@ function PlanTextarea({ title, value, disabled, onChange }) {
   );
 }
 
-function PlanModule({ title, count, children }) {
+function PlanModule({ title, count, children, wide = false }) {
   return (
-    <section className="content-band summer-plan-panel">
+    <section className={`content-band summer-plan-panel${wide ? ' wide' : ''}`}>
       <div className="admin-panel-heading">
         <h2>{title}</h2>
         <span>{count}</span>
       </div>
       {children}
     </section>
+  );
+}
+
+function DateSelector({ days, value, onChange, label }) {
+  return (
+    <label className="inline-date-selector">
+      <span>{label}</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        {days.map((day) => (
+          <option key={day.date} value={day.date}>{day.label} · {day.theme}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function UsageLineChart({ data }) {
+  const width = 560;
+  const height = 220;
+  const padding = 34;
+  const maxValue = Math.max(120, ...data.flatMap((item) => [item.actual, item.limit]));
+  const points = data.map((item, index) => {
+    const x = padding + (index * (width - padding * 2)) / Math.max(1, data.length - 1);
+    const y = height - padding - (item.actual / maxValue) * (height - padding * 2);
+    return { ...item, x, y };
+  });
+  const path = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+
+  return (
+    <div className="usage-chart-card">
+      <div className="usage-chart-heading">
+        <h3>7 日折线图</h3>
+        <span>实际使用总时长</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="七日手机应用使用折线图">
+        <line className="chart-axis" x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} />
+        <line className="chart-axis" x1={padding} y1={padding} x2={padding} y2={height - padding} />
+        <path className="chart-line" d={path} />
+        {points.map((point) => (
+          <g key={point.label}>
+            <circle className="chart-point" cx={point.x} cy={point.y} r="4" />
+            <text className="chart-label" x={point.x} y={height - 10} textAnchor="middle">{point.label.replace('8月', '8/').replace('日', '')}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function UsageBarChart({ data }) {
+  const width = 560;
+  const height = 220;
+  const padding = 34;
+  const maxValue = Math.max(120, ...data.flatMap((item) => [item.actual, item.limit]));
+  const barWidth = (width - padding * 2) / Math.max(1, data.length) * 0.52;
+
+  return (
+    <div className="usage-chart-card">
+      <div className="usage-chart-heading">
+        <h3>7 日柱状图</h3>
+        <span>实际 / 目标</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="七日手机应用使用柱状图">
+        <line className="chart-axis" x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} />
+        {data.map((item, index) => {
+          const groupWidth = (width - padding * 2) / Math.max(1, data.length);
+          const x = padding + index * groupWidth + (groupWidth - barWidth) / 2;
+          const actualHeight = (item.actual / maxValue) * (height - padding * 2);
+          const limitHeight = (item.limit / maxValue) * (height - padding * 2);
+          return (
+            <g key={item.label}>
+              <rect className="chart-bar-limit" x={x} y={height - padding - limitHeight} width={barWidth} height={limitHeight} rx="5" />
+              <rect className="chart-bar-actual" x={x} y={height - padding - actualHeight} width={barWidth} height={actualHeight} rx="5" />
+              <text className="chart-label" x={x + barWidth / 2} y={height - 10} textAnchor="middle">{item.label.replace('8月', '8/').replace('日', '')}</text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
   );
 }
 

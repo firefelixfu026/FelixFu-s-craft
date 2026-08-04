@@ -146,10 +146,10 @@ DEFAULT_SUMMER_PLAN: dict[str, Any] = {
         {"id": "meal-1", "date": "8月4日", "breakfast": "", "lunch": "", "dinner": "", "snack": ""},
     ],
     "bodyMetrics": [
-        {"id": "body-1", "date": "8月4日", "weight": "", "waist": "", "exercise": "", "mood": ""},
+        {"id": "body-1", "date": "8月4日", "weight": "", "exercise": "", "mood": ""},
     ],
     "sleep": [
-        {"id": "sleep-1", "date": "8月4日", "bed": "", "wake": "", "hours": "", "quality": ""},
+        {"id": "sleep-1", "date": "8月4-5日", "bed": "", "wake": "", "hours": "", "quality": ""},
     ],
 }
 
@@ -162,7 +162,7 @@ DEFAULT_SUMMER_PLAN["daily"] = [
     {"id": "slot-1400", "time": "14:00 - 15:30", "activity": "题目/笔记整理", "focus": "上午内容收束：整理公式、数据结构模板、组成原理图、概率概念。", "type": "学习"},
     {"id": "slot-1530", "time": "15:30 - 16:30", "activity": "运动", "focus": "游泳、快走、室内燃脂三选一；按身体状态调强度。", "type": "运动"},
     {"id": "slot-1630", "time": "16:30 - 17:30", "activity": "弹性时间", "focus": "外出、家务、临时安排、补觉都放这里；也可挪给学习追进度。", "type": "弹性"},
-    {"id": "slot-1730", "time": "17:30 - 19:00", "activity": "晚餐 + 记录", "focus": "填饮食、体重/指标、记账；当天花销随手记。", "type": "记录"},
+    {"id": "slot-1730", "time": "17:30 - 19:00", "activity": "晚餐 + 记录", "focus": "填饮食、体重/状态、记账；当天花销随手记。", "type": "记录"},
     {"id": "slot-1900", "time": "19:00 - 20:30", "activity": "轻学习 / 复盘", "focus": "复盘今日预习，列明天任务；不适合硬刚时改成阅读。", "type": "学习"},
     {"id": "slot-2030", "time": "20:30 - 21:30", "activity": "娱乐时间", "focus": "以撒的结合 / 第五人格 / 葬送的芙莉莲 / 红与黑，控制 B 站和小红书。", "type": "娱乐"},
     {"id": "slot-2130", "time": "21:30 - 22:30", "activity": "洗漱 + 睡眠准备", "focus": "填睡眠记录，尽量 22:30 前进入休息状态。", "type": "睡眠"},
@@ -275,6 +275,24 @@ DEFAULT_SUMMER_PLAN["dailyPlans"] = [
     }),
 ]
 DEFAULT_SUMMER_PLAN["daily"] = DEFAULT_SUMMER_PLAN["dailyPlans"][0]["slots"]
+DEFAULT_SUMMER_PLAN["appUsageDays"] = [
+    {
+        "id": day["date"],
+        "date": day["date"],
+        "label": day["label"],
+        "theme": day["theme"],
+        "apps": [
+            {
+                **app,
+                "id": f"{day['date']}-{app['id']}",
+                "actual": "",
+            }
+            for app in DEFAULT_SUMMER_PLAN["apps"]
+        ],
+    }
+    for day in DEFAULT_SUMMER_PLAN["dailyPlans"]
+]
+DEFAULT_SUMMER_PLAN["apps"] = DEFAULT_SUMMER_PLAN["appUsageDays"][0]["apps"]
 
 
 class CommentIn(BaseModel):

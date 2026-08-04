@@ -2884,6 +2884,10 @@ h3 {
   min-width: 0;
 }
 
+.summer-module-grid .summer-plan-panel.wide {
+  grid-column: 1 / -1;
+}
+
 .summer-plan-panel .admin-panel-heading p {
   margin: 4px 0 0;
   color: #6a7685;
@@ -2898,6 +2902,110 @@ h3 {
 .module-add-button {
   width: fit-content;
   margin-bottom: 10px;
+}
+
+.module-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+.inline-date-selector {
+  display: grid;
+  gap: 7px;
+  min-width: min(360px, 100%);
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.inline-date-selector select {
+  min-height: 40px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: #18212f;
+  background: #ffffff;
+  outline: 0;
+}
+
+.inline-date-selector select:focus {
+  border-color: #1f7a6d;
+  box-shadow: 0 0 0 3px rgba(31, 122, 109, 0.12);
+}
+
+.usage-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 12px 0 16px;
+}
+
+.usage-chart-card {
+  min-width: 0;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  padding: 14px;
+  background: #f8fafc;
+}
+
+.usage-chart-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.usage-chart-heading h3 {
+  margin: 0;
+  color: #102033;
+  font-size: 16px;
+}
+
+.usage-chart-heading span {
+  color: #6a7685;
+  font-size: 12px;
+}
+
+.usage-chart-card svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chart-axis {
+  stroke: #cbd5e1;
+  stroke-width: 1.5;
+}
+
+.chart-line {
+  fill: none;
+  stroke: #1f7a6d;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart-point {
+  fill: #ffffff;
+  stroke: #1f7a6d;
+  stroke-width: 3;
+}
+
+.chart-bar-limit {
+  fill: #dbe4ee;
+}
+
+.chart-bar-actual {
+  fill: #1f7a6d;
+}
+
+.chart-label {
+  fill: #6a7685;
+  font-size: 12px;
 }
 
 .summer-date-picker {
@@ -2993,6 +3101,10 @@ h3 {
   min-width: 560px;
 }
 
+.summer-plan-panel.wide .summer-plan-table {
+  min-width: 980px;
+}
+
 .summer-plan-table th,
 .summer-plan-table td {
   padding: 10px;
@@ -3032,6 +3144,10 @@ h3 {
   padding: 9px 10px;
   resize: vertical;
   line-height: 1.5;
+}
+
+.summer-plan-panel.wide .summer-plan-table textarea {
+  min-height: 78px;
 }
 
 .weekly-plan-list {
@@ -3196,7 +3312,8 @@ h3 {
   .template-grid,
   .summer-plan-hero,
   .summer-goal-grid,
-  .summer-module-grid {
+  .summer-module-grid,
+  .usage-chart-grid {
     grid-template-columns: 1fr;
   }
 
