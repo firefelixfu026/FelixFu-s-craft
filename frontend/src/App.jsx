@@ -345,6 +345,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v2.7.4',
+    title: '首页秒级计时热修',
+    date: '2026-08-08',
+    status: '已上线',
+    points: ['修复首页 homeNow 作用域错误', '秒级上线计时移动到首页组件内部', '恢复首页正常渲染', '保留每秒自动刷新']
+  },
+  {
     version: 'v2.7.3',
     title: '首页上线时间精确到秒',
     date: '2026-08-08',
@@ -811,7 +818,6 @@ function App() {
   const [activeView, setActiveView] = useState(readStoredActiveView);
   const [theme, setTheme] = useState(readStoredTheme);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(readStoredSidebarCollapsed);
-  const [homeNow, setHomeNow] = useState(() => new Date());
   const [query, setQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState(ALL_FILTER);
   const [selectedCategory, setSelectedCategory] = useState(ALL_FILTER);
@@ -903,11 +909,6 @@ function App() {
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setHomeNow(new Date()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   function toggleTheme() {
     setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'));
@@ -2394,6 +2395,12 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
   const [typingIndex, setTypingIndex] = useState(0);
   const [typedIdentity, setTypedIdentity] = useState('');
   const [isDeletingIdentity, setIsDeletingIdentity] = useState(false);
+  const [homeNow, setHomeNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setHomeNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const currentPhrase = identityPhrases[typingIndex];
