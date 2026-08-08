@@ -2137,6 +2137,33 @@ function App() {
 }
 
 function Overview({ profile, articles, setActiveView, currentUser }) {
+  const skillPillars = [
+    {
+      title: 'Web 全栈',
+      detail: 'React、FastAPI、PostgreSQL、Docker，把想法快速接成可访问的网站。',
+      level: '70%',
+      icon: Code2
+    },
+    {
+      title: 'AI 工作流',
+      detail: '把模型能力接到写作、学习助手、群聊语料和自动化工具里。',
+      level: '62%',
+      icon: Bot
+    },
+    {
+      title: '部署运维',
+      detail: '服务器续费、快照备份、日志排查、域名绑定和线上发布都纳入后台。',
+      level: '58%',
+      icon: ShieldCheck
+    }
+  ];
+
+  const roadmapItems = [
+    { stage: 'Now', title: '把个人博客打磨成稳定工作台', detail: '内容、评论、后台、备份和 AI 配置已经形成基本闭环。' },
+    { stage: 'Next', title: '沉淀学习助手和微信群 bot 语料', detail: '把暑期学习、课程笔记和群聊文本变成可检索、可总结的数据。' },
+    { stage: 'Later', title: '做更多可展示的小项目', detail: '管理工具、游戏、科研辅助和安全练习都可以接到同一个主页。' }
+  ];
+
   const capabilityCards = [
     {
       title: '文章系统',
@@ -2172,15 +2199,29 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
 
   return (
     <section className="workspace">
-      <div className="profile-grid">
+      <div className="profile-grid homepage-hero">
         <div className="profile-copy">
-          <p className="eyebrow">{profile.school}</p>
-          <h1>{profile.name}的个人博客</h1>
+          <div className="hero-badge">
+            <span aria-hidden="true" />
+            <strong>{profile.school}</strong>
+            <em>{profile.role}</em>
+          </div>
+          <p className="eyebrow">~/whoami</p>
+          <h1>
+            你好，我是 <span className="gradient-text">{profile.name}</span>
+          </h1>
+          <p className="hero-subtitle">
+            一个正在把学习、项目和 AI 想法变成真实作品的计算机学生。
+          </p>
           <p className="summary">{profile.summary}</p>
           <div className="hero-actions">
             <button className="primary-action" type="button" onClick={() => setActiveView('articles')}>
               <BookOpen size={17} />
               <span>看文章</span>
+            </button>
+            <button className="ghost-button" type="button" onClick={() => setActiveView('plan')}>
+              <List size={17} />
+              <span>看学习计划</span>
             </button>
             {currentUser?.role === 'admin' && (
               <button className="ghost-button" type="button" onClick={() => setActiveView('ai')}>
@@ -2195,7 +2236,19 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
             ))}
           </div>
         </div>
-        <img className="profile-image" src="/avatar.jpg" alt="付江樊头像" />
+        <div className="profile-showcase">
+          <img className="profile-image" src="/avatar.jpg" alt="付江樊头像" />
+          <div className="terminal-card" aria-label="个人主页状态">
+            <div className="terminal-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+            <code>felixfu@zju:~$ ship ideas</code>
+            <strong>Blog / AI / Tools</strong>
+            <p>Keep building, keep writing.</p>
+          </div>
+        </div>
       </div>
 
       <div className="metric-grid">
@@ -2209,8 +2262,35 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
 
       <section className="content-band">
         <div className="section-heading">
-          <p className="eyebrow">当前能力</p>
-          <h2>博客已经从 MVP 进入 AI 模块阶段</h2>
+          <p className="eyebrow">技能树</p>
+          <h2>正在点亮的方向</h2>
+        </div>
+        <div className="skill-pillar-grid">
+          {skillPillars.map((skill) => {
+            const Icon = skill.icon;
+            return (
+              <article className="skill-pillar-card" key={skill.title}>
+                <div className="skill-pillar-heading">
+                  <Icon size={20} />
+                  <div>
+                    <h3>{skill.title}</h3>
+                    <span>{skill.level}</span>
+                  </div>
+                </div>
+                <p>{skill.detail}</p>
+                <div className="skill-meter" aria-label={`${skill.title} 当前进度 ${skill.level}`}>
+                  <span style={{ width: skill.level }} />
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="content-band">
+        <div className="section-heading">
+          <p className="eyebrow">项目入口</p>
+          <h2>主页连接到正在生长的作品</h2>
         </div>
         <div className="capability-grid">
           {capabilityCards.filter((card) => !card.adminOnly || currentUser?.role === 'admin').map((card) => {
@@ -2229,6 +2309,24 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
               </article>
             );
           })}
+        </div>
+      </section>
+
+      <section className="content-band">
+        <div className="section-heading">
+          <p className="eyebrow">路线</p>
+          <h2>下一段迭代怎么走</h2>
+        </div>
+        <div className="roadmap-list">
+          {roadmapItems.map((item) => (
+            <article className="roadmap-item" key={item.stage}>
+              <span>{item.stage}</span>
+              <div>
+                <h3>{item.title}</h3>
+                <p>{item.detail}</p>
+              </div>
+            </article>
+          ))}
         </div>
       </section>
 
