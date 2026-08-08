@@ -1,11 +1,54 @@
 :root {
   font-family:
     Inter, 'Segoe UI', 'Microsoft YaHei', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  color: #18212f;
-  background: #f4f6f8;
+  color: var(--text-main);
+  background: var(--page-bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  color-scheme: light;
+  --page-bg: #f4f6f8;
+  --panel-bg: #ffffff;
+  --panel-soft: #f8fafc;
+  --panel-muted: #eef4f8;
+  --text-main: #18212f;
+  --text-soft: #5b6878;
+  --text-muted: #7a8797;
+  --border: #d8e0e9;
+  --border-soft: #e5edf4;
+  --input-bg: #ffffff;
+  --sidebar-bg: #102033;
+  --sidebar-active: #1d3550;
+  --sidebar-border: #29415d;
+  --accent: #1f7a6d;
+  --accent-strong: #155f54;
+  --accent-soft: #d9f6e7;
+  --accent-blue: #2d8df0;
+  --shadow-soft: 0 16px 38px rgba(16, 32, 51, 0.08);
+  --hero-page-bg: #091021;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page-bg: #080d18;
+  --panel-bg: #101827;
+  --panel-soft: #152034;
+  --panel-muted: #1b2940;
+  --text-main: #e8eef9;
+  --text-soft: #a7b4ca;
+  --text-muted: #8290a7;
+  --border: #27364d;
+  --border-soft: #1e2c42;
+  --input-bg: #0e1727;
+  --sidebar-bg: #07111f;
+  --sidebar-active: #142338;
+  --sidebar-border: #1e314a;
+  --accent: #34d399;
+  --accent-strong: #7dd3fc;
+  --accent-soft: rgba(52, 211, 153, 0.16);
+  --accent-blue: #60a5fa;
+  --shadow-soft: 0 18px 42px rgba(0, 0, 0, 0.34);
+  --hero-page-bg: #060b16;
 }
 
 * {
@@ -16,6 +59,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  color: var(--text-main);
+  background: var(--page-bg);
 }
 
 button,
@@ -43,7 +88,8 @@ button {
   overflow-y: auto;
   padding: 24px 18px;
   color: #f8fafc;
-  background: #102033;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
 }
 
 .brand {
@@ -101,7 +147,7 @@ button {
 .nav-button.active,
 .nav-button:hover {
   color: #ffffff;
-  background: #1d3550;
+  background: var(--sidebar-active);
 }
 
 .login-panel {
@@ -109,7 +155,7 @@ button {
   gap: 10px;
   margin-top: auto;
   padding-top: 20px;
-  border-top: 1px solid #29415d;
+  border-top: 1px solid var(--sidebar-border);
 }
 
 .login-panel > span {
@@ -123,13 +169,15 @@ button {
 }
 
 .icon-text-button {
-  color: #102033;
-  background: #ffffff;
+  color: var(--text-main);
+  background: var(--panel-bg);
+  border-color: var(--border);
 }
 
 .main-content {
   min-width: 0;
   padding: 24px clamp(16px, 3vw, 40px) 48px;
+  background: var(--page-bg);
 }
 
 .topbar {
@@ -152,9 +200,9 @@ button {
   width: min(620px, 100%);
   height: 44px;
   padding: 0 14px;
-  border: 1px solid #d8e0e9;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--input-bg);
 }
 
 .search-box input {
@@ -162,7 +210,35 @@ button {
   min-width: 0;
   border: 0;
   outline: 0;
-  color: #18212f;
+  color: var(--text-main);
+  background: transparent;
+}
+
+.topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.theme-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-main);
+  background: var(--panel-bg);
+  white-space: nowrap;
+}
+
+.theme-toggle-button:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  box-shadow: var(--shadow-soft);
 }
 
 .status-pill {
@@ -173,8 +249,8 @@ button {
   min-height: 34px;
   padding: 0 12px;
   border-radius: 999px;
-  color: #0f5132;
-  background: #d9f6e7;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
   font-size: 13px;
   white-space: nowrap;
 }
@@ -3725,6 +3801,192 @@ h3 {
   cursor: not-allowed;
 }
 
+:root[data-theme='dark'] .profile-copy,
+:root[data-theme='dark'] .archive-filter,
+:root[data-theme='dark'] .archive-button,
+:root[data-theme='dark'] .metric,
+:root[data-theme='dark'] .skill-pillar-card,
+:root[data-theme='dark'] .roadmap-item,
+:root[data-theme='dark'] .capability-card,
+:root[data-theme='dark'] .content-band,
+:root[data-theme='dark'] .tool-panel,
+:root[data-theme='dark'] .game-details,
+:root[data-theme='dark'] .article-card,
+:root[data-theme='dark'] .article-detail-card,
+:root[data-theme='dark'] .article-toc,
+:root[data-theme='dark'] .comment-form,
+:root[data-theme='dark'] .ai-generator,
+:root[data-theme='dark'] .ai-result-panel,
+:root[data-theme='dark'] .ai-reference-panel,
+:root[data-theme='dark'] .ai-result-card,
+:root[data-theme='dark'] .admin-page-card,
+:root[data-theme='dark'] .admin-panel,
+:root[data-theme='dark'] .admin-task-card,
+:root[data-theme='dark'] .admin-insight-grid > div,
+:root[data-theme='dark'] .release-metric,
+:root[data-theme='dark'] .release-version-card,
+:root[data-theme='dark'] .analytics-grid > div,
+:root[data-theme='dark'] .account-list article,
+:root[data-theme='dark'] .template-card,
+:root[data-theme='dark'] .study-task,
+:root[data-theme='dark'] .article-preview-panel,
+:root[data-theme='dark'] .ai-history-item,
+:root[data-theme='dark'] .usage-chart-card,
+:root[data-theme='dark'] .completion-summary-grid > div,
+:root[data-theme='dark'] .summer-date-tab,
+:root[data-theme='dark'] .weekly-plan-row,
+:root[data-theme='dark'] .weekly-check,
+:root[data-theme='dark'] .compact-icon-button {
+  border-color: var(--border);
+  color: var(--text-main);
+  background: var(--panel-bg);
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .homepage-hero .profile-copy {
+  border-color: rgba(96, 165, 250, 0.28);
+  background:
+    linear-gradient(135deg, rgba(52, 211, 153, 0.12), rgba(96, 165, 250, 0.12) 42%, rgba(16, 24, 39, 0.96)),
+    var(--panel-bg);
+}
+
+:root[data-theme='dark'] .admin-task-card.ready,
+:root[data-theme='dark'] .study-task.done,
+:root[data-theme='dark'] .weekly-plan-row.done,
+:root[data-theme='dark'] .weekly-check:has(input:checked) {
+  border-color: rgba(52, 211, 153, 0.42);
+  color: var(--accent);
+  background: rgba(52, 211, 153, 0.12);
+}
+
+:root[data-theme='dark'] .admin-task-card.attention {
+  border-color: rgba(245, 158, 11, 0.46);
+  background: rgba(245, 158, 11, 0.13);
+}
+
+:root[data-theme='dark'] .admin-page-card:hover,
+:root[data-theme='dark'] .admin-page-card.active,
+:root[data-theme='dark'] .archive-button.active,
+:root[data-theme='dark'] .archive-button:hover {
+  border-color: var(--accent);
+  background: rgba(52, 211, 153, 0.12);
+}
+
+:root[data-theme='dark'] .article-cover,
+:root[data-theme='dark'] .article-preview-panel .markdown-content,
+:root[data-theme='dark'] .markdown-toolbar,
+:root[data-theme='dark'] .ai-editor-tools,
+:root[data-theme='dark'] .ai-insert-mode,
+:root[data-theme='dark'] .corpus-row pre,
+:root[data-theme='dark'] .summer-plan-table,
+:root[data-theme='dark'] .summer-plan-table th,
+:root[data-theme='dark'] .readonly-plan-cell {
+  border-color: var(--border);
+  color: var(--text-main) !important;
+  background: var(--panel-soft) !important;
+}
+
+:root[data-theme='dark'] .comment {
+  background: var(--panel-soft);
+}
+
+:root[data-theme='dark'] .tag-button,
+:root[data-theme='dark'] .icon-toggle,
+:root[data-theme='dark'] .capability-card button,
+:root[data-theme='dark'] .comment-reply-button,
+:root[data-theme='dark'] .game-actions .secondary-link,
+:root[data-theme='dark'] .ai-editor-tools button,
+:root[data-theme='dark'] .summer-date-picker select,
+:root[data-theme='dark'] .inline-date-selector select,
+:root[data-theme='dark'] .ai-generator input,
+:root[data-theme='dark'] .ai-generator textarea,
+:root[data-theme='dark'] .ai-generator select,
+:root[data-theme='dark'] .admin-filter-bar input,
+:root[data-theme='dark'] .admin-filter-bar select,
+:root[data-theme='dark'] .ai-test-form input,
+:root[data-theme='dark'] .ai-test-form select,
+:root[data-theme='dark'] .ai-config-form input,
+:root[data-theme='dark'] .ai-config-form select,
+:root[data-theme='dark'] .corpus-textarea,
+:root[data-theme='dark'] .admin-form input,
+:root[data-theme='dark'] .admin-form textarea,
+:root[data-theme='dark'] .comment-filter-row select,
+:root[data-theme='dark'] .summer-plan-table input,
+:root[data-theme='dark'] .summer-plan-table select,
+:root[data-theme='dark'] .summer-plan-table textarea {
+  border-color: var(--border);
+  color: var(--text-main);
+  background: var(--input-bg);
+}
+
+:root[data-theme='dark'] .profile-copy p,
+:root[data-theme='dark'] .profile-copy span,
+:root[data-theme='dark'] .article-card p,
+:root[data-theme='dark'] .news-item p,
+:root[data-theme='dark'] .digest-item p,
+:root[data-theme='dark'] .game-details p,
+:root[data-theme='dark'] .roadmap-item p,
+:root[data-theme='dark'] .capability-card p,
+:root[data-theme='dark'] .comment span,
+:root[data-theme='dark'] .comment em,
+:root[data-theme='dark'] .release-version-card li,
+:root[data-theme='dark'] .release-version-card small,
+:root[data-theme='dark'] .account-profile p,
+:root[data-theme='dark'] .account-list span,
+:root[data-theme='dark'] .admin-panel-heading > span,
+:root[data-theme='dark'] .admin-page-card em,
+:root[data-theme='dark'] .admin-task-card em,
+:root[data-theme='dark'] .admin-task-card small,
+:root[data-theme='dark'] .analytics-grid p,
+:root[data-theme='dark'] .template-card span,
+:root[data-theme='dark'] .template-card small,
+:root[data-theme='dark'] .study-task em,
+:root[data-theme='dark'] .usage-chart-heading span,
+:root[data-theme='dark'] .completion-summary-grid span,
+:root[data-theme='dark'] .summer-date-picker label {
+  color: var(--text-soft);
+}
+
+:root[data-theme='dark'] h1,
+:root[data-theme='dark'] h2,
+:root[data-theme='dark'] h3,
+:root[data-theme='dark'] .admin-page-card strong,
+:root[data-theme='dark'] .admin-task-card strong,
+:root[data-theme='dark'] .comment strong,
+:root[data-theme='dark'] .comment-title,
+:root[data-theme='dark'] .release-version-card h3,
+:root[data-theme='dark'] .completion-summary-grid strong,
+:root[data-theme='dark'] .usage-chart-heading h3 {
+  color: var(--text-main);
+}
+
+:root[data-theme='dark'] .brand-mark {
+  border-color: rgba(232, 238, 249, 0.24);
+}
+
+:root[data-theme='dark'] .date,
+:root[data-theme='dark'] .article-meta,
+:root[data-theme='dark'] .release-pager span,
+:root[data-theme='dark'] .chart-label {
+  color: var(--text-muted);
+}
+
+:root[data-theme='dark'] .markdown-math,
+:root[data-theme='dark'] .interaction-message,
+:root[data-theme='dark'] .draft-notice {
+  border-color: rgba(52, 211, 153, 0.32);
+  color: var(--accent);
+  background: rgba(52, 211, 153, 0.10);
+}
+
+:root[data-theme='dark'] .chart-axis {
+  stroke: #334155;
+}
+
+:root[data-theme='dark'] .chart-bar-limit {
+  fill: #263449;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -3839,6 +4101,10 @@ h3 {
   .topbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .topbar-actions {
+    justify-content: flex-start;
   }
 
   .admin-form-grid {

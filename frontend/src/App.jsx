@@ -19,6 +19,7 @@ import {
   CircleHelp,
   LogOut,
   MessageCircle,
+  Moon,
   PencilLine,
   PlusCircle,
   Quote,
@@ -28,6 +29,7 @@ import {
   ShieldCheck,
   Sigma,
   Star,
+  Sun,
   ThumbsDown,
   Trash2,
   UserRound,
@@ -89,6 +91,7 @@ const AUTH_USER_KEY = 'felix_blog_user';
 const AUTH_EXPIRES_KEY = 'felix_blog_token_expires_at';
 const ACTIVE_VIEW_KEY = 'felix_blog_active_view';
 const ADMIN_PAGE_KEY = 'felix_blog_admin_page';
+const THEME_KEY = 'felix_blog_theme';
 const emptyReactionState = { like: false, favorite: false, downvote: false, question: false };
 const ALL_FILTER = '全部';
 const ALL_ARCHIVE = '全部';
@@ -178,6 +181,16 @@ function readStoredUser() {
 function readStoredActiveView() {
   if (typeof localStorage === 'undefined') return 'overview';
   return localStorage.getItem(ACTIVE_VIEW_KEY) || 'overview';
+}
+
+function readStoredTheme() {
+  if (typeof localStorage === 'undefined') return 'light';
+  const storedTheme = localStorage.getItem(THEME_KEY);
+  if (storedTheme === 'light' || storedTheme === 'dark') return storedTheme;
+  if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
+    return 'dark';
+  }
+  return 'light';
 }
 
 function readStoredAdminPage() {
@@ -654,6 +667,7 @@ function aiTaskLabel(task) {
 
 function App() {
   const [activeView, setActiveView] = useState(readStoredActiveView);
+  const [theme, setTheme] = useState(readStoredTheme);
   const [query, setQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState(ALL_FILTER);
   const [selectedCategory, setSelectedCategory] = useState(ALL_FILTER);
@@ -720,6 +734,8 @@ function App() {
   const [authMessage, setAuthMessage] = useState('');
   const [interactionMessage, setInteractionMessage] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const ThemeIcon = theme === 'dark' ? Moon : Sun;
+  const nextThemeLabel = theme === 'dark' ? '日间模式' : '夜间模式';
 
   const visibleNavItems = useMemo(() => {
     if (!currentUser) {
@@ -736,6 +752,15 @@ function App() {
   useEffect(() => {
     localStorage.setItem(ACTIVE_VIEW_KEY, activeView);
   }, [activeView]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'));
+  }
 
   useEffect(() => {
     async function loadInitialData() {
@@ -1975,9 +2000,21 @@ function App() {
               />
             </div>
           )}
-          <div className="status-pill">
-            <Zap size={16} />
-            <span>在线工作台</span>
+          <div className="topbar-actions">
+            <button
+              className="theme-toggle-button"
+              type="button"
+              onClick={toggleTheme}
+              title={`切换到${nextThemeLabel}`}
+              aria-label={`切换到${nextThemeLabel}`}
+            >
+              <ThemeIcon size={16} />
+              <span>{theme === 'dark' ? '夜间' : '日间'}</span>
+            </button>
+            <div className="status-pill">
+              <Zap size={16} />
+              <span>在线工作台</span>
+            </div>
           </div>
         </header>
 
