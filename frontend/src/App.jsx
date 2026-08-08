@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   BookOpen,
@@ -42,7 +42,8 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import changelogText from '../../CHANGELOG.md?raw';
 import { aiNews as fallbackNews, articles as fallbackArticles, gameModule, profile as fallbackProfile } from './data.js';
-import ProjectOpsPanel from './ProjectOpsPanel.jsx';
+
+const ProjectOpsPanel = lazy(() => import('./ProjectOpsPanel.jsx'));
 
 const createEmptyArticleForm = () => ({
   title: '',
@@ -2295,6 +2296,13 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
       adminOnly: true
     }
   ];
+  const recentArticles = [...articles].slice(0, 3);
+  const terminalLines = [
+    ['boot', 'personal site online'],
+    ['stack', 'React + FastAPI + PostgreSQL + Docker'],
+    ['latest', recentArticles[0]?.title || '等待第一篇新文章'],
+    ['mode', currentUser?.role === 'admin' ? 'admin workspace unlocked' : 'reader mode']
+  ];
 
   return (
     <section className="workspace homepage-workspace">
@@ -2319,6 +2327,22 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
           <p className="geek-summary">
             {profile.summary}
           </p>
+          <div className="hero-terminal" aria-label="站点动态摘要">
+            <div className="hero-terminal-bar">
+              <span />
+              <span />
+              <span />
+              <strong>felixfu@site:~</strong>
+            </div>
+            <div className="hero-terminal-lines">
+              {terminalLines.map(([label, value]) => (
+                <p key={label}>
+                  <span>$ {label}</span>
+                  <strong>{value}</strong>
+                </p>
+              ))}
+            </div>
+          </div>
           <div className="hero-actions">
             <button className="primary-action" type="button" onClick={() => setActiveView('articles')}>
               <BookOpen size={17} />
@@ -2644,6 +2668,32 @@ function ArticleDetail({
   const visibleComments = commentPageGroups[currentCommentPage] || [];
   const draftLength = (commentDrafts[article.id] || '').length;
   const replyTarget = commentReplyTargets?.[article.id] || null;
+  const articleRef = useRef(null);
+  const [readingProgress, setReadingProgress] = useState(0);
+  const headings = useMemo(() => getMarkdownHeadings(article.content || ''), [article.content]);
+
+  useEffect(() => {
+    function updateReadingProgress() {
+      if (!articleRef.current) {
+        setReadingProgress(0);
+        return;
+      }
+      const rect = articleRef.current.getBoundingClientRect();
+      const start = window.scrollY + rect.top;
+      const end = start + articleRef.current.scrollHeight - window.innerHeight;
+      const total = Math.max(1, end - start);
+      const nextProgress = Math.min(1, Math.max(0, (window.scrollY - start) / total));
+      setReadingProgress(nextProgress);
+    }
+
+    updateReadingProgress();
+    window.addEventListener('scroll', updateReadingProgress, { passive: true });
+    window.addEventListener('resize', updateReadingProgress);
+    return () => {
+      window.removeEventListener('scroll', updateReadingProgress);
+      window.removeEventListener('resize', updateReadingProgress);
+    };
+  }, [article.id]);
 
   return (
     <section className="workspace article-detail-workspace">
@@ -2654,7 +2704,7 @@ function ArticleDetail({
 
       {interactionMessage && <p className="interaction-message">{interactionMessage}</p>}
 
-      <article className="article-card article-detail-card">
+      <article className="article-card article-detail-card" ref={articleRef}>
         {article.coverUrl && <ArticleCover article={article} size="large" />}
         <div className="article-meta">
           {article.pinned && <span>置顶</span>}
@@ -2670,6 +2720,18 @@ function ArticleDetail({
             <span key={tag}>{tag}</span>
           ))}
         </div>
+
+        <div className="reading-toolbar" aria-label="阅读状态">
+          <div>
+            <span>阅读进度</span>
+            <strong>{Math.round(readingProgress * 100)}%</strong>
+          </div>
+          <div className="reading-progress-track" aria-hidden="true">
+            <span style={{ transform: `scaleX(${readingProgress})` }} />
+          </div>
+        </div>
+
+        {headings.length > 0 && <ArticleToc headings={headings} />}
 
         {article.content && (
           <MarkdownContent content={article.content} title={article.title} />
@@ -2841,6 +2903,33 @@ function MarkdownContent({ content, title }) {
     <div className="markdown-content" aria-label={`${title} 正文`}>
       {blocks.map((block, index) => renderMarkdownBlock(block, index))}
     </div>
+  );
+}
+
+function MarkdownCodeBlock({ language, text }) {
+  const [isCopied, setIsCopied] = useState(false);
+
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setIsCopied(true);
+      window.setTimeout(() => setIsCopied(false), 1400);
+    } catch {
+      setIsCopied(false);
+    }
+  }
+
+  return (
+    <pre className="markdown-code">
+      <div className="markdown-code-toolbar">
+        <span>{language || 'code'}</span>
+        <button type="button" onClick={copyCode}>
+          <Copy size={14} />
+          <span>{isCopied ? '已复制' : '复制'}</span>
+        </button>
+      </div>
+      <code>{text}</code>
+    </pre>
   );
 }
 
@@ -3100,12 +3189,7 @@ function renderMarkdownBlock(block, index) {
     return <hr className="markdown-divider" key={index} />;
   }
   if (block.type === 'code') {
-    return (
-      <pre className="markdown-code" key={index}>
-        {block.language && <span>{block.language}</span>}
-        <code>{block.text}</code>
-      </pre>
-    );
+    return <MarkdownCodeBlock language={block.language} text={block.text} key={index} />;
   }
   if (block.type === 'math') {
     return <div className="markdown-math" key={index}>{renderMathExpression(block.text, true)}</div>;
@@ -5085,6 +5169,32 @@ function AdminWorkspace({
     { label: '管理员登录', done: Boolean(currentUser?.role === 'admin') },
     { label: 'AI 写作辅助', done: true },
   ];
+  const adminPulseItems = [
+    {
+      label: '待处理',
+      value: pendingCommentCount ? `${pendingCommentCount} 条` : '清爽',
+      detail: pendingCommentCount ? '有评论等待审核' : '评论队列暂无压力',
+      tone: pendingCommentCount ? 'attention' : 'ready'
+    },
+    {
+      label: '内容库存',
+      value: `${publishedCount} / ${draftCount}`,
+      detail: '已发布 / 草稿',
+      tone: draftCount ? 'attention' : 'ready'
+    },
+    {
+      label: 'AI 状态',
+      value: aiSettings?.configured ? '已接入' : '待配置',
+      detail: aiSettings?.configured ? (aiSettings.model || '模型已保存') : '可在 AI 页配置模型',
+      tone: aiSettings?.configured ? 'ready' : 'attention'
+    },
+    {
+      label: '安全日志',
+      value: `${adminAuditLogs.length} 条`,
+      detail: isLoadingAuditLogs ? '正在刷新' : '最近操作留痕',
+      tone: 'ready'
+    }
+  ];
   const adminPageItems = [
     { id: 'overview', label: '总览', detail: '状态、统计、待办', icon: Star, count: `${publishedCount} 篇` },
     { id: 'ops', label: '运维', detail: '服务、部署、脚本', icon: ShieldCheck, count: '控制台' },
@@ -5490,7 +5600,9 @@ function AdminWorkspace({
           title="运维页暂时打不开"
           onReset={() => openAdminPage('overview')}
         >
-          <ProjectOpsPanel authToken={authToken} />
+          <Suspense fallback={<section className="admin-panel lazy-panel">正在加载运维面板...</section>}>
+            <ProjectOpsPanel authToken={authToken} />
+          </Suspense>
         </AdminPanelErrorBoundary>
       )}
 
@@ -5504,6 +5616,15 @@ function AdminWorkspace({
                 <h2>今天先看这里</h2>
                 <span>常用动作拆开了，不用在一屏里翻到眼花</span>
               </div>
+            </div>
+            <div className="admin-pulse-grid" aria-label="后台状态速览">
+              {adminPulseItems.map((item) => (
+                <div className={`admin-pulse-card ${item.tone}`} key={item.label}>
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                  <small>{item.detail}</small>
+                </div>
+              ))}
             </div>
             <div className="admin-home-actions">
               <button className="primary-action" type="button" onClick={() => openAdminPage('editor')}>

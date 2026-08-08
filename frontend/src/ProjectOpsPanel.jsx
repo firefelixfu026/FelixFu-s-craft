@@ -186,6 +186,14 @@ function workflowStatusClass(run) {
   return run.conclusion === 'success' ? 'ready' : 'danger';
 }
 
+function deploymentErrorMessage(status) {
+  if (status === 403) return 'GitHub 返回 403：公共接口可能被限流，或仓库 Actions 读取权限受限';
+  if (status === 404) return 'GitHub 返回 404：请检查仓库地址或 Actions 是否开启';
+  if (status === 401) return 'GitHub 返回 401：需要登录态或 token 才能读取';
+  if (status === 429) return 'GitHub 返回 429：请求太频繁，稍后再刷新';
+  return `GitHub 返回 ${status}：部署记录暂时不可读`;
+}
+
 function readCheckHistory() {
   if (typeof localStorage === 'undefined') return [];
   try {
@@ -253,7 +261,7 @@ function ProjectOpsPanel({ authToken }) {
         headers: { Accept: 'application/vnd.github+json' }
       });
       if (!response.ok) {
-        setDeploymentMessage(`GitHub 返回 ${response.status}`);
+        setDeploymentMessage(deploymentErrorMessage(response.status));
         return;
       }
       const payload = await response.json();
