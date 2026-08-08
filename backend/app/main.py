@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -52,6 +52,8 @@ COMMENT_COOLDOWN_SECONDS = 20
 ADMIN_COMMENTS_REQUIRE_APPROVAL = os.getenv("ADMIN_COMMENTS_REQUIRE_APPROVAL", "false").strip().lower() in {"1", "true", "yes", "on"}
 ALLOW_PUBLIC_EMAIL_REGISTRATION = os.getenv("ALLOW_PUBLIC_EMAIL_REGISTRATION", "false").strip().lower() in {"1", "true", "yes", "on"}
 ALLOW_READER_EMAIL_LOGIN = os.getenv("ALLOW_READER_EMAIL_LOGIN", "false").strip().lower() in {"1", "true", "yes", "on"}
+LOGIN_FAILURE_LIMIT = int(os.getenv("LOGIN_FAILURE_LIMIT", "5") or "5")
+LOGIN_LOCK_SECONDS = int(os.getenv("LOGIN_LOCK_SECONDS", "60") or "60")
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE_TYPES = {
@@ -63,6 +65,7 @@ ALLOWED_IMAGE_TYPES = {
 }
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
+LOGIN_FAILURES: dict[str, dict[str, Any]] = {}
 
 
 app = FastAPI(title="FelixFu Blog API", version="0.8.0")
@@ -321,6 +324,10 @@ class CommentIn(BaseModel):
     content: str
     authorName: str | None = None
     parentId: int | None = None
+
+
+class CommentBulkActionIn(BaseModel):
+    ids: list[int]
 
 
 class ReactionIn(BaseModel):
@@ -616,14 +623,19 @@ def register_admin(payload: RegisterIn, db: Session = Depends(get_db)) -> dict:
 
 
 @app.post("/api/auth/login")
-def login(payload: LoginIn, db: Session = Depends(get_db)) -> dict:
+def login(payload: LoginIn, request: Request, db: Session = Depends(get_db)) -> dict:
     email = _normalize_email(payload.email)
+    throttle_key = _login_throttle_key(email, request)
+    _ensure_login_allowed(throttle_key)
     user = db.scalar(select(User).where(User.email == email))
     if not user or not verify_password(payload.password, user.password_hash):
+        _record_login_failure(throttle_key)
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if user.role != "admin" and not ALLOW_READER_EMAIL_LOGIN:
+        _record_login_failure(throttle_key)
         raise HTTPException(status_code=403, detail="Reader email login is disabled")
 
+    LOGIN_FAILURES.pop(throttle_key, None)
     return {"token": create_access_token(user), "user": _user_to_dict(user)}
 
 
@@ -870,6 +882,28 @@ def approve_admin_comment(
     _record_admin_event(db, current_user, "通过评论", "comment", str(comment_id), detail)
     db.refresh(comment)
     return _admin_comment_to_dict(comment)
+
+
+@app.post("/api/admin/comments/approve-bulk")
+def approve_admin_comments_bulk(
+    payload: CommentBulkActionIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict:
+    ids = sorted({int(comment_id) for comment_id in payload.ids if int(comment_id) > 0})
+    if not ids:
+        raise HTTPException(status_code=400, detail="No comments selected")
+
+    comments = db.scalars(select(Comment).where(Comment.id.in_(ids))).all()
+    approved = 0
+    for comment in comments:
+        if comment.status == "pending":
+            comment.status = "approved"
+            approved += 1
+
+    db.commit()
+    _record_admin_event(db, current_user, "批量通过评论", "comment", str(approved), f"选择 {len(ids)} 条")
+    return {"status": "approved", "approved": approved, "selected": len(ids)}
 
 
 @app.get("/api/admin/audit-logs")
@@ -2066,6 +2100,35 @@ def _verify_admin_setup_token(value: str) -> None:
         raise HTTPException(status_code=403, detail="Admin setup is disabled")
     if not hmac.compare_digest(value.strip(), ADMIN_SETUP_TOKEN):
         raise HTTPException(status_code=403, detail="Invalid admin setup token")
+
+
+def _login_throttle_key(email: str, request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for", "")
+    client_ip = forwarded_for.split(",", 1)[0].strip() if forwarded_for else ""
+    if not client_ip and request.client:
+        client_ip = request.client.host
+    return f"{email}:{client_ip or 'unknown'}"
+
+
+def _ensure_login_allowed(key: str) -> None:
+    state = LOGIN_FAILURES.get(key)
+    if not state:
+        return
+    locked_until = state.get("locked_until")
+    if isinstance(locked_until, datetime) and locked_until > datetime.utcnow():
+        retry_after = max(1, int((locked_until - datetime.utcnow()).total_seconds()))
+        raise HTTPException(status_code=429, detail=f"Too many login attempts, retry after {retry_after} seconds")
+    if isinstance(locked_until, datetime):
+        LOGIN_FAILURES.pop(key, None)
+
+
+def _record_login_failure(key: str) -> None:
+    state = LOGIN_FAILURES.get(key, {"count": 0, "locked_until": None})
+    count = int(state.get("count") or 0) + 1
+    LOGIN_FAILURES[key] = {
+        "count": count,
+        "locked_until": datetime.utcnow() + timedelta(seconds=LOGIN_LOCK_SECONDS) if count >= LOGIN_FAILURE_LIMIT else None,
+    }
 
 
 def _normalize_email(value: str) -> str:

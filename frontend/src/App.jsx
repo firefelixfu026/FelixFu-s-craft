@@ -97,9 +97,13 @@ const ACTIVE_VIEW_KEY = 'felix_blog_active_view';
 const ADMIN_PAGE_KEY = 'felix_blog_admin_page';
 const THEME_KEY = 'felix_blog_theme';
 const SIDEBAR_COLLAPSED_KEY = 'felix_blog_sidebar_collapsed';
+const AUTH_FAIL_STATE_KEY = 'felix_blog_auth_fail_state';
+const SITE_LAUNCH_DATE = '2026-07-22T00:00:00+08:00';
+const LOGIN_LOCK_MS = 60 * 1000;
 const emptyReactionState = { like: false, favorite: false, downvote: false, question: false };
 const ALL_FILTER = '全部';
 const ALL_ARCHIVE = '全部';
+const SEARCH_FILTER_PATTERN = /(?:^|\s)(tag|标签|category|cat|分类|month|月份):([^\s]+)/gi;
 
 function readCookie(name) {
   if (typeof document === 'undefined') return '';
@@ -653,6 +657,80 @@ function formatArchiveLabel(month) {
   if (month === ALL_ARCHIVE) return '全部月份';
   const [year, monthValue] = month.split('-');
   return `${year}年${Number(monthValue)}月`;
+}
+
+function parseSearchQuery(value) {
+  const filters = { tags: [], categories: [], months: [] };
+  const cleaned = String(value || '').replace(SEARCH_FILTER_PATTERN, (_, key, rawValue) => {
+    const normalizedKey = String(key).toLowerCase();
+    const normalizedValue = String(rawValue || '').trim();
+    if (!normalizedValue) return ' ';
+    if (normalizedKey === 'tag' || normalizedKey === '标签') filters.tags.push(normalizedValue);
+    if (normalizedKey === 'category' || normalizedKey === 'cat' || normalizedKey === '分类') filters.categories.push(normalizedValue);
+    if (normalizedKey === 'month' || normalizedKey === '月份') filters.months.push(normalizedValue);
+    return ' ';
+  });
+  const terms = cleaned
+    .split(/\s+/)
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+  return { filters, terms, hasAdvancedFilters: filters.tags.length > 0 || filters.categories.length > 0 || filters.months.length > 0 };
+}
+
+function highlightText(value, terms = []) {
+  const source = String(value || '');
+  const uniqueTerms = Array.from(new Set(terms.map((term) => term.trim()).filter(Boolean)));
+  if (!source || uniqueTerms.length === 0) return source;
+
+  const lowerSource = source.toLowerCase();
+  const matches = [];
+  uniqueTerms.forEach((term) => {
+    let index = lowerSource.indexOf(term.toLowerCase());
+    while (index !== -1) {
+      matches.push([index, index + term.length]);
+      index = lowerSource.indexOf(term.toLowerCase(), index + Math.max(term.length, 1));
+    }
+  });
+  if (!matches.length) return source;
+
+  const merged = matches
+    .sort((left, right) => left[0] - right[0])
+    .reduce((result, match) => {
+      const previous = result[result.length - 1];
+      if (previous && match[0] <= previous[1]) {
+        previous[1] = Math.max(previous[1], match[1]);
+      } else {
+        result.push([...match]);
+      }
+      return result;
+    }, []);
+
+  const parts = [];
+  let cursor = 0;
+  merged.forEach(([start, end], index) => {
+    if (start > cursor) parts.push(source.slice(cursor, start));
+    parts.push(<mark key={`${start}-${end}-${index}`}>{source.slice(start, end)}</mark>);
+    cursor = end;
+  });
+  if (cursor < source.length) parts.push(source.slice(cursor));
+  return parts;
+}
+
+function daysSinceLaunch() {
+  const diff = Date.now() - new Date(SITE_LAUNCH_DATE).getTime();
+  return Math.max(1, Math.floor(diff / (24 * 60 * 60 * 1000)) + 1);
+}
+
+function readAuthFailState() {
+  try {
+    return JSON.parse(localStorage.getItem(AUTH_FAIL_STATE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function writeAuthFailState(value) {
+  localStorage.setItem(AUTH_FAIL_STATE_KEY, JSON.stringify(value));
 }
 
 function hasArticleDraftContent(form) {
@@ -1233,6 +1311,13 @@ function App() {
 
   async function submitAuthForm(event) {
     event.preventDefault();
+    const failState = readAuthFailState();
+    if (Number(failState.lockedUntil || 0) > Date.now()) {
+      const seconds = Math.ceil((Number(failState.lockedUntil) - Date.now()) / 1000);
+      setAuthMessage(`登录尝试过多，请 ${seconds} 秒后再试`);
+      return;
+    }
+
     setIsAuthLoading(true);
     setAuthMessage('');
 
@@ -1250,10 +1335,16 @@ function App() {
 
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
+        const nextCount = Number(failState.count || 0) + 1;
+        writeAuthFailState({
+          count: nextCount,
+          lockedUntil: nextCount >= 5 ? Date.now() + LOGIN_LOCK_MS : 0
+        });
         setAuthMessage(result.detail || '登录失败');
         return;
       }
 
+      localStorage.removeItem(AUTH_FAIL_STATE_KEY);
       persistAuthSession(result.token, result.user);
       setAuthToken(result.token);
       setCurrentUser(result.user);
@@ -1305,17 +1396,25 @@ function App() {
     ];
   }, [articles]);
 
-  const filteredArticles = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+  const searchMeta = useMemo(() => parseSearchQuery(query), [query]);
 
+  const filteredArticles = useMemo(() => {
     return articles.filter((article) => {
       const tagMatched = selectedTag === ALL_FILTER || article.tags.includes(selectedTag);
       const categoryMatched = selectedCategory === ALL_FILTER || (article.category || '学习笔记') === selectedCategory;
       const archiveMatched = selectedArchive === ALL_ARCHIVE || getArticleMonth(article.date) === selectedArchive;
+      const advancedTagMatched = searchMeta.filters.tags.every((tag) =>
+        article.tags.some((articleTag) => articleTag.toLowerCase().includes(tag.toLowerCase()))
+      );
+      const advancedCategoryMatched = searchMeta.filters.categories.every((category) =>
+        (article.category || '学习笔记').toLowerCase().includes(category.toLowerCase())
+      );
+      const advancedMonthMatched = searchMeta.filters.months.every((month) => getArticleMonth(article.date).includes(month));
       const text = `${article.title} ${article.summary} ${article.content} ${article.category || ''} ${article.tags.join(' ')}`.toLowerCase();
-      return categoryMatched && tagMatched && archiveMatched && (!normalizedQuery || text.includes(normalizedQuery));
+      const termMatched = searchMeta.terms.every((term) => text.includes(term));
+      return categoryMatched && tagMatched && archiveMatched && advancedTagMatched && advancedCategoryMatched && advancedMonthMatched && termMatched;
     });
-  }, [articles, query, selectedCategory, selectedTag, selectedArchive]);
+  }, [articles, searchMeta, selectedCategory, selectedTag, selectedArchive]);
 
   async function toggleReaction(articleId, type) {
     if (!authToken) {
@@ -1941,6 +2040,41 @@ function App() {
     }
   }
 
+  async function approveAdminCommentsBulk(commentList) {
+    const ids = commentList
+      .filter((comment) => comment.status === 'pending')
+      .map((comment) => comment.id)
+      .filter(Boolean);
+    if (!ids.length) {
+      setAdminMessage('当前筛选结果没有待审评论');
+      return;
+    }
+    if (!window.confirm(`确定通过当前筛选结果中的 ${ids.length} 条待审评论吗？`)) return;
+
+    try {
+      const response = await fetch('/api/admin/comments/approve-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ ids })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setAdminMessage(result.detail || '批量通过失败');
+        if (response.status === 401 || response.status === 403) {
+          setActiveView('login');
+        }
+        return;
+      }
+      setAdminMessage(`已通过 ${result.approved || 0} 条评论`);
+      await refreshAdminComments({ resetPage: false });
+      await refreshArticles();
+      await refreshAdminStats();
+      await refreshAdminAuditLogs();
+    } catch {
+      setAdminMessage('后端服务不可用，批量通过失败');
+    }
+  }
+
   const isRestoringSession = Boolean(authToken && !currentUser);
   const showGlobalSearch = activeView === 'articles';
 
@@ -2077,6 +2211,8 @@ function App() {
             currentUser={currentUser}
             commentPages={commentPages}
             setCommentPages={setCommentPages}
+            query={query}
+            searchMeta={searchMeta}
           />
         )}
 
@@ -2178,6 +2314,7 @@ function App() {
             isLoadingAdminComments={isLoadingAdminComments}
             refreshAdminComments={refreshAdminComments}
             approveAdminComment={approveAdminComment}
+            approveAdminCommentsBulk={approveAdminCommentsBulk}
             deleteAdminComment={deleteAdminComment}
             currentUser={currentUser}
             authToken={authToken}
@@ -2248,6 +2385,17 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
     { stage: 'Now', title: '把个人博客打磨成稳定工作台', detail: '内容、评论、后台、备份和 AI 配置已经形成基本闭环。' },
     { stage: 'Next', title: '沉淀学习助手和微信群 bot 语料', detail: '把暑期学习、课程笔记和群聊文本变成可检索、可总结的数据。' },
     { stage: 'Later', title: '做更多可展示的小项目', detail: '管理工具、游戏、科研辅助和安全练习都可以接到同一个主页。' }
+  ];
+  const publishedArticles = articles.filter((article) => article.status !== 'draft');
+  const recentArticle = publishedArticles[0];
+  const totalViews = publishedArticles.reduce((sum, article) => sum + Number(article.viewCount || 0), 0);
+  const totalComments = publishedArticles.reduce((sum, article) => sum + (article.comments?.length || 0), 0);
+  const currentMonthCount = publishedArticles.filter((article) => getArticleMonth(article.date) === getArticleMonth(new Date().toISOString())).length;
+  const liveStats = [
+    { label: '上线天数', value: `${daysSinceLaunch()} 天`, detail: '持续打磨中' },
+    { label: '公开文章', value: `${publishedArticles.length} 篇`, detail: currentMonthCount ? `本月 ${currentMonthCount} 篇` : '等待新内容' },
+    { label: '阅读记录', value: `${totalViews} 次`, detail: '来自文章详情页' },
+    { label: '评论互动', value: `${totalComments} 条`, detail: currentUser ? '已登录可参与' : 'GitHub 登录后可评论' }
   ];
 
   const capabilityCards = [
@@ -2359,6 +2507,29 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
             ))}
           </div>
         </div>
+      </section>
+
+      <section className="content-band live-status-band">
+        <div className="section-heading">
+          <p className="eyebrow">现在</p>
+          <h2>这个站点正在发生什么</h2>
+        </div>
+        <div className="live-status-grid">
+          {liveStats.map((item) => (
+            <article className="live-status-card" key={item.label}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+              <p>{item.detail}</p>
+            </article>
+          ))}
+        </div>
+        {recentArticle && (
+          <button className="latest-article-strip" type="button" onClick={() => setActiveView('articles')}>
+            <span>最近更新</span>
+            <strong>{recentArticle.title}</strong>
+            <em>{recentArticle.date}</em>
+          </button>
+        )}
       </section>
 
       <section className="content-band">
@@ -2490,9 +2661,18 @@ function ArticleWorkspace({
   interactionMessage,
   currentUser,
   commentPages,
-  setCommentPages
+  setCommentPages,
+  query = '',
+  searchMeta = parseSearchQuery('')
 }) {
   const selectedArticle = articles.find((article) => article.id === selectedArticleId) || null;
+  const hasSearch = query.trim().length > 0;
+  const searchTips = [
+    searchMeta.filters.tags.length ? `标签：${searchMeta.filters.tags.join('、')}` : '',
+    searchMeta.filters.categories.length ? `分类：${searchMeta.filters.categories.join('、')}` : '',
+    searchMeta.filters.months.length ? `月份：${searchMeta.filters.months.join('、')}` : '',
+    searchMeta.terms.length ? `关键词：${searchMeta.terms.join('、')}` : ''
+  ].filter(Boolean);
   const popularArticles = [...articles]
     .filter((article) => Number(article.viewCount || 0) > 0)
     .sort((first, second) => Number(second.viewCount || 0) - Number(first.viewCount || 0))
@@ -2525,6 +2705,11 @@ function ArticleWorkspace({
       <div className="section-heading">
         <p className="eyebrow">文章中心</p>
         <h1>学习笔记、项目记录和标签搜索</h1>
+        {hasSearch && (
+          <p className="search-result-summary">
+            找到 {articles.length} 篇文章{searchTips.length ? ` · ${searchTips.join(' · ')}` : ''}
+          </p>
+        )}
       </div>
 
       <div className="tag-filter" aria-label="文章标签筛选">
@@ -2611,8 +2796,8 @@ function ArticleWorkspace({
                 <span>{article.readTime}</span>
                 <span><Eye size={15} /> {article.viewCount || 0}</span>
               </div>
-              <h2>{article.title}</h2>
-              <p className="article-summary">{article.summary}</p>
+              <h2>{highlightText(article.title, searchMeta.terms)}</h2>
+              <p className="article-summary">{highlightText(article.summary, searchMeta.terms)}</p>
               <div className="tag-row">
                 {article.tags.map((tag) => (
                   <span key={tag}>{tag}</span>
@@ -5066,6 +5251,7 @@ function AdminWorkspace({
   isLoadingAdminComments,
   refreshAdminComments,
   approveAdminComment,
+  approveAdminCommentsBulk,
   deleteAdminComment,
   currentUser,
   authToken,
@@ -5089,6 +5275,7 @@ function AdminWorkspace({
     Math.max(adminCommentPageGroups.length - 1, 0)
   );
   const visibleAdminComments = adminCommentPageGroups[currentAdminCommentPage] || [];
+  const filteredPendingCommentCount = filteredAdminComments.filter((comment) => comment.status === 'pending').length;
   const publishedCount = articles.filter((article) => article.status !== 'draft').length;
   const draftCount = articles.filter((article) => article.status === 'draft').length;
   const pendingCommentCount = adminComments.filter((comment) => comment.status === 'pending').length;
@@ -6565,6 +6752,14 @@ function AdminWorkspace({
             <h2>评论管理</h2>
             <div className="manager-actions">
               <span>{isLoadingAdminComments ? '加载中' : `${filteredAdminComments.length} / ${adminComments.length} 条`}</span>
+              <button
+                type="button"
+                disabled={filteredPendingCommentCount === 0}
+                onClick={() => approveAdminCommentsBulk(filteredAdminComments)}
+              >
+                <CheckCircle2 size={17} />
+                <span>通过当前筛选</span>
+              </button>
               <button type="button" onClick={() => refreshAdminComments()}>
                 <RefreshCw size={17} />
                 <span>刷新</span>

@@ -321,6 +321,21 @@ textarea {
   background: transparent;
 }
 
+.search-result-summary {
+  max-width: 780px;
+  margin: 0;
+  color: var(--text-soft);
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+mark {
+  border-radius: 4px;
+  padding: 0 3px;
+  color: #102033;
+  background: #b7f7d1;
+}
+
 .topbar-actions {
   display: inline-flex;
   align-items: center;
@@ -365,6 +380,67 @@ textarea {
 .status-pill.inline {
   width: fit-content;
   border-radius: 8px;
+}
+
+.live-status-band {
+  gap: 16px;
+}
+
+.live-status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.live-status-card {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.live-status-card span,
+.live-status-card p {
+  margin: 0;
+  color: #6a7685;
+  font-size: 13px;
+}
+
+.live-status-card strong {
+  display: block;
+  margin: 8px 0 5px;
+  color: #102033;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.latest-article-strip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid #cce8dd;
+  border-radius: 8px;
+  color: #102033;
+  background: #effbf5;
+  text-align: left;
+}
+
+.latest-article-strip span,
+.latest-article-strip em {
+  color: #1f7a6d;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.latest-article-strip strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workspace {
@@ -3453,6 +3529,11 @@ h3 {
   background: #f8fafc;
 }
 
+.manager-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .danger-button {
   color: #9f1d2f !important;
   border-color: #f1b7c0 !important;
@@ -4236,6 +4317,8 @@ h3 {
 :root[data-theme='dark'] .archive-button,
 :root[data-theme='dark'] .popular-panel,
 :root[data-theme='dark'] .popular-list button,
+:root[data-theme='dark'] .live-status-card,
+:root[data-theme='dark'] .latest-article-strip,
 :root[data-theme='dark'] .metric,
 :root[data-theme='dark'] .skill-pillar-card,
 :root[data-theme='dark'] .roadmap-item,
@@ -4416,6 +4499,10 @@ h3 {
 :root[data-theme='dark'] .profile-copy span,
 :root[data-theme='dark'] .popular-panel-heading span,
 :root[data-theme='dark'] .popular-list em,
+:root[data-theme='dark'] .live-status-card span,
+:root[data-theme='dark'] .live-status-card p,
+:root[data-theme='dark'] .latest-article-strip span,
+:root[data-theme='dark'] .latest-article-strip em,
 :root[data-theme='dark'] .article-card p,
 :root[data-theme='dark'] .news-item p,
 :root[data-theme='dark'] .digest-item p,
@@ -4457,6 +4544,8 @@ h3 {
 :root[data-theme='dark'] h3,
 :root[data-theme='dark'] .popular-panel-heading h2,
 :root[data-theme='dark'] .popular-list span,
+:root[data-theme='dark'] .live-status-card strong,
+:root[data-theme='dark'] .latest-article-strip strong,
 :root[data-theme='dark'] .admin-page-card strong,
 :root[data-theme='dark'] .admin-pulse-card strong,
 :root[data-theme='dark'] .admin-task-card strong,
@@ -4501,6 +4590,16 @@ h3 {
 
 :root[data-theme='dark'] .chart-bar-limit {
   fill: #263449;
+}
+
+:root[data-theme='dark'] mark {
+  color: #062117;
+  background: #6ee7b7;
+}
+
+:root[data-theme='dark'] .manager-actions button:disabled {
+  color: var(--text-muted);
+  background: rgba(232, 238, 249, 0.04);
 }
 
 @media (max-width: 900px) {
@@ -4582,6 +4681,10 @@ h3 {
 
   .metric-grid {
     grid-template-columns: 1fr;
+  }
+
+  .live-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .skill-pillar-grid {
@@ -4695,6 +4798,16 @@ h3 {
   .tool-panel,
   .game-details {
     padding: 16px;
+  }
+
+  .live-status-grid,
+  .latest-article-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .latest-article-strip {
+    align-items: flex-start;
+    padding: 12px;
   }
 
   .hero-badge {
