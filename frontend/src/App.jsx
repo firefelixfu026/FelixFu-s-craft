@@ -1977,7 +1977,7 @@ function App() {
           )}
           <div className="status-pill">
             <Zap size={16} />
-            <span>本地 MVP</span>
+            <span>在线工作台</span>
           </div>
         </header>
 
@@ -2137,6 +2137,39 @@ function App() {
 }
 
 function Overview({ profile, articles, setActiveView, currentUser }) {
+  const identityPhrases = useMemo(
+    () => ['爱折腾的计算机学生', 'Web 全栈学习者', 'AI 工具搭建者', '安全与运维探索者', '长跑中的长期主义者'],
+    []
+  );
+  const [typingIndex, setTypingIndex] = useState(0);
+  const [typedIdentity, setTypedIdentity] = useState('');
+  const [isDeletingIdentity, setIsDeletingIdentity] = useState(false);
+
+  useEffect(() => {
+    const currentPhrase = identityPhrases[typingIndex];
+    const isComplete = !isDeletingIdentity && typedIdentity === currentPhrase;
+    const isCleared = isDeletingIdentity && typedIdentity === '';
+    const delay = isComplete ? 1500 : isCleared ? 280 : isDeletingIdentity ? 42 : 78;
+
+    const timer = window.setTimeout(() => {
+      if (isComplete) {
+        setIsDeletingIdentity(true);
+        return;
+      }
+
+      if (isCleared) {
+        setIsDeletingIdentity(false);
+        setTypingIndex((current) => (current + 1) % identityPhrases.length);
+        return;
+      }
+
+      const nextLength = typedIdentity.length + (isDeletingIdentity ? -1 : 1);
+      setTypedIdentity(currentPhrase.slice(0, nextLength));
+    }, delay);
+
+    return () => window.clearTimeout(timer);
+  }, [identityPhrases, isDeletingIdentity, typedIdentity, typingIndex]);
+
   const skillPillars = [
     {
       title: 'Web 全栈',
@@ -2198,26 +2231,32 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
   ];
 
   return (
-    <section className="workspace">
-      <div className="profile-grid homepage-hero">
-        <div className="profile-copy">
-          <div className="hero-badge">
+    <section className="workspace homepage-workspace">
+      <section className="geek-hero" aria-labelledby="home-title">
+        <div className="geek-grid" aria-hidden="true" />
+        <div className="geek-hero-inner">
+          <div className="hero-badge geek-badge">
             <span aria-hidden="true" />
-            <strong>{profile.school}</strong>
+            <strong>目前专注</strong>
             <em>{profile.role}</em>
           </div>
-          <p className="eyebrow">~/whoami</p>
-          <h1>
-            你好，我是 <span className="gradient-text">{profile.name}</span>
+          <p className="terminal-path">~/whoami</p>
+          <h1 id="home-title" className="geek-title">
+            你好，我是
+            <span className="gradient-text">{profile.name}</span>
           </h1>
-          <p className="hero-subtitle">
-            一个正在把学习、项目和 AI 想法变成真实作品的计算机学生。
+          <p className="typewriter-line" aria-label={`一名${typedIdentity}`}>
+            <span>一名</span>
+            <strong>{typedIdentity || identityPhrases[0].slice(0, 1)}</strong>
+            <i aria-hidden="true" />
           </p>
-          <p className="summary">{profile.summary}</p>
+          <p className="geek-summary">
+            {profile.summary}
+          </p>
           <div className="hero-actions">
             <button className="primary-action" type="button" onClick={() => setActiveView('articles')}>
               <BookOpen size={17} />
-              <span>看文章</span>
+              <span>看看我的文章</span>
             </button>
             <button className="ghost-button" type="button" onClick={() => setActiveView('plan')}>
               <List size={17} />
@@ -2230,35 +2269,21 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
               </button>
             )}
           </div>
-          <div className="interest-row">
+          <div className="interest-row geek-interest-row">
             {profile.interests.map((interest) => (
               <span key={interest}>{interest}</span>
             ))}
           </div>
-        </div>
-        <div className="profile-showcase">
-          <img className="profile-image" src="/avatar.jpg" alt="付江樊头像" />
-          <div className="terminal-card" aria-label="个人主页状态">
-            <div className="terminal-dots" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </div>
-            <code>felixfu@zju:~$ ship ideas</code>
-            <strong>Blog / AI / Tools</strong>
-            <p>Keep building, keep writing.</p>
+          <div className="metric-grid hero-metrics">
+            {profile.metrics.map((metric) => (
+              <div className="metric" key={metric.label}>
+                <span>{metric.label}</span>
+                <strong>{metric.value}</strong>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
-
-      <div className="metric-grid">
-        {profile.metrics.map((metric) => (
-          <div className="metric" key={metric.label}>
-            <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
-          </div>
-        ))}
-      </div>
+      </section>
 
       <section className="content-band">
         <div className="section-heading">

@@ -2,14 +2,14 @@ export const profile = {
   name: '付江樊',
   englishName: 'Felix Fu',
   school: '浙江大学',
-  role: '计算机学生 · 技术写作 · AI 工具 · 个人项目',
+  role: 'Web 前端 & Python',
   interests: ['Web 全栈', 'AI 自动化', '安全与运维', '长跑', '游戏'],
   summary:
-    '这里是我的学习主页和项目工作台：记录课程笔记、技术实验、AI 自动化、小游戏和运维工具。目标是把“想到的东西”尽快做成可以上线、可以复盘、可以继续迭代的作品。',
+    '普通大学生，正在努力把“想做的事”变成“会做的事”。从一行代码开始，一路把课程笔记、AI 工具、小游戏和运维后台慢慢接到这个小站里。',
   metrics: [
-    { label: '当前方向', value: 'Web + AI' },
-    { label: '站点形态', value: '博客工作台' },
-    { label: '迭代节奏', value: '持续上线' }
+    { label: '技能方向', value: '3+' },
+    { label: '线上项目', value: '1+' },
+    { label: '好奇心', value: '100%' }
   ]
 };
 
@@ -24,7 +24,7 @@ export const aiNews = [
   {
     title: 'AI 总结模块适合从文章摘要开始',
     source: 'AI Workflow',
-    summary: 'MVP 阶段可先保留摘要入口，后续把文章正文发送到模型服务并缓存总结结果。'
+    summary: '可以先从文章摘要、标题候选和写作续写开始，逐步把模型能力沉淀成日常工作流。'
   }
 ];
 
