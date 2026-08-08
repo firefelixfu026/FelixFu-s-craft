@@ -346,6 +346,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v2.6.2',
+    title: '后台夜间模式补全',
+    date: '2026-08-08',
+    status: '已上线',
+    points: ['文章库和图片管理卡片适配深色主题', '评论、安全、备份和群聊语料空状态适配', '上传按钮和删除按钮深色模式修正', '后台徽章和说明卡对比度优化']
+  },
+  {
     version: 'v2.6.1',
     title: '可用性、安全和性能打磨',
     date: '2026-08-08',

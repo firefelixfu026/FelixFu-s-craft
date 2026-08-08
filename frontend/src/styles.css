@@ -4340,6 +4340,9 @@ h3 {
 :root[data-theme='dark'] .admin-pulse-card,
 :root[data-theme='dark'] .admin-task-card,
 :root[data-theme='dark'] .admin-insight-grid > div,
+:root[data-theme='dark'] .security-rule-grid article,
+:root[data-theme='dark'] .manager-row,
+:root[data-theme='dark'] .image-resource,
 :root[data-theme='dark'] .ops-metric,
 :root[data-theme='dark'] .ops-live-card,
 :root[data-theme='dark'] .ops-service-card,
@@ -4359,6 +4362,10 @@ h3 {
 :root[data-theme='dark'] .summer-date-tab,
 :root[data-theme='dark'] .weekly-plan-row,
 :root[data-theme='dark'] .weekly-check,
+:root[data-theme='dark'] .empty-state,
+:root[data-theme='dark'] .file-upload-control,
+:root[data-theme='dark'] .ghost-button,
+:root[data-theme='dark'] .manager-actions button,
 :root[data-theme='dark'] .compact-icon-button {
   border-color: var(--border);
   color: var(--text-main);
@@ -4402,6 +4409,7 @@ h3 {
 
 :root[data-theme='dark'] .article-cover,
 :root[data-theme='dark'] .article-preview-panel .markdown-content,
+:root[data-theme='dark'] .image-resource-preview,
 :root[data-theme='dark'] .reading-progress-track,
 :root[data-theme='dark'] .markdown-toolbar,
 :root[data-theme='dark'] .ai-editor-tools,
@@ -4479,6 +4487,8 @@ h3 {
 :root[data-theme='dark'] .admin-form textarea,
 :root[data-theme='dark'] .comment-filter-row select,
 :root[data-theme='dark'] .summer-goal-card textarea,
+:root[data-theme='dark'] .weekly-plan-row input[type='text'],
+:root[data-theme='dark'] .weekly-plan-row > input,
 :root[data-theme='dark'] .summer-plan-table input,
 :root[data-theme='dark'] .summer-plan-table select,
 :root[data-theme='dark'] .summer-plan-table textarea {
@@ -4504,11 +4514,13 @@ h3 {
 :root[data-theme='dark'] .latest-article-strip span,
 :root[data-theme='dark'] .latest-article-strip em,
 :root[data-theme='dark'] .article-card p,
+:root[data-theme='dark'] .manager-row p,
 :root[data-theme='dark'] .news-item p,
 :root[data-theme='dark'] .digest-item p,
 :root[data-theme='dark'] .game-details p,
 :root[data-theme='dark'] .roadmap-item p,
 :root[data-theme='dark'] .capability-card p,
+:root[data-theme='dark'] .security-rule-grid span,
 :root[data-theme='dark'] .reading-toolbar > div:first-child,
 :root[data-theme='dark'] .comment span,
 :root[data-theme='dark'] .comment em,
@@ -4524,6 +4536,7 @@ h3 {
 :root[data-theme='dark'] .account-list span,
 :root[data-theme='dark'] .admin-panel-heading > span,
 :root[data-theme='dark'] .admin-page-card em,
+:root[data-theme='dark'] .comment-filter-row label,
 :root[data-theme='dark'] .admin-pulse-card span,
 :root[data-theme='dark'] .admin-pulse-card small,
 :root[data-theme='dark'] .admin-task-card em,
@@ -4533,6 +4546,7 @@ h3 {
 :root[data-theme='dark'] .template-card span,
 :root[data-theme='dark'] .template-card small,
 :root[data-theme='dark'] .study-task em,
+:root[data-theme='dark'] .image-resource-meta span,
 :root[data-theme='dark'] .usage-chart-heading span,
 :root[data-theme='dark'] .completion-summary-grid span,
 :root[data-theme='dark'] .summer-date-picker label {
@@ -4549,6 +4563,8 @@ h3 {
 :root[data-theme='dark'] .admin-page-card strong,
 :root[data-theme='dark'] .admin-pulse-card strong,
 :root[data-theme='dark'] .admin-task-card strong,
+:root[data-theme='dark'] .security-rule-grid strong,
+:root[data-theme='dark'] .image-resource-meta strong,
 :root[data-theme='dark'] .comment strong,
 :root[data-theme='dark'] .comment-title,
 :root[data-theme='dark'] .ops-metric strong,
@@ -4590,6 +4606,27 @@ h3 {
 
 :root[data-theme='dark'] .chart-bar-limit {
   fill: #263449;
+}
+
+:root[data-theme='dark'] .danger-button {
+  color: #fecdd3 !important;
+  border-color: rgba(244, 63, 94, 0.42) !important;
+  background: rgba(244, 63, 94, 0.12) !important;
+}
+
+:root[data-theme='dark'] .status-badge {
+  color: #99f6e4;
+  background: rgba(45, 212, 191, 0.14);
+}
+
+:root[data-theme='dark'] .status-badge.draft {
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.16);
+}
+
+:root[data-theme='dark'] .status-badge.pending {
+  color: #fecdd3;
+  background: rgba(244, 63, 94, 0.14);
 }
 
 :root[data-theme='dark'] mark {
