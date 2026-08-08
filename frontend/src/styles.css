@@ -4047,6 +4047,10 @@ h3 {
 :root[data-theme='dark'] .admin-panel,
 :root[data-theme='dark'] .admin-task-card,
 :root[data-theme='dark'] .admin-insight-grid > div,
+:root[data-theme='dark'] .ops-metric,
+:root[data-theme='dark'] .ops-live-card,
+:root[data-theme='dark'] .ops-service-card,
+:root[data-theme='dark'] .ops-list-row,
 :root[data-theme='dark'] .release-metric,
 :root[data-theme='dark'] .release-version-card,
 :root[data-theme='dark'] .analytics-grid > div,
@@ -4090,6 +4094,8 @@ h3 {
 
 :root[data-theme='dark'] .admin-page-card:hover,
 :root[data-theme='dark'] .admin-page-card.active,
+:root[data-theme='dark'] .ops-service-card:hover,
+:root[data-theme='dark'] .ops-service-card.active,
 :root[data-theme='dark'] .archive-button.active,
 :root[data-theme='dark'] .archive-button:hover {
   border-color: var(--accent);
@@ -4153,6 +4159,12 @@ h3 {
 :root[data-theme='dark'] .capability-card p,
 :root[data-theme='dark'] .comment span,
 :root[data-theme='dark'] .comment em,
+:root[data-theme='dark'] .ops-metric span,
+:root[data-theme='dark'] .ops-command-heading span,
+:root[data-theme='dark'] .ops-live-card small,
+:root[data-theme='dark'] .ops-list-row span,
+:root[data-theme='dark'] .ops-service-card > div span,
+:root[data-theme='dark'] .ops-history-row small,
 :root[data-theme='dark'] .release-version-card li,
 :root[data-theme='dark'] .release-version-card small,
 :root[data-theme='dark'] .account-profile p,
@@ -4178,10 +4190,18 @@ h3 {
 :root[data-theme='dark'] .admin-task-card strong,
 :root[data-theme='dark'] .comment strong,
 :root[data-theme='dark'] .comment-title,
+:root[data-theme='dark'] .ops-metric strong,
+:root[data-theme='dark'] .ops-live-card strong,
+:root[data-theme='dark'] .ops-service-card strong,
+:root[data-theme='dark'] .ops-list-row strong,
 :root[data-theme='dark'] .release-version-card h3,
 :root[data-theme='dark'] .completion-summary-grid strong,
 :root[data-theme='dark'] .usage-chart-heading h3 {
   color: var(--text-main);
+}
+
+:root[data-theme='dark'] .ops-list-row code {
+  color: var(--accent);
 }
 
 :root[data-theme='dark'] .brand-mark {
