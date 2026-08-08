@@ -4210,6 +4210,8 @@ h3 {
 :root[data-theme='dark'] .profile-copy,
 :root[data-theme='dark'] .archive-filter,
 :root[data-theme='dark'] .archive-button,
+:root[data-theme='dark'] .popular-panel,
+:root[data-theme='dark'] .popular-list button,
 :root[data-theme='dark'] .metric,
 :root[data-theme='dark'] .skill-pillar-card,
 :root[data-theme='dark'] .roadmap-item,
@@ -4283,7 +4285,8 @@ h3 {
 :root[data-theme='dark'] .ops-service-card:hover,
 :root[data-theme='dark'] .ops-service-card.active,
 :root[data-theme='dark'] .archive-button.active,
-:root[data-theme='dark'] .archive-button:hover {
+:root[data-theme='dark'] .archive-button:hover,
+:root[data-theme='dark'] .popular-list button:hover {
   border-color: var(--accent);
   background: rgba(52, 211, 153, 0.12);
 }
@@ -4338,6 +4341,8 @@ h3 {
 
 :root[data-theme='dark'] .profile-copy p,
 :root[data-theme='dark'] .profile-copy span,
+:root[data-theme='dark'] .popular-panel-heading span,
+:root[data-theme='dark'] .popular-list em,
 :root[data-theme='dark'] .article-card p,
 :root[data-theme='dark'] .news-item p,
 :root[data-theme='dark'] .digest-item p,
@@ -4376,6 +4381,8 @@ h3 {
 :root[data-theme='dark'] h1,
 :root[data-theme='dark'] h2,
 :root[data-theme='dark'] h3,
+:root[data-theme='dark'] .popular-panel-heading h2,
+:root[data-theme='dark'] .popular-list span,
 :root[data-theme='dark'] .admin-page-card strong,
 :root[data-theme='dark'] .admin-pulse-card strong,
 :root[data-theme='dark'] .admin-task-card strong,
