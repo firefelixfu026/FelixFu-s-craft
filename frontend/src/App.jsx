@@ -346,6 +346,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v2.6.1',
+    title: '可用性、安全和性能打磨',
+    date: '2026-08-08',
+    status: '已上线',
+    points: ['高级搜索和关键词高亮', '首页站点状态和最近更新', '评论批量审核', '登录失败限流和前端构建拆包']
+  },
+  {
     version: 'v2.6',
     title: '后台工具扩展',
     date: '2026-08-03',
@@ -416,7 +423,7 @@ function parseChangelogReleases(text) {
 const releaseArchive = [
   ...releaseRoadmap,
   ...parseChangelogReleases(changelogText)
-];
+].filter((release, index, releases) => releases.findIndex((item) => item.version === release.version) === index);
 
 const defaultSummerPlan = {
   goals: {
