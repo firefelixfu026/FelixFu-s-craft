@@ -735,12 +735,9 @@ function App() {
   const [isSavingAiSettings, setIsSavingAiSettings] = useState(false);
   const [authToken, setAuthToken] = useState(readStoredAuthToken);
   const [currentUser, setCurrentUser] = useState(readStoredUser);
-  const [authMode, setAuthMode] = useState('login');
   const [authForm, setAuthForm] = useState({
     email: '',
-    password: '',
-    displayName: 'Felix Fu',
-    setupToken: ''
+    password: ''
   });
   const [authMessage, setAuthMessage] = useState('');
   const [interactionMessage, setInteractionMessage] = useState('');
@@ -1239,20 +1236,13 @@ function App() {
     setIsAuthLoading(true);
     setAuthMessage('');
 
-    const endpoint = {
-      login: '/api/auth/login',
-      signup: '/api/auth/register',
-      'admin-register': '/api/auth/admin/register'
-    }[authMode] || '/api/auth/login';
     const payload = {
       email: authForm.email,
-      password: authForm.password,
-      ...(authMode !== 'login' ? { displayName: authForm.displayName } : {}),
-      ...(authMode === 'admin-register' ? { setupToken: authForm.setupToken } : {})
+      password: authForm.password
     };
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -1269,9 +1259,7 @@ function App() {
       setCurrentUser(result.user);
       setInteractionMessage('');
       await refreshArticles(result.token);
-      setAuthMessage(
-        authMode === 'signup' ? '普通账号已注册' : authMode === 'admin-register' ? '管理员已初始化' : '已登录'
-      );
+      setAuthMessage('已登录');
       setActiveView(result.user?.role === 'admin' ? 'admin' : 'articles');
     } catch {
       setAuthMessage('后端服务不可用，登录失败');
@@ -1575,7 +1563,6 @@ function App() {
 
   function useAiResultAsArticleDraft(item) {
     if (currentUser?.role !== 'admin') {
-      setAuthMode('login');
       setAuthMessage('请先登录管理员账号，再把 AI 候选填入文章表单');
       setActiveView('login');
       return;
@@ -2120,8 +2107,6 @@ function App() {
 
         {activeView === 'login' && (
           <LoginWorkspace
-            authMode={authMode}
-            setAuthMode={setAuthMode}
             authForm={authForm}
             updateAuthForm={updateAuthForm}
             submitAuthForm={submitAuthForm}
@@ -4735,8 +4720,6 @@ function reactionLabel(type) {
 }
 
 function LoginWorkspace({
-  authMode,
-  setAuthMode,
   authForm,
   updateAuthForm,
   submitAuthForm,
@@ -4791,88 +4774,41 @@ function LoginWorkspace({
           <span>使用 GitHub 登录</span>
         </a>
 
-        <div className="auth-divider">
-          <span>或使用邮箱账号</span>
-        </div>
+        <details className="owner-login-details">
+          <summary>站长邮箱登录</summary>
 
-        <div className="auth-mode-switch" aria-label="账号模式">
-          <button
-            type="button"
-            className={authMode === 'login' ? 'active' : ''}
-            onClick={() => setAuthMode('login')}
-          >
-            登录
-          </button>
-          <button
-            type="button"
-            className={authMode === 'signup' ? 'active' : ''}
-            onClick={() => setAuthMode('signup')}
-          >
-            注册普通用户
-          </button>
-          <button
-            type="button"
-            className={authMode === 'admin-register' ? 'active' : ''}
-            onClick={() => setAuthMode('admin-register')}
-          >
-            初始化管理员
-          </button>
-        </div>
+          <div className="owner-login-form">
+            <label>
+              <span>邮箱</span>
+              <input
+                type="email"
+                value={authForm.email}
+                onChange={(event) => updateAuthForm('email', event.target.value)}
+                placeholder="you@example.com"
+                required
+              />
+            </label>
 
-        {authMode !== 'login' && (
-          <label>
-            <span>显示名称</span>
-            <input
-              value={authForm.displayName}
-              onChange={(event) => updateAuthForm('displayName', event.target.value)}
-              placeholder="Felix Fu"
-              required
-            />
-          </label>
-        )}
+            <label>
+              <span>密码</span>
+              <input
+                type="password"
+                value={authForm.password}
+                onChange={(event) => updateAuthForm('password', event.target.value)}
+                placeholder="至少 8 位"
+                minLength={8}
+                required
+              />
+            </label>
 
-        {authMode === 'admin-register' && (
-          <label>
-            <span>初始化密钥</span>
-            <input
-              type="password"
-              value={authForm.setupToken}
-              onChange={(event) => updateAuthForm('setupToken', event.target.value)}
-              placeholder="服务器 ADMIN_SETUP_TOKEN"
-              required
-            />
-          </label>
-        )}
-
-        <label>
-          <span>邮箱</span>
-          <input
-            type="email"
-            value={authForm.email}
-            onChange={(event) => updateAuthForm('email', event.target.value)}
-            placeholder="you@example.com"
-            required
-          />
-        </label>
-
-        <label>
-          <span>密码</span>
-          <input
-            type="password"
-            value={authForm.password}
-            onChange={(event) => updateAuthForm('password', event.target.value)}
-            placeholder="至少 8 位"
-            minLength={8}
-            required
-          />
-        </label>
-
-        <div className="admin-actions">
-          <button className="primary-action" type="submit" disabled={isAuthLoading}>
-            <LogIn size={17} />
-            <span>{isAuthLoading ? '处理中' : authMode === 'signup' ? '注册' : authMode === 'admin-register' ? '初始化' : '登录'}</span>
-          </button>
-        </div>
+            <div className="admin-actions">
+              <button className="primary-action" type="submit" disabled={isAuthLoading}>
+                <LogIn size={17} />
+                <span>{isAuthLoading ? '处理中' : '登录'}</span>
+              </button>
+            </div>
+          </div>
+        </details>
 
         {authMessage && <p className="admin-message">{authMessage}</p>}
       </form>

@@ -50,6 +50,8 @@ ADMIN_SETUP_TOKEN = os.getenv("ADMIN_SETUP_TOKEN", "").strip()
 COMMENT_MAX_LENGTH = 300
 COMMENT_COOLDOWN_SECONDS = 20
 ADMIN_COMMENTS_REQUIRE_APPROVAL = os.getenv("ADMIN_COMMENTS_REQUIRE_APPROVAL", "false").strip().lower() in {"1", "true", "yes", "on"}
+ALLOW_PUBLIC_EMAIL_REGISTRATION = os.getenv("ALLOW_PUBLIC_EMAIL_REGISTRATION", "false").strip().lower() in {"1", "true", "yes", "on"}
+ALLOW_READER_EMAIL_LOGIN = os.getenv("ALLOW_READER_EMAIL_LOGIN", "false").strip().lower() in {"1", "true", "yes", "on"}
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE_TYPES = {
@@ -565,6 +567,9 @@ def create_reaction(
 
 @app.post("/api/auth/register")
 def register_reader(payload: RegisterIn, db: Session = Depends(get_db)) -> dict:
+    if not ALLOW_PUBLIC_EMAIL_REGISTRATION:
+        raise HTTPException(status_code=403, detail="Email registration is disabled")
+
     email = _normalize_email(payload.email)
     password = _validate_password(payload.password)
     display_name = payload.displayName.strip() or email.split("@", 1)[0]
@@ -616,6 +621,8 @@ def login(payload: LoginIn, db: Session = Depends(get_db)) -> dict:
     user = db.scalar(select(User).where(User.email == email))
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if user.role != "admin" and not ALLOW_READER_EMAIL_LOGIN:
+        raise HTTPException(status_code=403, detail="Reader email login is disabled")
 
     return {"token": create_access_token(user), "user": _user_to_dict(user)}
 
