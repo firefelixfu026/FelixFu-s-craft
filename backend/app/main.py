@@ -530,7 +530,7 @@ def create_comment(
     article = _get_article_or_404(db, article_id)
     return {
         "articleId": article_id,
-        "comments": [_comment_to_dict(item) for item in _public_comments(article)],
+        "comments": [_comment_to_dict(item) for item in _visible_comments(article, current_user)],
         "message": "管理员评论已直接公开" if comment_status == "approved" else "评论已提交，审核通过后会公开显示",
     }
 
@@ -1869,7 +1869,8 @@ def _load_articles(db: Session) -> list[Article]:
         select(Article)
         .options(
             selectinload(Article.tags),
-            selectinload(Article.comments),
+            selectinload(Article.comments).selectinload(Comment.user),
+            selectinload(Article.comments).selectinload(Comment.parent),
             selectinload(Article.reactions),
             selectinload(Article.user_reactions),
         )
@@ -1884,7 +1885,8 @@ def _get_article_or_404(db: Session, article_id: str) -> Article:
         .where(Article.id == article_id)
         .options(
             selectinload(Article.tags),
-            selectinload(Article.comments),
+            selectinload(Article.comments).selectinload(Comment.user),
+            selectinload(Article.comments).selectinload(Comment.parent),
             selectinload(Article.reactions),
             selectinload(Article.user_reactions),
         )
@@ -1925,6 +1927,14 @@ def _ensure_article_visible(article: Article, current_user: User | None) -> None
 def _visible_comments(article: Article, current_user: User | None) -> list[Comment]:
     if current_user and current_user.role == "admin":
         return sorted(article.comments, key=lambda item: item.created_at)
+    if current_user:
+        return sorted(
+            [
+                comment for comment in article.comments
+                if comment.status == "approved" or comment.user_id == current_user.id
+            ],
+            key=lambda item: item.created_at,
+        )
     return _public_comments(article)
 
 
@@ -1939,6 +1949,7 @@ def _comment_to_dict(comment: Comment) -> dict:
     return {
         "id": comment.id,
         "authorName": comment.author_name,
+        "authorRole": comment.user.role if comment.user else "reader",
         "userId": comment.user_id,
         "parentId": comment.parent_id,
         "replyToAuthor": comment.parent.author_name if comment.parent else "",

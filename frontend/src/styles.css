@@ -1239,6 +1239,114 @@ h3 {
   background: linear-gradient(90deg, #1f7a6d, #2563eb);
 }
 
+.story-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.36fr);
+  gap: 16px;
+}
+
+.story-timeline {
+  display: grid;
+  gap: 12px;
+}
+
+.story-step {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.story-step > span {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 8px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #1f7a6d, #2563eb);
+  font-weight: 900;
+}
+
+.story-step strong,
+.project-showcase-card span {
+  color: #1f7a6d;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.story-step h3,
+.project-showcase-card strong {
+  margin: 5px 0 6px;
+  color: #102033;
+}
+
+.story-step p,
+.project-showcase-card p,
+.exploration-panel strong {
+  margin: 0;
+  color: #5b6878;
+  line-height: 1.65;
+}
+
+.exploration-panel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(31, 122, 109, 0.12), rgba(37, 99, 235, 0.08)),
+    #ffffff;
+}
+
+.exploration-panel > div {
+  display: grid;
+  gap: 5px;
+  padding-top: 12px;
+  border-top: 1px solid #d8e0e9;
+}
+
+.exploration-panel span {
+  color: #6a7685;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.project-showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.project-showcase-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  min-height: 210px;
+  padding: 18px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  text-align: left;
+  background: #f8fafc;
+}
+
+.project-showcase-card:hover {
+  border-color: #1f7a6d;
+  transform: translateY(-2px);
+}
+
+.project-showcase-card svg {
+  color: #2563eb;
+}
+
 .roadmap-list {
   display: grid;
   gap: 12px;
@@ -1858,9 +1966,59 @@ h3 {
 .comment-title {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 7px;
   color: #334155;
   font-weight: 700;
+}
+
+.comment-title > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.comment-title em {
+  color: #6a7685;
+  font-size: 13px;
+  font-style: normal;
+}
+
+.comment-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.comment-insight-grid > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.comment-insight-grid span {
+  color: #6a7685;
+  font-size: 12px;
+}
+
+.comment-insight-grid strong {
+  color: #102033;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.comment-pending-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #b7dfd6;
+  border-radius: 8px;
+  color: #155f53;
+  background: #edfdf7;
+  line-height: 1.55;
 }
 
 .comment {
@@ -1868,27 +2026,71 @@ h3 {
   min-width: 0;
   margin: 0;
   padding: 10px 12px;
+  border: 1px solid transparent;
   border-radius: 8px;
   background: #f4f6f8;
   overflow: hidden;
 }
 
-.comment strong {
+.comment.owner-comment {
+  border-color: #b7dfd6;
+  background: #f0fbf7;
+}
+
+.comment.my-comment {
+  border-color: #bfd5f8;
+}
+
+.comment.pending-comment {
+  border-color: #f4d48a;
+  background: #fffbeb;
+}
+
+.comment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+
+.comment-meta strong {
   color: #334155;
 }
 
-.comment em {
-  margin-left: 8px;
+.comment-meta em {
   color: #6a7685;
   font-size: 13px;
   font-style: normal;
 }
 
-.comment span {
-  display: block;
+.comment p {
+  margin: 0;
   color: #5b6878;
+  line-height: 1.6;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.comment-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.comment-badge.owner,
+.comment-badge.mine {
+  color: #155f53;
+  background: #dff4ed;
+}
+
+.comment-badge.pending {
+  color: #92400e;
+  background: #fef3c7;
 }
 
 .comment-reply-button {
@@ -4321,6 +4523,9 @@ h3 {
 :root[data-theme='dark'] .latest-article-strip,
 :root[data-theme='dark'] .metric,
 :root[data-theme='dark'] .skill-pillar-card,
+:root[data-theme='dark'] .story-step,
+:root[data-theme='dark'] .exploration-panel,
+:root[data-theme='dark'] .project-showcase-card,
 :root[data-theme='dark'] .roadmap-item,
 :root[data-theme='dark'] .capability-card,
 :root[data-theme='dark'] .content-band,
@@ -4330,6 +4535,7 @@ h3 {
 :root[data-theme='dark'] .article-detail-card,
 :root[data-theme='dark'] .reading-toolbar,
 :root[data-theme='dark'] .article-toc,
+:root[data-theme='dark'] .comment-insight-grid > div,
 :root[data-theme='dark'] .comment-form,
 :root[data-theme='dark'] .ai-generator,
 :root[data-theme='dark'] .ai-result-panel,
@@ -4427,6 +4633,19 @@ h3 {
   background: var(--panel-soft);
 }
 
+:root[data-theme='dark'] .comment.owner-comment,
+:root[data-theme='dark'] .comment.my-comment {
+  border-color: rgba(52, 211, 153, 0.34);
+  background: rgba(52, 211, 153, 0.10);
+}
+
+:root[data-theme='dark'] .comment.pending-comment,
+:root[data-theme='dark'] .comment-pending-note {
+  border-color: rgba(245, 158, 11, 0.45);
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.13);
+}
+
 :root[data-theme='dark'] .auth-mode-switch {
   border-color: var(--border);
   background: var(--panel-soft);
@@ -4514,6 +4733,10 @@ h3 {
 :root[data-theme='dark'] .latest-article-strip span,
 :root[data-theme='dark'] .latest-article-strip em,
 :root[data-theme='dark'] .article-card p,
+:root[data-theme='dark'] .story-step p,
+:root[data-theme='dark'] .project-showcase-card p,
+:root[data-theme='dark'] .exploration-panel strong,
+:root[data-theme='dark'] .exploration-panel span,
 :root[data-theme='dark'] .manager-row p,
 :root[data-theme='dark'] .news-item p,
 :root[data-theme='dark'] .digest-item p,
@@ -4524,6 +4747,9 @@ h3 {
 :root[data-theme='dark'] .reading-toolbar > div:first-child,
 :root[data-theme='dark'] .comment span,
 :root[data-theme='dark'] .comment em,
+:root[data-theme='dark'] .comment p,
+:root[data-theme='dark'] .comment-title em,
+:root[data-theme='dark'] .comment-insight-grid span,
 :root[data-theme='dark'] .ops-metric span,
 :root[data-theme='dark'] .ops-command-heading span,
 :root[data-theme='dark'] .ops-live-card small,
@@ -4566,12 +4792,15 @@ h3 {
 :root[data-theme='dark'] .popular-list span,
 :root[data-theme='dark'] .live-status-card strong,
 :root[data-theme='dark'] .latest-article-strip strong,
+:root[data-theme='dark'] .story-step h3,
+:root[data-theme='dark'] .project-showcase-card strong,
 :root[data-theme='dark'] .admin-page-card strong,
 :root[data-theme='dark'] .admin-pulse-card strong,
 :root[data-theme='dark'] .admin-task-card strong,
 :root[data-theme='dark'] .security-rule-grid strong,
 :root[data-theme='dark'] .image-resource-meta strong,
 :root[data-theme='dark'] .comment strong,
+:root[data-theme='dark'] .comment-insight-grid strong,
 :root[data-theme='dark'] .comment-title,
 :root[data-theme='dark'] .ops-metric strong,
 :root[data-theme='dark'] .ops-live-card strong,
@@ -4587,6 +4816,23 @@ h3 {
 
 :root[data-theme='dark'] .ops-list-row code {
   color: var(--accent);
+}
+
+:root[data-theme='dark'] .story-step strong,
+:root[data-theme='dark'] .project-showcase-card span,
+:root[data-theme='dark'] .project-showcase-card svg {
+  color: var(--accent);
+}
+
+:root[data-theme='dark'] .comment-badge.owner,
+:root[data-theme='dark'] .comment-badge.mine {
+  color: #bbf7d0;
+  background: rgba(52, 211, 153, 0.18);
+}
+
+:root[data-theme='dark'] .comment-badge.pending {
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.18);
 }
 
 :root[data-theme='dark'] .brand-mark {
@@ -4732,6 +4978,12 @@ h3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .story-layout,
+  .project-showcase-grid,
+  .comment-insight-grid {
+    grid-template-columns: 1fr;
+  }
+
   .skill-pillar-grid {
     grid-template-columns: 1fr;
   }
@@ -4827,6 +5079,20 @@ h3 {
 
   .admin-page-nav {
     grid-template-columns: 1fr;
+  }
+
+  .story-step {
+    grid-template-columns: 1fr;
+  }
+
+  .story-step > span {
+    width: 38px;
+    height: 38px;
+  }
+
+  .comment-title {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .admin-page-card {

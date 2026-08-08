@@ -346,6 +346,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v2.7',
+    title: '主页故事线和评论体验',
+    date: '2026-08-08',
+    status: '已上线',
+    points: ['首页新增学习故事线和当前探索', '作品墙突出博客、AI 和运维项目', '评论区新增互动摘要和站长标识', '登录用户可看到自己的待审核评论']
+  },
+  {
     version: 'v2.6.3',
     title: '夜间模式文字对比度修复',
     date: '2026-08-08',
@@ -2407,6 +2414,26 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
     { stage: 'Next', title: '沉淀学习助手和微信群 bot 语料', detail: '把暑期学习、课程笔记和群聊文本变成可检索、可总结的数据。' },
     { stage: 'Later', title: '做更多可展示的小项目', detail: '管理工具、游戏、科研辅助和安全练习都可以接到同一个主页。' }
   ];
+  const storyTimeline = [
+    {
+      stage: '01',
+      title: '从课程和笔记开始',
+      detail: '把 React、后端、网络基础和旧笔记整理成可检索的文章库，让学习过程留下痕迹。',
+      signal: '内容沉淀'
+    },
+    {
+      stage: '02',
+      title: '把站点做成自己的工具箱',
+      detail: '后台、图片管理、评论审核、备份中心、运维状态和版本清单都接进同一套界面。',
+      signal: '工程闭环'
+    },
+    {
+      stage: '03',
+      title: '继续接入 AI 和自动化',
+      detail: '让写作辅助、学习助手和群聊语料逐步变成能复盘、能问答、能帮忙推进项目的系统。',
+      signal: 'AI 工作流'
+    }
+  ];
   const publishedArticles = articles.filter((article) => article.status !== 'draft');
   const recentArticle = publishedArticles[0];
   const totalViews = publishedArticles.reduce((sum, article) => sum + Number(article.viewCount || 0), 0);
@@ -2450,6 +2477,34 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
       icon: FilePenLine,
       adminOnly: true
     }
+  ];
+  const projectHighlights = [
+    {
+      title: '个人博客工作台',
+      detail: '从内容发布到评论审核、版本记录、备份和线上部署，已经跑通一个完整的小型全栈产品。',
+      meta: `${publishedArticles.length} 篇公开文章`,
+      view: 'articles',
+      icon: BookOpen
+    },
+    {
+      title: 'AI 写作与学习助手',
+      detail: '支持前端配置模型参数，围绕文章摘要、标题、润色、续写、学习计划和语料样本继续扩展。',
+      meta: currentUser?.role === 'admin' ? '后台可用' : '管理员维护中',
+      view: currentUser?.role === 'admin' ? 'ai' : 'overview',
+      icon: Bot
+    },
+    {
+      title: '运维和备份面板',
+      detail: '把健康检查、容器状态、备份记录和版本路线放进后台，让网站不是一次性作品。',
+      meta: `v${releaseRoadmap[0].version.replace(/^v/, '')}`,
+      view: currentUser?.role === 'admin' ? 'admin' : 'overview',
+      icon: ShieldCheck
+    }
+  ];
+  const explorationCards = [
+    { label: '正在学', value: 'Web 全栈、网络基础、AI 工具链' },
+    { label: '正在做', value: '把博客升级成个人作品集和学习控制台' },
+    { label: '接下来', value: '评论体验、站内副驾驶、更多可展示项目' }
   ];
   const recentArticles = [...articles].slice(0, 3);
   const terminalLines = [
@@ -2553,6 +2608,36 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
         )}
       </section>
 
+      <section className="content-band personal-story-band">
+        <div className="section-heading">
+          <p className="eyebrow">故事线</p>
+          <h2>这个主页不只是入口，也是学习路线图</h2>
+        </div>
+        <div className="story-layout">
+          <div className="story-timeline">
+            {storyTimeline.map((item) => (
+              <article className="story-step" key={item.stage}>
+                <span>{item.stage}</span>
+                <div>
+                  <strong>{item.signal}</strong>
+                  <h3>{item.title}</h3>
+                  <p>{item.detail}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="exploration-panel">
+            <p className="eyebrow">当前探索</p>
+            {explorationCards.map((item) => (
+              <div key={item.label}>
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="content-band">
         <div className="section-heading">
           <p className="eyebrow">技能树</p>
@@ -2575,6 +2660,26 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
                   <span style={{ width: skill.level }} />
                 </div>
               </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="content-band project-showcase-band">
+        <div className="section-heading">
+          <p className="eyebrow">作品墙</p>
+          <h2>已经能拿出来讲的东西</h2>
+        </div>
+        <div className="project-showcase-grid">
+          {projectHighlights.map((project) => {
+            const Icon = project.icon;
+            return (
+              <button className="project-showcase-card" type="button" key={project.title} onClick={() => setActiveView(project.view)}>
+                <Icon size={20} />
+                <span>{project.meta}</span>
+                <strong>{project.title}</strong>
+                <p>{project.detail}</p>
+              </button>
             );
           })}
         </div>
@@ -2852,6 +2957,11 @@ function ArticleDetail({
   onBack
 }) {
   const articleComments = comments[article.id] || [];
+  const approvedCommentCount = articleComments.filter((comment) => comment.status !== 'pending').length;
+  const pendingOwnCommentCount = currentUser
+    ? articleComments.filter((comment) => comment.status === 'pending' && comment.userId === currentUser.id).length
+    : 0;
+  const latestComment = articleComments[articleComments.length - 1];
   const commentPageGroups = paginateComments(articleComments);
   const currentCommentPage = Math.min(
     commentPages[article.id] || 0,
@@ -2962,16 +3072,46 @@ function ArticleDetail({
 
         <div className="comment-box">
           <div className="comment-title">
-            <MessageCircle size={17} />
-            <span>评论</span>
+            <div>
+              <MessageCircle size={17} />
+              <span>评论区</span>
+            </div>
+            <em>{articleComments.length} 条可见评论</em>
           </div>
+          <div className="comment-insight-grid" aria-label="评论状态">
+            <div>
+              <span>公开评论</span>
+              <strong>{approvedCommentCount}</strong>
+            </div>
+            <div>
+              <span>最近互动</span>
+              <strong>{latestComment ? formatCommentTime(latestComment.createdAt) : '等待第一条'}</strong>
+            </div>
+            <div>
+              <span>我的状态</span>
+              <strong>
+                {currentUser ? (pendingOwnCommentCount ? `${pendingOwnCommentCount} 条待审` : '可参与讨论') : '登录后评论'}
+              </strong>
+            </div>
+          </div>
+          {pendingOwnCommentCount > 0 && (
+            <p className="comment-pending-note">你的待审核评论只有你和站长能看到，审核通过后会公开显示。</p>
+          )}
           {visibleComments.map((comment, index) => (
-            <div className="comment" key={comment.id || `${article.id}-${currentCommentPage}-${index}`}>
-              <div>
-                <strong>{comment.authorName || '访客'}：</strong>
+            <div
+              className={`comment ${comment.authorRole === 'admin' ? 'owner-comment' : ''} ${
+                currentUser?.id === comment.userId ? 'my-comment' : ''
+              } ${comment.status === 'pending' ? 'pending-comment' : ''}`.trim()}
+              key={comment.id || `${article.id}-${currentCommentPage}-${index}`}
+            >
+              <div className="comment-meta">
+                <strong>{comment.authorName || '访客'}</strong>
+                {comment.authorRole === 'admin' && <span className="comment-badge owner">站长</span>}
+                {currentUser?.id === comment.userId && <span className="comment-badge mine">我</span>}
+                {comment.status === 'pending' && <span className="comment-badge pending">待审核</span>}
                 {comment.replyToAuthor && <em>回复 {comment.replyToAuthor}</em>}
               </div>
-              <span>{comment.content}</span>
+              <p>{comment.content}</p>
               {currentUser && (
                 <button
                   className="comment-reply-button"
@@ -3535,6 +3675,16 @@ function paginateComments(commentList) {
   }
 
   return pages;
+}
+
+function formatCommentTime(value) {
+  if (!value) return '刚刚';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '刚刚';
+  return date.toLocaleDateString('zh-CN', {
+    month: 'short',
+    day: 'numeric'
+  });
 }
 
 function paginateFixedSize(items, pageSize) {
