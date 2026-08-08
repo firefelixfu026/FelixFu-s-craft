@@ -4530,8 +4530,11 @@ h3 {
 :root[data-theme='dark'] .ops-list-row span,
 :root[data-theme='dark'] .ops-service-card > div span,
 :root[data-theme='dark'] .ops-history-row small,
+:root[data-theme='dark'] .release-metric span,
+:root[data-theme='dark'] .release-checks span,
 :root[data-theme='dark'] .release-version-card li,
 :root[data-theme='dark'] .release-version-card small,
+:root[data-theme='dark'] .admin-insight-grid p,
 :root[data-theme='dark'] .account-profile p,
 :root[data-theme='dark'] .account-list span,
 :root[data-theme='dark'] .admin-panel-heading > span,
@@ -4549,7 +4552,10 @@ h3 {
 :root[data-theme='dark'] .image-resource-meta span,
 :root[data-theme='dark'] .usage-chart-heading span,
 :root[data-theme='dark'] .completion-summary-grid span,
-:root[data-theme='dark'] .summer-date-picker label {
+:root[data-theme='dark'] .summer-date-picker label,
+:root[data-theme='dark'] .summer-plan-panel .admin-panel-heading p,
+:root[data-theme='dark'] .summer-plan-panel .admin-panel-heading > span,
+:root[data-theme='dark'] .inline-date-selector {
   color: var(--text-soft);
 }
 
@@ -4571,7 +4577,9 @@ h3 {
 :root[data-theme='dark'] .ops-live-card strong,
 :root[data-theme='dark'] .ops-service-card strong,
 :root[data-theme='dark'] .ops-list-row strong,
+:root[data-theme='dark'] .release-metric strong,
 :root[data-theme='dark'] .release-version-card h3,
+:root[data-theme='dark'] .admin-insight-grid h3,
 :root[data-theme='dark'] .completion-summary-grid strong,
 :root[data-theme='dark'] .usage-chart-heading h3 {
   color: var(--text-main);

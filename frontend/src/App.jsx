@@ -346,6 +346,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v2.6.3',
+    title: '夜间模式文字对比度修复',
+    date: '2026-08-08',
+    status: '已上线',
+    points: ['备份中心统计卡文字提亮', '版本指标和后台说明文字跟随主题变量', '暑期计划弱文本夜间可读性补齐', '减少硬编码浅色灰字残留']
+  },
+  {
     version: 'v2.6.2',
     title: '后台夜间模式补全',
     date: '2026-08-08',
