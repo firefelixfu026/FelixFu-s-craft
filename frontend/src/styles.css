@@ -413,6 +413,12 @@ mark {
   color: #102033;
   font-size: 26px;
   line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.live-status-card:first-child strong {
+  font-size: 22px;
+  line-height: 1.25;
 }
 
 .latest-article-strip {
@@ -5227,6 +5233,10 @@ h3 {
   .live-status-grid,
   .latest-article-strip {
     grid-template-columns: 1fr;
+  }
+
+  .live-status-card:first-child strong {
+    font-size: 20px;
   }
 
   .summer-date-picker label {

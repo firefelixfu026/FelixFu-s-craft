@@ -345,6 +345,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v2.7.3',
+    title: '首页上线时间精确到秒',
+    date: '2026-08-08',
+    status: '已上线',
+    points: ['首页站点状态新增实时秒级计时', '上线时间从整数天改为天时分秒', '计时每秒自动刷新', '移动端状态卡补充长文本防溢出']
+  },
+  {
     version: 'v2.7.2',
     title: '运维页加载稳定性',
     date: '2026-08-08',
@@ -757,9 +764,15 @@ function highlightText(value, terms = []) {
   return parts;
 }
 
-function daysSinceLaunch() {
-  const diff = Date.now() - new Date(SITE_LAUNCH_DATE).getTime();
-  return Math.max(1, Math.floor(diff / (24 * 60 * 60 * 1000)) + 1);
+function formatLaunchDuration(now = new Date()) {
+  const startedAt = new Date(SITE_LAUNCH_DATE);
+  const totalSeconds = Math.max(0, Math.floor((now.getTime() - startedAt.getTime()) / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${days} 天 ${pad(hours)} 小时 ${pad(minutes)} 分 ${pad(seconds)} 秒`;
 }
 
 function readAuthFailState() {
@@ -798,6 +811,7 @@ function App() {
   const [activeView, setActiveView] = useState(readStoredActiveView);
   const [theme, setTheme] = useState(readStoredTheme);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(readStoredSidebarCollapsed);
+  const [homeNow, setHomeNow] = useState(() => new Date());
   const [query, setQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState(ALL_FILTER);
   const [selectedCategory, setSelectedCategory] = useState(ALL_FILTER);
@@ -889,6 +903,11 @@ function App() {
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setHomeNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   function toggleTheme() {
     setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'));
@@ -2453,7 +2472,7 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
   const totalComments = publishedArticles.reduce((sum, article) => sum + (article.comments?.length || 0), 0);
   const currentMonthCount = publishedArticles.filter((article) => getArticleMonth(article.date) === getArticleMonth(new Date().toISOString())).length;
   const liveStats = [
-    { label: '上线天数', value: `${daysSinceLaunch()} 天`, detail: '持续打磨中' },
+    { label: '上线时间', value: formatLaunchDuration(homeNow), detail: '精准到秒' },
     { label: '公开文章', value: `${publishedArticles.length} 篇`, detail: currentMonthCount ? `本月 ${currentMonthCount} 篇` : '等待新内容' },
     { label: '阅读记录', value: `${totalViews} 次`, detail: '来自文章详情页' },
     { label: '评论互动', value: `${totalComments} 条`, detail: currentUser ? '已登录可参与' : 'GitHub 登录后可评论' }
