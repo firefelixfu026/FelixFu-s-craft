@@ -4312,6 +4312,35 @@ h3 {
   background: var(--panel-soft);
 }
 
+:root[data-theme='dark'] .auth-mode-switch {
+  border-color: var(--border);
+  background: var(--panel-soft);
+}
+
+:root[data-theme='dark'] .auth-mode-switch button {
+  color: var(--text-soft);
+}
+
+:root[data-theme='dark'] .auth-mode-switch button.active {
+  color: var(--text-main);
+  background: rgba(232, 238, 249, 0.08);
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .github-auth-button {
+  border: 1px solid rgba(232, 238, 249, 0.1);
+  background: rgba(232, 238, 249, 0.08);
+}
+
+:root[data-theme='dark'] .auth-divider {
+  color: var(--text-muted);
+}
+
+:root[data-theme='dark'] .auth-divider::before,
+:root[data-theme='dark'] .auth-divider::after {
+  background: var(--border);
+}
+
 :root[data-theme='dark'] .tag-button,
 :root[data-theme='dark'] .icon-toggle,
 :root[data-theme='dark'] .capability-card button,
@@ -4379,6 +4408,7 @@ h3 {
 :root[data-theme='dark'] .admin-pulse-card small,
 :root[data-theme='dark'] .admin-task-card em,
 :root[data-theme='dark'] .admin-task-card small,
+:root[data-theme='dark'] .admin-form label > span,
 :root[data-theme='dark'] .analytics-grid p,
 :root[data-theme='dark'] .template-card span,
 :root[data-theme='dark'] .template-card small,
