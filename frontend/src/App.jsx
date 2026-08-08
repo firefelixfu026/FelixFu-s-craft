@@ -346,6 +346,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v2.7.1',
+    title: '移动端布局整理',
+    date: '2026-08-08',
+    status: '已上线',
+    points: ['移动端侧栏改为单行横向导航', '横屏时品牌区和导航并排', '暑期计划表手机端改为卡片流', '移动端夜间表格卡片同步适配']
+  },
+  {
     version: 'v2.7',
     title: '主页故事线和评论体验',
     date: '2026-08-08',
@@ -4843,17 +4850,17 @@ function CompletionTable({ rows, section, disabled, updateRow }) {
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td><input className="readonly-plan-cell" value={row.time || ''} readOnly /></td>
-              <td><textarea className="readonly-plan-cell" value={row.planned || ''} readOnly /></td>
-              <td><textarea value={row.actual || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'actual', event.target.value)} /></td>
-              <td>
+              <td data-label="时间段"><input className="readonly-plan-cell" value={row.time || ''} readOnly /></td>
+              <td data-label="计划做什么"><textarea className="readonly-plan-cell" value={row.planned || ''} readOnly /></td>
+              <td data-label="我实际做了什么"><textarea value={row.actual || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'actual', event.target.value)} /></td>
+              <td data-label="状态">
                 <select value={row.status || '未开始'} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'status', event.target.value)}>
                   {completionStatusOptions.map((status) => (
                     <option key={status} value={status}>{status}</option>
                   ))}
                 </select>
               </td>
-              <td><textarea value={row.note || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'note', event.target.value)} /></td>
+              <td data-label="备注"><textarea value={row.note || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'note', event.target.value)} /></td>
             </tr>
           ))}
         </tbody>
@@ -4877,8 +4884,8 @@ function EditableTable({ columns, rows, section, disabled, updateRow, deleteRow,
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              {columns.map(([field, , type]) => (
-                <td key={field}>
+              {columns.map(([field, label, type]) => (
+                <td data-label={label} key={field}>
                   {type === 'textarea' ? (
                     <textarea value={row[field] || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, field, event.target.value)} />
                   ) : (
@@ -4886,7 +4893,7 @@ function EditableTable({ columns, rows, section, disabled, updateRow, deleteRow,
                   )}
                 </td>
               ))}
-              <td>
+              <td data-label="操作">
                 <button className="compact-icon-button danger-button" type="button" onClick={() => deleteRow(section, row.id)} disabled={disabled} aria-label="删除这一行">
                   <Trash2 size={16} />
                 </button>

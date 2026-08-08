@@ -4908,21 +4908,43 @@ h3 {
     z-index: 10;
     display: grid;
     grid-template-columns: 1fr;
-    gap: 14px;
+    gap: 8px;
     height: auto;
-    overflow: visible;
-    padding: 14px;
+    overflow: hidden;
+    padding: 10px 12px;
   }
 
   .sidebar-collapsed .sidebar {
     align-items: stretch;
-    gap: 14px;
-    padding: 14px;
+    gap: 8px;
+    padding: 10px 12px;
   }
 
   .sidebar-collapsed .brand {
     display: flex;
     justify-items: stretch;
+  }
+
+  .brand {
+    gap: 10px;
+  }
+
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+  }
+
+  .brand strong {
+    font-size: 17px;
+  }
+
+  .brand span {
+    font-size: 12px;
+  }
+
+  .sidebar-toggle-button {
+    width: 34px;
+    height: 34px;
   }
 
   .sidebar-collapsed .brand-text,
@@ -4936,18 +4958,38 @@ h3 {
   }
 
   .nav-list {
-    grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+    display: flex;
+    gap: 6px;
+    min-width: 0;
+    margin: 0 -4px;
+    padding: 0 4px 4px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .nav-list::-webkit-scrollbar {
+    display: none;
   }
 
   .nav-button {
+    flex: 0 0 auto;
     justify-content: center;
-    padding: 0 8px;
+    min-height: 38px;
+    padding: 0 12px;
+    white-space: nowrap;
   }
 
   .sidebar-collapsed .nav-button {
     width: auto;
     justify-content: center;
-    padding: 0 8px;
+    padding: 0 12px;
+  }
+
+  .nav-button.active::before {
+    left: 7px;
+    width: 3px;
+    height: 18px;
   }
 
   .admin-page-nav {
@@ -5042,6 +5084,31 @@ h3 {
     justify-content: flex-start;
   }
 
+  .summer-date-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summer-date-tab {
+    min-height: 56px;
+    padding: 9px 10px;
+  }
+
+  .summer-plan-table {
+    min-width: 620px;
+  }
+
+  .summer-plan-table.compact {
+    min-width: 520px;
+  }
+
+  .summer-plan-panel.wide .summer-plan-table {
+    min-width: 680px;
+  }
+
+  .summer-plan-panel.wide .completion-table {
+    min-width: 760px;
+  }
+
   .account-profile {
     grid-template-columns: auto minmax(0, 1fr);
   }
@@ -5060,21 +5127,67 @@ h3 {
   }
 }
 
-@media (max-width: 560px) {
-  .main-content {
-    padding: 18px 12px 34px;
+@media (max-width: 900px) and (orientation: landscape) {
+  .sidebar {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px;
   }
 
   .brand {
-    align-items: flex-start;
+    min-width: 210px;
   }
 
-  .nav-button span {
-    display: none;
+  .nav-list {
+    padding-bottom: 0;
   }
 
+  .main-content {
+    padding-top: 14px;
+  }
+}
+
+@media (max-width: 560px) {
+  .main-content {
+    padding: 14px 10px 32px;
+  }
+
+  .brand {
+    align-items: center;
+  }
+
+  .nav-button {
+    min-height: 36px;
+    padding: 0 10px;
+    font-size: 14px;
+  }
+
+  .nav-button span,
   .sidebar-collapsed .nav-button span {
+    display: inline;
+  }
+
+  .sidebar {
+    padding: 9px 10px;
+  }
+
+  .brand-mark {
+    width: 34px;
+    height: 34px;
+  }
+
+  .brand strong {
+    font-size: 16px;
+  }
+
+  .brand span {
     display: none;
+  }
+
+  .sidebar-toggle-button {
+    width: 32px;
+    height: 32px;
   }
 
   .admin-page-nav {
@@ -5114,6 +5227,93 @@ h3 {
   .live-status-grid,
   .latest-article-strip {
     grid-template-columns: 1fr;
+  }
+
+  .summer-date-picker label {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .summer-date-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .summer-table-wrap {
+    overflow: visible;
+  }
+
+  .summer-plan-table,
+  .summer-plan-table.compact,
+  .summer-plan-panel.wide .summer-plan-table,
+  .summer-plan-panel.wide .completion-table {
+    display: block;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .summer-plan-table thead {
+    display: none;
+  }
+
+  .summer-plan-table tbody,
+  .summer-plan-table tr,
+  .summer-plan-table td {
+    display: block;
+    width: 100% !important;
+  }
+
+  .summer-plan-table tr {
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid #d8e0e9;
+    border-radius: 8px;
+    background: #ffffff;
+  }
+
+  .summer-plan-table td {
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  .summer-plan-table td + td {
+    margin-top: 10px;
+  }
+
+  .summer-plan-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 5px;
+    color: #6a7685;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .summer-plan-table td:last-child {
+    text-align: left;
+  }
+
+  .summer-plan-table input,
+  .summer-plan-table select,
+  .summer-plan-table textarea,
+  .summer-plan-panel.wide .summer-plan-table textarea,
+  .completion-table textarea {
+    min-height: 38px;
+  }
+
+  .summer-plan-table textarea,
+  .summer-plan-panel.wide .summer-plan-table textarea,
+  .completion-table textarea {
+    min-height: 68px;
+  }
+
+  :root[data-theme='dark'] .summer-plan-table tr {
+    border-color: var(--border);
+    background: var(--panel-bg);
+  }
+
+  :root[data-theme='dark'] .summer-plan-table td::before {
+    color: var(--text-soft);
   }
 
   .latest-article-strip {
