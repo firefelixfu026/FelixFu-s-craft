@@ -4247,6 +4247,8 @@ h3 {
 :root[data-theme='dark'] .ai-history-item,
 :root[data-theme='dark'] .usage-chart-card,
 :root[data-theme='dark'] .completion-summary-grid > div,
+:root[data-theme='dark'] .summer-goal-card,
+:root[data-theme='dark'] .summer-readonly-note,
 :root[data-theme='dark'] .summer-date-tab,
 :root[data-theme='dark'] .weekly-plan-row,
 :root[data-theme='dark'] .weekly-check,
@@ -4331,12 +4333,21 @@ h3 {
 :root[data-theme='dark'] .admin-form input,
 :root[data-theme='dark'] .admin-form textarea,
 :root[data-theme='dark'] .comment-filter-row select,
+:root[data-theme='dark'] .summer-goal-card textarea,
 :root[data-theme='dark'] .summer-plan-table input,
 :root[data-theme='dark'] .summer-plan-table select,
 :root[data-theme='dark'] .summer-plan-table textarea {
   border-color: var(--border);
   color: var(--text-main);
   background: var(--input-bg);
+}
+
+:root[data-theme='dark'] .summer-goal-card textarea:disabled,
+:root[data-theme='dark'] .summer-plan-table input:disabled,
+:root[data-theme='dark'] .summer-plan-table textarea:disabled,
+:root[data-theme='dark'] .summer-plan-table select:disabled {
+  color: var(--text-soft);
+  background: var(--panel-soft);
 }
 
 :root[data-theme='dark'] .profile-copy p,
