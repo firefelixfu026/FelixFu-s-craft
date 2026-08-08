@@ -20,6 +20,8 @@ import {
   LogOut,
   MessageCircle,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   PencilLine,
   PlusCircle,
   Quote,
@@ -92,6 +94,7 @@ const AUTH_EXPIRES_KEY = 'felix_blog_token_expires_at';
 const ACTIVE_VIEW_KEY = 'felix_blog_active_view';
 const ADMIN_PAGE_KEY = 'felix_blog_admin_page';
 const THEME_KEY = 'felix_blog_theme';
+const SIDEBAR_COLLAPSED_KEY = 'felix_blog_sidebar_collapsed';
 const emptyReactionState = { like: false, favorite: false, downvote: false, question: false };
 const ALL_FILTER = '全部';
 const ALL_ARCHIVE = '全部';
@@ -191,6 +194,11 @@ function readStoredTheme() {
     return 'dark';
   }
   return 'light';
+}
+
+function readStoredSidebarCollapsed() {
+  if (typeof localStorage === 'undefined') return false;
+  return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
 }
 
 function readStoredAdminPage() {
@@ -668,6 +676,7 @@ function aiTaskLabel(task) {
 function App() {
   const [activeView, setActiveView] = useState(readStoredActiveView);
   const [theme, setTheme] = useState(readStoredTheme);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(readStoredSidebarCollapsed);
   const [query, setQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState(ALL_FILTER);
   const [selectedCategory, setSelectedCategory] = useState(ALL_FILTER);
@@ -736,6 +745,7 @@ function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const ThemeIcon = theme === 'dark' ? Moon : Sun;
   const nextThemeLabel = theme === 'dark' ? '日间模式' : '夜间模式';
+  const SidebarToggleIcon = isSidebarCollapsed ? PanelLeftOpen : PanelLeftClose;
 
   const visibleNavItems = useMemo(() => {
     if (!currentUser) {
@@ -758,8 +768,16 @@ function App() {
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
+
   function toggleTheme() {
     setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'));
+  }
+
+  function toggleSidebar() {
+    setIsSidebarCollapsed((currentValue) => !currentValue);
   }
 
   useEffect(() => {
@@ -1938,14 +1956,23 @@ function App() {
   const showGlobalSearch = activeView === 'articles';
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar" aria-label="博客导航">
+    <div className={isSidebarCollapsed ? 'app-shell sidebar-collapsed' : 'app-shell'}>
+      <aside className="sidebar" aria-label="博客导航" aria-expanded={!isSidebarCollapsed}>
         <div className="brand">
           <img className="brand-mark" src="/avatar.jpg" alt="付江樊头像" />
-          <div>
+          <div className="brand-text">
             <strong>{profile.name}</strong>
             <span>{profile.englishName}</span>
           </div>
+          <button
+            className="sidebar-toggle-button"
+            type="button"
+            onClick={toggleSidebar}
+            title={isSidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
+            aria-label={isSidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
+          >
+            <SidebarToggleIcon size={18} />
+          </button>
         </div>
 
         <nav className="nav-list">
@@ -1957,6 +1984,8 @@ function App() {
                 className={activeView === item.id ? 'nav-button active' : 'nav-button'}
                 type="button"
                 onClick={() => setActiveView(item.id)}
+                title={item.label}
+                aria-label={item.label}
               >
                 <Icon size={18} />
                 <span>{item.label}</span>
@@ -1970,7 +1999,7 @@ function App() {
             <>
               <span>管理员</span>
               <strong>{currentUser.displayName}</strong>
-              <button className="icon-text-button" type="button" onClick={() => logout()}>
+              <button className="icon-text-button" type="button" onClick={() => logout()} title="退出" aria-label="退出">
                 <LogOut size={17} />
                 <span>退出</span>
               </button>
@@ -1978,7 +2007,7 @@ function App() {
           ) : (
             <>
               <span>后台账号</span>
-              <button className="icon-text-button" type="button" onClick={() => setActiveView('login')}>
+              <button className="icon-text-button" type="button" onClick={() => setActiveView('login')} title="登录" aria-label="登录">
                 <LogIn size={17} />
                 <span>登录</span>
               </button>
