@@ -59,6 +59,7 @@ const createEmptyArticleForm = () => ({
 });
 
 const visitorNavItems = [
+  { id: 'overview', label: '首页', icon: UserRound },
   { id: 'articles', label: '文章', icon: BookOpen },
   { id: 'plan', label: '计划', icon: List },
   { id: 'game', label: '游戏', icon: Gamepad2 },
@@ -895,8 +896,8 @@ function App() {
   useEffect(() => {
     if (!currentUser) {
       if (authToken) return;
-      if (!['articles', 'plan', 'game', 'login'].includes(activeView)) {
-        setActiveView('articles');
+      if (!['overview', 'articles', 'plan', 'game', 'login'].includes(activeView)) {
+        setActiveView('overview');
       }
       return;
     }
