@@ -1,4 +1,4 @@
-﻿import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   BookOpen,
@@ -42,8 +42,7 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import changelogText from '../../CHANGELOG.md?raw';
 import { aiNews as fallbackNews, articles as fallbackArticles, gameModule, profile as fallbackProfile } from './data.js';
-
-const ProjectOpsPanel = lazy(() => import('./ProjectOpsPanel.jsx'));
+import ProjectOpsPanel from './ProjectOpsPanel.jsx';
 
 const createEmptyArticleForm = () => ({
   title: '',
@@ -345,6 +344,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v2.7.2',
+    title: '运维页加载稳定性',
+    date: '2026-08-08',
+    status: '已上线',
+    points: ['运维面板取消动态分包', '避免部署后旧缓存导致运维模块加载失败', '保留运维页局部错误保护', '降低手机浏览器打开后台时的白屏概率']
+  },
   {
     version: 'v2.7.1',
     title: '移动端布局整理',
@@ -5902,9 +5908,7 @@ function AdminWorkspace({
           title="运维页暂时打不开"
           onReset={() => openAdminPage('overview')}
         >
-          <Suspense fallback={<section className="admin-panel lazy-panel">正在加载运维面板...</section>}>
-            <ProjectOpsPanel authToken={authToken} />
-          </Suspense>
+          <ProjectOpsPanel authToken={authToken} />
         </AdminPanelErrorBoundary>
       )}
 
