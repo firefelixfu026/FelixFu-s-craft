@@ -379,6 +379,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v4.1',
+    title: '原创二次元小贴纸',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['前台加入方舟感和乐队感的原创小贴纸', '不同板块显示不同贴纸组合', '贴纸仅作轻装饰不影响阅读和操作', '继续保留后台管理页的干净布局']
+  },
+  {
     version: 'v4.0',
     title: '二次元个人站视觉改版',
     date: '2026-08-09',
@@ -2610,6 +2617,8 @@ function App() {
       </aside>
 
       <main className="main-content">
+        {activeView !== 'admin' && <DecorativeStickerLayer activeView={activeView} />}
+
         <audio
           ref={globalAudioRef}
           src={currentMusicTrack?.url || undefined}
@@ -5565,6 +5574,54 @@ function EditableTable({ columns, rows, section, disabled, updateRow, deleteRow,
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+const stickerSets = {
+  overview: [
+    { variant: 'terminal', label: 'SANITY +1', icon: '◇' },
+    { variant: 'guitar', label: 'BAND TIME', icon: '♪' },
+    { variant: 'memo', label: 'ZJU NOTE', icon: '✦' }
+  ],
+  articles: [
+    { variant: 'memo', label: 'TECH NOTE', icon: '⌁' },
+    { variant: 'terminal', label: 'DOCS 02', icon: '◇' },
+    { variant: 'guitar', label: 'REST', icon: '♪' }
+  ],
+  plan: [
+    { variant: 'terminal', label: 'MISSION', icon: '◇' },
+    { variant: 'memo', label: 'PLAN 8/15', icon: '✦' },
+    { variant: 'guitar', label: 'AFTER CLASS', icon: '♪' }
+  ],
+  music: [
+    { variant: 'guitar', label: 'PLAYLIST', icon: '♪' },
+    { variant: 'terminal', label: 'AUDIO LOG', icon: '◇' },
+    { variant: 'memo', label: 'LOOP ON', icon: '✦' }
+  ],
+  game: [
+    { variant: 'terminal', label: 'STAGE READY', icon: '◇' },
+    { variant: 'guitar', label: 'BREAK', icon: '♪' },
+    { variant: 'memo', label: 'SAVE', icon: '✦' }
+  ],
+  default: [
+    { variant: 'terminal', label: 'FELIX LOG', icon: '◇' },
+    { variant: 'guitar', label: 'BGM', icon: '♪' },
+    { variant: 'memo', label: 'NOTE', icon: '✦' }
+  ]
+};
+
+function DecorativeStickerLayer({ activeView }) {
+  const stickers = stickerSets[activeView] || stickerSets.default;
+
+  return (
+    <div className={`sticker-layer sticker-layer-${activeView}`} aria-hidden="true">
+      {stickers.map((sticker, index) => (
+        <span className={`sticker-decal sticker-${sticker.variant}`} key={`${sticker.label}-${index}`}>
+          <span className="sticker-icon">{sticker.icon}</span>
+          <span>{sticker.label}</span>
+        </span>
+      ))}
     </div>
   );
 }
