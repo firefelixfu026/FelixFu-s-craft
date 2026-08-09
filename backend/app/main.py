@@ -362,6 +362,8 @@ class ArticleIn(BaseModel):
     date: str | None = None
     readTime: str = "3 min"
     status: Literal["published", "draft"] = "published"
+    noteCollection: str = ""
+    notePath: str = ""
     category: str = "学习笔记"
     pinned: bool = False
 
@@ -808,6 +810,8 @@ def create_admin_article(
         read_time=(payload.readTime or "3 min").strip(),
         status=payload.status,
         category=(_optional_text(payload.category) or "学习笔记")[:80],
+        note_collection=(_optional_text(payload.noteCollection) or "")[:120],
+        note_path=_optional_text(payload.notePath) or "",
         pinned=payload.pinned,
         created_at=now,
         updated_at=now,
@@ -839,6 +843,8 @@ def update_admin_article(
     article.read_time = (payload.readTime or article.read_time).strip()
     article.status = payload.status
     article.category = (_optional_text(payload.category) or "学习笔记")[:80]
+    article.note_collection = (_optional_text(payload.noteCollection) or "")[:120]
+    article.note_path = _optional_text(payload.notePath) or ""
     article.pinned = payload.pinned
     article.updated_at = datetime.utcnow()
     article.tags = [_get_or_create_tag(db, tag_name) for tag_name in _clean_tags(payload.tags)]
@@ -2168,6 +2174,8 @@ def _article_to_dict(article: Article, current_user: User | None = None) -> dict
         "updatedAt": (article.updated_at or article.created_at or datetime.utcnow()).isoformat(),
         "status": article.status,
         "category": article.category or "学习笔记",
+        "noteCollection": article.note_collection or "",
+        "notePath": article.note_path or "",
         "pinned": bool(article.pinned),
         "viewCount": article.view_count or 0,
         "comments": [_comment_to_dict(comment) for comment in _visible_comments(article, current_user)],

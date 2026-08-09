@@ -68,6 +68,8 @@ const createEmptyArticleForm = () => ({
   updatedAt: '',
   status: 'published',
   category: '学习笔记',
+  noteCollection: '',
+  notePath: '',
   pinned: false
 });
 
@@ -382,6 +384,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v5.3',
+    title: '技术笔记收纳目录',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['后台文章支持设置笔记合集和目录路径', '技术笔记左侧索引按层级折叠展示', '未设置目录的旧文章继续按分类自动归组']
+  },
   {
     version: 'v5.2.1',
     title: '侧边栏动画优化',
@@ -1111,7 +1120,7 @@ function writeAuthFailState(value) {
 }
 
 function hasArticleDraftContent(form) {
-  return ['title', 'summary', 'content', 'coverUrl', 'tags'].some((field) => form[field]?.trim());
+  return ['title', 'summary', 'content', 'coverUrl', 'tags', 'noteCollection', 'notePath'].some((field) => form[field]?.trim());
 }
 
 function formatFileSize(bytes) {
@@ -1147,6 +1156,52 @@ function isTechnicalArticle(article = {}) {
 
 function getArticleSection(article) {
   return isTechnicalArticle(article) ? 'notes' : 'essays';
+}
+
+function splitNotePath(value = '') {
+  return String(value)
+    .split(/[\/>｜|]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function getArticleNoteCollection(article = {}) {
+  return article.noteCollection?.trim() || article.category || '技术笔记';
+}
+
+function getArticleNotePathSegments(article = {}) {
+  const segments = splitNotePath(article.notePath || '');
+  if (segments.length) return segments;
+  return [article.category || '未收纳'];
+}
+
+function createNoteTreeNode(name) {
+  return {
+    name,
+    children: new Map(),
+    articles: []
+  };
+}
+
+function buildNoteTree(articles = []) {
+  const root = new Map();
+  articles.forEach((article) => {
+    const collectionName = getArticleNoteCollection(article);
+    if (!root.has(collectionName)) root.set(collectionName, createNoteTreeNode(collectionName));
+    let currentNode = root.get(collectionName);
+    getArticleNotePathSegments(article).forEach((segment) => {
+      if (segment === collectionName) return;
+      if (!currentNode.children.has(segment)) currentNode.children.set(segment, createNoteTreeNode(segment));
+      currentNode = currentNode.children.get(segment);
+    });
+    currentNode.articles.push(article);
+  });
+  return Array.from(root.values()).sort((first, second) => first.name.localeCompare(second.name, 'zh-CN'));
+}
+
+function noteNodeHasActiveArticle(node, activeArticleId) {
+  return node.articles.some((article) => article.id === activeArticleId)
+    || Array.from(node.children.values()).some((child) => noteNodeHasActiveArticle(child, activeArticleId));
 }
 
 function readFileAsText(file) {
@@ -2454,6 +2509,8 @@ function App() {
         tags: '技术笔记, Markdown',
         category: '技术笔记',
         readTime: `${estimatedMinutes} min`,
+        noteCollection: 'X-lab 软件团队学习笔记',
+        notePath: '未分组',
         status: 'draft'
       });
       setAdminMessage(`已导入笔记：${title}。图片路径已尽量自动替换，可预览后发布。`);
@@ -2482,6 +2539,8 @@ function App() {
       updatedAt: article.updatedAt || '',
       status: article.status || 'published',
       category: article.category || '学习笔记',
+      noteCollection: article.noteCollection || '',
+      notePath: article.notePath || '',
       pinned: Boolean(article.pinned)
     });
   }
@@ -2514,6 +2573,8 @@ function App() {
       readTime: articleForm.readTime,
       status: nextStatus,
       category: articleForm.category,
+      noteCollection: articleForm.noteCollection,
+      notePath: articleForm.notePath,
       pinned: articleForm.pinned
     };
 
@@ -4157,12 +4218,7 @@ function ArticleDetail({
 }
 
 function NoteTree({ articles, activeArticleId, openArticle }) {
-  const grouped = articles.reduce((groups, article) => {
-    const key = article.category || '技术笔记';
-    groups[key] = groups[key] || [];
-    groups[key].push(article);
-    return groups;
-  }, {});
+  const tree = buildNoteTree(articles);
 
   return (
     <aside className="note-tree" aria-label="技术笔记目录树" tabIndex={0}>
@@ -4175,24 +4231,60 @@ function NoteTree({ articles, activeArticleId, openArticle }) {
           <BookOpen size={17} />
           <span>技术笔记</span>
         </div>
-        {Object.entries(grouped).map(([category, group]) => (
-          <div className="note-tree-group" key={category}>
-            <strong>{category}</strong>
-            {group.map((item) => (
-              <button
-                className={item.id === activeArticleId ? 'active' : ''}
-                key={item.id}
-                type="button"
-                onClick={() => openArticle(item.id)}
-              >
-                <span>{item.title}</span>
-                <em>{item.readTime}</em>
-              </button>
-            ))}
-          </div>
+        {tree.map((node) => (
+          <NoteTreeNode
+            activeArticleId={activeArticleId}
+            key={node.name}
+            level={0}
+            node={node}
+            openArticle={openArticle}
+          />
         ))}
       </div>
     </aside>
+  );
+}
+
+function NoteTreeNode({ node, activeArticleId, openArticle, level }) {
+  const childNodes = Array.from(node.children.values()).sort((first, second) => first.name.localeCompare(second.name, 'zh-CN'));
+  const articles = [...node.articles].sort((first, second) => (first.title || '').localeCompare(second.title || '', 'zh-CN'));
+  const isOpenByDefault = level < 1 || noteNodeHasActiveArticle(node, activeArticleId);
+  const [isOpen, setIsOpen] = useState(isOpenByDefault);
+
+  useEffect(() => {
+    if (noteNodeHasActiveArticle(node, activeArticleId)) setIsOpen(true);
+  }, [activeArticleId, node]);
+
+  return (
+    <details className="note-tree-folder" open={isOpen} onToggle={(event) => setIsOpen(event.currentTarget.open)}>
+      <summary style={{ '--tree-level': level }}>
+        <span className="note-folder-caret"><ChevronRight size={14} /></span>
+        <span>{node.name}</span>
+      </summary>
+      <div className="note-tree-children">
+        {childNodes.map((child) => (
+          <NoteTreeNode
+            activeArticleId={activeArticleId}
+            key={`${node.name}-${child.name}`}
+            level={level + 1}
+            node={child}
+            openArticle={openArticle}
+          />
+        ))}
+        {articles.map((item) => (
+          <button
+            className={item.id === activeArticleId ? 'note-tree-article active' : 'note-tree-article'}
+            key={item.id}
+            style={{ '--tree-level': level + 1 }}
+            type="button"
+            onClick={() => openArticle(item.id)}
+          >
+            <span>{item.title}</span>
+            <em>{item.readTime}</em>
+          </button>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -7276,7 +7368,7 @@ function AdminWorkspace({
   ).sort((first, second) => first.localeCompare(second, 'zh-CN'));
   const filteredManagerArticles = articles.filter((article) => {
     const query = articleManagerQuery.trim().toLowerCase();
-    const searchable = [article.title, article.summary, article.category, ...(article.tags || [])]
+    const searchable = [article.title, article.summary, article.category, article.noteCollection, article.notePath, ...(article.tags || [])]
       .join(' ')
       .toLowerCase();
     return (
@@ -8340,6 +8432,22 @@ function AdminWorkspace({
               />
             </label>
             <label>
+              <span>笔记合集</span>
+              <input
+                value={articleForm.noteCollection}
+                onChange={(event) => updateArticleForm('noteCollection', event.target.value)}
+                placeholder="X-lab 软件团队学习笔记"
+              />
+            </label>
+            <label>
+              <span>目录路径</span>
+              <input
+                value={articleForm.notePath}
+                onChange={(event) => updateArticleForm('notePath', event.target.value)}
+                placeholder="算法相关/高级数据结构与算法分析/Heaps"
+              />
+            </label>
+            <label>
               <span>日期</span>
               <input
                 type="date"
@@ -8518,6 +8626,11 @@ function AdminWorkspace({
                   </div>
                   <p>{article.summary}</p>
                   <span className="manager-meta-line">创建 {formatArticleTimestamp(article.createdAt, article.date || '未知')} · 修改 {formatArticleTimestamp(article.updatedAt, article.createdAt || article.date || '未知')}</span>
+                  {(article.noteCollection || article.notePath) && (
+                    <span className="manager-meta-line note-location">
+                      收纳 {article.noteCollection || article.category || '技术笔记'}{article.notePath ? ` / ${article.notePath}` : ''}
+                    </span>
+                  )}
                   <div className="tag-row">
                     {article.tags.map((tag) => (
                       <span key={tag}>{tag}</span>

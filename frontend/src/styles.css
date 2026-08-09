@@ -2310,9 +2310,52 @@ h3 {
   font-weight: 900;
 }
 
-.note-tree-group {
+.note-tree-group,
+.note-tree-folder {
   display: grid;
   gap: 8px;
+}
+
+.note-tree-folder {
+  min-width: 0;
+}
+
+.note-tree-folder summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 8px 0 calc(8px + var(--tree-level, 0) * 14px);
+  border-radius: 8px;
+  color: #26364a;
+  font-weight: 900;
+  list-style: none;
+  cursor: pointer;
+}
+
+.note-tree-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.note-tree-folder summary:hover {
+  color: #1f7a6d;
+  background: #edf8f4;
+}
+
+.note-folder-caret {
+  display: inline-grid;
+  place-items: center;
+  color: #8190a3;
+  transition: transform 160ms ease;
+}
+
+.note-tree-folder[open] > summary .note-folder-caret {
+  transform: rotate(90deg);
+}
+
+.note-tree-children {
+  display: grid;
+  gap: 6px;
 }
 
 .note-tree-group strong {
@@ -2320,11 +2363,12 @@ h3 {
   font-size: 13px;
 }
 
-.note-tree-group button {
+.note-tree-group button,
+.note-tree-article {
   display: grid;
   gap: 3px;
   min-width: 0;
-  padding: 9px 10px;
+  padding: 9px 10px 9px calc(10px + var(--tree-level, 0) * 16px);
   border: 1px solid transparent;
   border-radius: 8px;
   color: #334155;
@@ -2332,23 +2376,31 @@ h3 {
   background: #f8fafc;
 }
 
-.note-tree-group button span {
+.note-tree-group button span,
+.note-tree-article span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 800;
 }
 
-.note-tree-group button em {
+.note-tree-group button em,
+.note-tree-article em {
   color: #8190a3;
   font-size: 12px;
   font-style: normal;
 }
 
 .note-tree-group button.active,
-.note-tree-group button:hover {
+.note-tree-group button:hover,
+.note-tree-article.active,
+.note-tree-article:hover {
   border-color: #1f7a6d;
   background: #edf8f4;
+}
+
+.note-tree-article.active span {
+  color: #1f7a6d;
 }
 
 .note-side-panel .reading-toolbar {
@@ -6077,6 +6129,7 @@ h3 {
 :root[data-theme='dark'] .note-tree-panel,
 :root[data-theme='dark'] .note-tree-peek,
 :root[data-theme='dark'] .note-tree-group button,
+:root[data-theme='dark'] .note-tree-article,
 :root[data-theme='dark'] .note-import-card,
 :root[data-theme='dark'] .comment-insight-grid > div,
 :root[data-theme='dark'] .comment-form,
@@ -6505,6 +6558,7 @@ h3 {
 :root[data-theme='dark'] .article-section-card em,
 :root[data-theme='dark'] .note-import-card span,
 :root[data-theme='dark'] .comment-manager-note,
+:root[data-theme='dark'] .note-folder-caret,
 :root[data-theme='dark'] .note-tree-group button em {
   color: #b7c6da;
 }
@@ -6513,6 +6567,9 @@ h3 {
 :root[data-theme='dark'] .article-section-card:hover,
 :root[data-theme='dark'] .note-tree-group button.active,
 :root[data-theme='dark'] .note-tree-group button:hover,
+:root[data-theme='dark'] .note-tree-folder summary:hover,
+:root[data-theme='dark'] .note-tree-article.active,
+:root[data-theme='dark'] .note-tree-article:hover,
 :root[data-theme='dark'] .note-import-card:hover {
   border-color: rgba(125, 211, 252, 0.62);
   background: rgba(31, 122, 109, 0.18);

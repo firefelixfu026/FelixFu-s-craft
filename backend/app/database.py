@@ -47,6 +47,10 @@ def _ensure_schema_updates() -> None:
             connection.execute(text("ALTER TABLE articles ADD COLUMN cover_url TEXT"))
         if "articles" in table_names and "category" not in article_columns:
             connection.execute(text("ALTER TABLE articles ADD COLUMN category VARCHAR(80) DEFAULT '学习笔记' NOT NULL"))
+        if "articles" in table_names and "note_collection" not in article_columns:
+            connection.execute(text("ALTER TABLE articles ADD COLUMN note_collection VARCHAR(120) DEFAULT '' NOT NULL"))
+        if "articles" in table_names and "note_path" not in article_columns:
+            connection.execute(text("ALTER TABLE articles ADD COLUMN note_path TEXT DEFAULT '' NOT NULL"))
         if "articles" in table_names and "pinned" not in article_columns:
             connection.execute(text("ALTER TABLE articles ADD COLUMN pinned BOOLEAN DEFAULT FALSE NOT NULL"))
         if "articles" in table_names and "created_at" not in article_columns:

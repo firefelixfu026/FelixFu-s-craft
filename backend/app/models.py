@@ -43,6 +43,8 @@ class Article(Base):
     date: Mapped[str] = mapped_column(String(20), nullable=False)
     read_time: Mapped[str] = mapped_column(String(30), default="3 min")
     status: Mapped[str] = mapped_column(String(20), default="published")
+    note_collection: Mapped[str] = mapped_column(String(120), default="")
+    note_path: Mapped[str] = mapped_column(Text, default="")
     category: Mapped[str] = mapped_column(String(80), default="学习笔记")
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     view_count: Mapped[int] = mapped_column(Integer, default=0)
