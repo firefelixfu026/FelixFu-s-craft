@@ -379,6 +379,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v4.2.1',
+    title: '折叠态播放器瘦身',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['侧边栏折叠后迷你播放器只保留播放/暂停键', '隐藏上一首、下一首、唱片和进度条避免拥挤', '展开侧边栏后仍显示完整播放控制']
+  },
+  {
     version: 'v4.2',
     title: '夏活字标感标题字体',
     date: '2026-08-09',

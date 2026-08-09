@@ -705,18 +705,34 @@ textarea {
 }
 
 .sidebar-collapsed .sidebar-music-player {
-  width: 100%;
-  padding: 8px;
+  width: 46px;
+  gap: 0;
+  padding: 0;
+  border-color: rgba(248, 250, 252, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
 }
 
-.sidebar-collapsed .sidebar-music-main {
-  grid-template-columns: 1fr;
-  justify-items: center;
-}
-
-.sidebar-collapsed .sidebar-music-main > span:last-child,
+.sidebar-collapsed .sidebar-music-main,
 .sidebar-collapsed .sidebar-music-range {
   display: none;
+}
+
+.sidebar-collapsed .sidebar-music-actions {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+.sidebar-collapsed .sidebar-music-actions button:first-child,
+.sidebar-collapsed .sidebar-music-actions button:last-child {
+  display: none;
+}
+
+.sidebar-collapsed .sidebar-music-actions button {
+  width: 46px;
+  min-height: 46px;
+  border: 0;
+  background: transparent;
 }
 
 .sidebar-collapsed .nav-button,
