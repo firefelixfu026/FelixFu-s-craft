@@ -2194,26 +2194,77 @@ h3 {
 
 .note-reading-grid {
   display: grid;
-  grid-template-columns: minmax(210px, 0.72fr) minmax(0, 1.7fr) minmax(220px, 0.78fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.32fr);
+  gap: 22px;
   align-items: start;
 }
 
-.note-tree,
 .note-side-panel {
   position: sticky;
-  top: 14px;
+  top: 18px;
   display: grid;
   gap: 12px;
 }
 
 .note-tree {
-  max-height: calc(100vh - 28px);
+  position: fixed;
+  top: 92px;
+  left: 14px;
+  z-index: 28;
+  width: min(318px, calc(100vw - 72px));
+  padding: 14px;
+  outline: none;
+  transform: translateX(calc(-100% - 14px));
+  transition: transform 220ms ease, filter 220ms ease;
+}
+
+.note-tree:hover,
+.note-tree:focus,
+.note-tree:focus-within {
+  filter: drop-shadow(0 24px 42px rgba(15, 23, 42, 0.18));
+  transform: translateX(0);
+}
+
+.note-tree-panel {
+  display: grid;
+  gap: 12px;
+  max-height: calc(100vh - 124px);
   overflow: auto;
   padding: 14px;
   border: 1px solid #d8e0e9;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.note-tree-peek {
+  position: absolute;
+  top: 22px;
+  right: -46px;
+  display: inline-flex;
+  width: 44px;
+  min-height: 126px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 8px;
+  border: 1px solid #c8d6e5;
+  border-left: 0;
+  border-radius: 0 14px 14px 0;
+  color: #0f766e;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 10px 16px 30px rgba(15, 23, 42, 0.12);
+  writing-mode: vertical-rl;
+  backdrop-filter: blur(12px);
+}
+
+.note-tree-peek svg {
+  transform: rotate(90deg);
+}
+
+.note-tree-peek span {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
 }
 
 .note-tree-heading {
@@ -2267,6 +2318,11 @@ h3 {
 
 .note-side-panel .reading-toolbar {
   position: static;
+}
+
+.note-side-panel {
+  max-height: calc(100vh - 36px);
+  overflow: auto;
 }
 
 .article-detail-card {
@@ -5983,6 +6039,8 @@ h3 {
 :root[data-theme='dark'] .reading-toolbar,
 :root[data-theme='dark'] .article-toc,
 :root[data-theme='dark'] .note-tree,
+:root[data-theme='dark'] .note-tree-panel,
+:root[data-theme='dark'] .note-tree-peek,
 :root[data-theme='dark'] .note-tree-group button,
 :root[data-theme='dark'] .note-import-card,
 :root[data-theme='dark'] .comment-insight-grid > div,
@@ -6685,6 +6743,18 @@ h3 {
   .note-side-panel {
     position: static;
     max-height: none;
+    width: auto;
+    padding: 0;
+    transform: none;
+    filter: none;
+  }
+
+  .note-tree-panel {
+    max-height: none;
+  }
+
+  .note-tree-peek {
+    display: none;
   }
 
   .editor-side-stack {

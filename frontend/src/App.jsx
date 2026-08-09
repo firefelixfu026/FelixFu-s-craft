@@ -383,6 +383,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v5.2',
+    title: '技术笔记侧栏悬浮',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['技术笔记左侧索引默认收起为悬浮把手', '鼠标悬停或键盘聚焦时滑出完整笔记列表', '右侧阅读进度和文章目录保持滚动跟随']
+  },
+  {
     version: 'v5.1',
     title: '工具箱自定义链接',
     date: '2026-08-09',
@@ -4151,27 +4158,33 @@ function NoteTree({ articles, activeArticleId, openArticle }) {
   }, {});
 
   return (
-    <aside className="note-tree" aria-label="技术笔记目录树">
-      <div className="note-tree-heading">
-        <BookOpen size={17} />
-        <span>技术笔记</span>
+    <aside className="note-tree" aria-label="技术笔记目录树" tabIndex={0}>
+      <div className="note-tree-peek" aria-hidden="true">
+        <BookOpen size={16} />
+        <span>笔记索引</span>
       </div>
-      {Object.entries(grouped).map(([category, group]) => (
-        <div className="note-tree-group" key={category}>
-          <strong>{category}</strong>
-          {group.map((item) => (
-            <button
-              className={item.id === activeArticleId ? 'active' : ''}
-              key={item.id}
-              type="button"
-              onClick={() => openArticle(item.id)}
-            >
-              <span>{item.title}</span>
-              <em>{item.readTime}</em>
-            </button>
-          ))}
+      <div className="note-tree-panel">
+        <div className="note-tree-heading">
+          <BookOpen size={17} />
+          <span>技术笔记</span>
         </div>
-      ))}
+        {Object.entries(grouped).map(([category, group]) => (
+          <div className="note-tree-group" key={category}>
+            <strong>{category}</strong>
+            {group.map((item) => (
+              <button
+                className={item.id === activeArticleId ? 'active' : ''}
+                key={item.id}
+                type="button"
+                onClick={() => openArticle(item.id)}
+              >
+                <span>{item.title}</span>
+                <em>{item.readTime}</em>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
     </aside>
   );
 }
