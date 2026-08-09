@@ -4451,6 +4451,25 @@ h3 {
   background: #f8fafc;
 }
 
+.editor-side-stack {
+  position: sticky;
+  top: 18px;
+  display: grid;
+  gap: 16px;
+  align-self: start;
+  min-width: 0;
+}
+
+.editor-side-stack .article-preview-panel {
+  max-height: calc(100vh - 36px);
+  overflow: hidden;
+}
+
+.editor-side-stack .article-preview-panel .markdown-content {
+  max-height: min(62vh, 720px);
+  overflow: auto;
+}
+
 .article-preview-panel .markdown-content {
   background: #ffffff;
 }
@@ -6362,6 +6381,15 @@ h3 {
   .admin-layout,
   .manager-row {
     grid-template-columns: 1fr;
+  }
+
+  .editor-side-stack {
+    position: static;
+  }
+
+  .editor-side-stack .article-preview-panel,
+  .editor-side-stack .article-preview-panel .markdown-content {
+    max-height: none;
   }
 
   .game-details {

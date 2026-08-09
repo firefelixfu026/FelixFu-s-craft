@@ -382,6 +382,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v4.3.1',
+    title: '写作台布局整理',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['删除写文章页的 AI 生成历史', '收起正文上方的 AI 辅助按钮', '正文预览移动到右侧栏', '保留草稿版本历史方便恢复']
+  },
+  {
     version: 'v4.3',
     title: '个人工具箱上线',
     date: '2026-08-09',
@@ -7737,7 +7744,7 @@ function AdminWorkspace({
             <div className="admin-panel-heading compact-heading">
               <div>
                 <h3>写作模板库</h3>
-                <span>先铺结构，再交给 AI 润色或续写</span>
+                <span>先铺结构，再慢慢填内容</span>
               </div>
               <button className="ghost-button" type="button" onClick={() => saveDraftSnapshot('套模板前快照')}>
                 <Save size={16} />
@@ -7806,37 +7813,6 @@ function AdminWorkspace({
 
           <label>
             <span>正文</span>
-            <div className="ai-editor-tools" aria-label="AI 写作辅助">
-              <div className="ai-insert-mode" role="group" aria-label="AI 结果插入方式">
-                {[
-                  { id: 'append', label: '追加' },
-                  { id: 'insert', label: '插入' },
-                  { id: 'replace', label: '替换' }
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={aiInsertMode === item.id ? 'active' : ''}
-                    onClick={() => setAiInsertMode(item.id)}
-                    aria-pressed={aiInsertMode === item.id}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-              <button type="button" disabled={isRunningArticleAi} onClick={() => handleRunArticleAiTask('polish')}>
-                <Bot size={16} />
-                <span>AI 润色</span>
-              </button>
-              <button type="button" disabled={isRunningArticleAi} onClick={() => handleRunArticleAiTask('continue')}>
-                <PlusCircle size={16} />
-                <span>AI 续写</span>
-              </button>
-              <button type="button" disabled={isRunningArticleAi} onClick={() => handleRunArticleAiTask('outline')}>
-                <List size={16} />
-                <span>AI 大纲</span>
-              </button>
-            </div>
             <div className="markdown-toolbar" aria-label="Markdown 工具栏">
               <button type="button" title="二级标题" onClick={() => insertIntoContent('## ', '', '小标题')}>
                 <Heading2 size={16} />
@@ -7886,16 +7862,6 @@ function AdminWorkspace({
               />
             </label>
           </div>
-
-          {articleForm.content.trim() && (
-            <section className="article-preview-panel" aria-label="文章预览">
-              <div className="admin-panel-heading">
-                <h3>正文预览</h3>
-                <span>Markdown / LaTeX</span>
-              </div>
-              <MarkdownContent content={articleForm.content} title={articleForm.title || '文章预览'} />
-            </section>
-          )}
 
           <div className="admin-form-grid">
             <label>
@@ -8051,54 +8017,44 @@ function AdminWorkspace({
         )}
 
         {activeAdminPage === 'editor' && (
-        <section className="admin-panel ai-history-panel">
-          <div className="admin-panel-heading">
-            <h2>AI 生成历史</h2>
-            <span>{aiGenerationHistory.length} 条</span>
-          </div>
-          {aiGenerationHistory.length === 0 ? (
-            <p className="empty-state">暂无 AI 写作记录</p>
-          ) : (
-            <div className="ai-history-list">
-              {aiGenerationHistory.map((entry, index) => (
-                <article className="ai-history-item" key={entry.id}>
-                  <div>
-                    <strong>{entry.task}</strong>
-                    <span>{entry.mode} · {entry.source} · {new Date(entry.createdAt).toLocaleString('zh-CN', { hour12: false })}</span>
-                  </div>
-                  {index === 0 && entry.beforeContent !== undefined && (
-                    <button className="ghost-button" type="button" onClick={() => undoLatestArticleAiResult(entry)}>
+        <aside className="editor-side-stack">
+          <section className="article-preview-panel" aria-label="文章预览">
+            <div className="admin-panel-heading">
+              <h3>正文预览</h3>
+              <span>Markdown / LaTeX</span>
+            </div>
+            {articleForm.content.trim() ? (
+              <MarkdownContent content={articleForm.content} title={articleForm.title || '文章预览'} />
+            ) : (
+              <p className="empty-state">左侧开始写正文后，这里会实时预览。</p>
+            )}
+          </section>
+
+          <section className="admin-panel draft-history-panel">
+            <div className="admin-panel-heading compact-heading">
+              <h3>草稿版本历史</h3>
+              <span>{draftHistory.length} 份</span>
+            </div>
+            {draftHistory.length === 0 ? (
+              <p className="empty-state">可以在写作模板区手动保存快照</p>
+            ) : (
+              <div className="ai-history-list">
+                {draftHistory.map((snapshot) => (
+                  <article className="ai-history-item" key={snapshot.id}>
+                    <div>
+                      <strong>{snapshot.title}</strong>
+                      <span>{snapshot.reason} · {snapshot.wordCount} 字 · {new Date(snapshot.createdAt).toLocaleString('zh-CN', { hour12: false })}</span>
+                    </div>
+                    <button className="ghost-button" type="button" onClick={() => restoreDraftSnapshot(snapshot)}>
                       <RefreshCw size={16} />
-                      <span>撤回</span>
+                      <span>恢复</span>
                     </button>
-                  )}
-                </article>
-              ))}
-            </div>
-          )}
-          <div className="admin-panel-heading compact-heading">
-            <h3>草稿版本历史</h3>
-            <span>{draftHistory.length} 份</span>
-          </div>
-          {draftHistory.length === 0 ? (
-            <p className="empty-state">可以在写作模板区手动保存快照</p>
-          ) : (
-            <div className="ai-history-list">
-              {draftHistory.map((snapshot) => (
-                <article className="ai-history-item" key={snapshot.id}>
-                  <div>
-                    <strong>{snapshot.title}</strong>
-                    <span>{snapshot.reason} · {snapshot.wordCount} 字 · {new Date(snapshot.createdAt).toLocaleString('zh-CN', { hour12: false })}</span>
-                  </div>
-                  <button className="ghost-button" type="button" onClick={() => restoreDraftSnapshot(snapshot)}>
-                    <RefreshCw size={16} />
-                    <span>恢复</span>
-                  </button>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </aside>
         )}
 
         {activeAdminPage === 'music' && (
