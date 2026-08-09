@@ -383,6 +383,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v5.0.1',
+    title: '仓库文档同步',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['重写 README 为当前个人站定位', 'CHANGELOG 补齐 v5 内容架构重组后的关键版本', 'docs 文档导航同步文章分区、技术笔记和后台精简说明']
+  },
+  {
     version: 'v5.0',
     title: '内容架构重组',
     date: '2026-08-09',
