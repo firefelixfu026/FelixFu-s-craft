@@ -89,7 +89,6 @@ textarea {
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
   min-height: 100vh;
-  transition: grid-template-columns 180ms cubic-bezier(0.2, 0, 0, 1);
 }
 
 .app-shell.sidebar-collapsed {
@@ -454,7 +453,7 @@ textarea {
   contain: layout paint style;
   transform: translateZ(0);
   transition: background 160ms ease;
-  will-change: contents;
+  will-change: transform;
 }
 
 .brand {
@@ -483,11 +482,10 @@ textarea {
 .brand-text {
   overflow: hidden;
   min-width: 0;
-  max-width: 132px;
+  width: 132px;
   opacity: 1;
   transform: translateX(0);
   transition:
-    max-width 160ms ease,
     opacity 120ms ease,
     transform 160ms ease;
   white-space: nowrap;
@@ -780,7 +778,7 @@ textarea {
 }
 
 .sidebar-collapsed .brand-text {
-  max-width: 0;
+  width: 0;
 }
 
 .sidebar-collapsed .sidebar-toggle-button {
@@ -3555,6 +3553,7 @@ h3 {
 
 .music-player-panel,
 .music-library-panel,
+.music-recent-panel,
 .music-manager {
   display: grid;
   gap: 18px;
@@ -3619,6 +3618,55 @@ h3 {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+}
+
+.music-recent-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.music-recent-card {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  color: #18212f;
+  background: #f8fafc;
+  text-align: left;
+}
+
+.music-recent-card > span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  color: #ffffff;
+  background: #1f7a6d;
+  grid-row: span 2;
+}
+
+.music-recent-card strong,
+.music-recent-card em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-recent-card em {
+  color: #6a7685;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.music-recent-card.active {
+  border-color: #1f7a6d;
+  background: #eefaf6;
 }
 
 .playlist-toolbar {
@@ -5567,6 +5615,38 @@ h3 {
   background: #f8fafc;
 }
 
+.article-manager-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.manager-select-box {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 38px;
+}
+
+.manager-select-box input {
+  width: 18px;
+  height: 18px;
+}
+
+.manager-bulk-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.manager-bulk-bar > strong {
+  color: #1f7a6d;
+  white-space: nowrap;
+}
+
 .manager-row > div {
   min-width: 0;
   max-width: 100%;
@@ -6324,10 +6404,12 @@ h3 {
 :root[data-theme='dark'] .game-details,
 :root[data-theme='dark'] .music-player-panel,
 :root[data-theme='dark'] .music-library-panel,
+:root[data-theme='dark'] .music-recent-panel,
 :root[data-theme='dark'] .toolbox-card,
 :root[data-theme='dark'] .toolbox-search,
 :root[data-theme='dark'] .toolbox-featured-grid a,
 :root[data-theme='dark'] .music-track,
+:root[data-theme='dark'] .music-recent-card,
 :root[data-theme='dark'] .playlist-chip,
 :root[data-theme='dark'] .playlist-create-row input,
 :root[data-theme='dark'] .playlist-editor,
@@ -6357,6 +6439,7 @@ h3 {
 :root[data-theme='dark'] .admin-insight-grid > div,
 :root[data-theme='dark'] .security-rule-grid article,
 :root[data-theme='dark'] .manager-row,
+:root[data-theme='dark'] .manager-bulk-bar,
 :root[data-theme='dark'] .image-resource,
 :root[data-theme='dark'] .music-manager,
 :root[data-theme='dark'] .ops-metric,
@@ -6713,6 +6796,7 @@ h3 {
 :root[data-theme='dark'] .release-major-head p,
 :root[data-theme='dark'] .release-version-card li,
 :root[data-theme='dark'] .release-version-card small,
+:root[data-theme='dark'] .music-recent-card em,
 :root[data-theme='dark'] .admin-insight-grid p,
 :root[data-theme='dark'] .account-profile p,
 :root[data-theme='dark'] .account-list span,
@@ -6765,9 +6849,11 @@ h3 {
 :root[data-theme='dark'] .ops-service-card strong,
 :root[data-theme='dark'] .ops-list-row strong,
 :root[data-theme='dark'] .release-metric strong,
+:root[data-theme='dark'] .manager-bulk-bar > strong,
 :root[data-theme='dark'] .release-story-hero h3,
 :root[data-theme='dark'] .release-major-head h3,
 :root[data-theme='dark'] .release-version-card h3,
+:root[data-theme='dark'] .music-recent-card strong,
 :root[data-theme='dark'] .admin-insight-grid h3,
 :root[data-theme='dark'] .account-site-avatar-editor strong,
 :root[data-theme='dark'] .completion-summary-grid strong,
@@ -6787,7 +6873,8 @@ h3 {
 
 :root[data-theme='dark'] .release-major-mark,
 :root[data-theme='dark'] .release-next-order strong,
-:root[data-theme='dark'] .release-major-block .release-version-card::before {
+:root[data-theme='dark'] .release-major-block .release-version-card::before,
+:root[data-theme='dark'] .music-recent-card > span {
   background: var(--accent);
 }
 
@@ -7070,6 +7157,7 @@ h3 {
   .article-section-switch,
   .note-reading-grid,
   .note-import-grid,
+  .manager-bulk-bar,
   .manager-row {
     grid-template-columns: 1fr;
   }

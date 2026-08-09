@@ -118,6 +118,7 @@ const AUTH_EXPIRES_KEY = 'felix_blog_token_expires_at';
 const ACTIVE_VIEW_KEY = 'felix_blog_active_view';
 const ADMIN_PAGE_KEY = 'felix_blog_admin_page';
 const MUSIC_PLAYLISTS_KEY = 'felix_blog_music_playlists';
+const MUSIC_RECENT_KEY = 'felix_blog_music_recent';
 const THEME_KEY = 'felix_blog_theme';
 const SIDEBAR_COLLAPSED_KEY = 'felix_blog_sidebar_collapsed';
 const AUTH_FAIL_STATE_KEY = 'felix_blog_auth_fail_state';
@@ -269,6 +270,11 @@ function readStoredMusicPlaylists() {
     }));
 }
 
+function readStoredRecentMusic() {
+  const stored = readStoredJson(MUSIC_RECENT_KEY, []);
+  return Array.isArray(stored) ? stored.map((filename) => String(filename)).filter(Boolean).slice(0, 8) : [];
+}
+
 function readDraftHistory() {
   const stored = readStoredJson(ARTICLE_DRAFT_HISTORY_KEY, []);
   return Array.isArray(stored) ? stored.slice(0, 12) : [];
@@ -384,6 +390,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v5.4.2',
+    title: '侧栏性能、音乐续播与批量管理',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['侧边栏折叠展开减少整页重排', '音乐页新增最近播放和快速续播', '内容库支持批量发布、转草稿和删除']
+  },
   {
     version: 'v5.4.1',
     title: '侧边栏头像可修改',
@@ -1344,6 +1357,7 @@ function App() {
   const [isLoadingMusicTracks, setIsLoadingMusicTracks] = useState(false);
   const [isUploadingMusic, setIsUploadingMusic] = useState(false);
   const [musicPlaylists, setMusicPlaylists] = useState(readStoredMusicPlaylists);
+  const [recentMusicFilenames, setRecentMusicFilenames] = useState(readStoredRecentMusic);
   const [selectedMusicPlaylistId, setSelectedMusicPlaylistId] = useState('all');
   const [musicCurrentFilename, setMusicCurrentFilename] = useState('');
   const [musicIsPlaying, setMusicIsPlaying] = useState(false);
@@ -1420,14 +1434,28 @@ function App() {
     if (!musicQueue.length) return null;
     return musicQueue.find((track) => track.filename === musicCurrentFilename) || musicQueue[0];
   }, [musicCurrentFilename, musicQueue]);
+  const recentMusicTracks = useMemo(() => {
+    const trackMap = new Map(musicTracks.map((track) => [track.filename, track]));
+    return recentMusicFilenames.map((filename) => trackMap.get(filename)).filter(Boolean);
+  }, [musicTracks, recentMusicFilenames]);
 
   function persistMusicPlaylists(nextPlaylists) {
     setMusicPlaylists(nextPlaylists);
     writeStoredJson(MUSIC_PLAYLISTS_KEY, nextPlaylists);
   }
 
+  function rememberMusicTrack(track) {
+    if (!track?.filename) return;
+    setRecentMusicFilenames((current) => {
+      const nextFilenames = [track.filename, ...current.filter((filename) => filename !== track.filename)].slice(0, 8);
+      writeStoredJson(MUSIC_RECENT_KEY, nextFilenames);
+      return nextFilenames;
+    });
+  }
+
   function playMusicTrack(track, playlistId = selectedMusicPlaylistId) {
     if (!track) return;
+    rememberMusicTrack(track);
     setSelectedMusicPlaylistId(playlistId);
     setMusicCurrentFilename(track.filename);
     setMusicIsPlaying(true);
@@ -2710,6 +2738,75 @@ function App() {
     }
   }
 
+  function buildArticlePayload(article, overrides = {}) {
+    return {
+      title: article.title,
+      summary: article.summary,
+      content: article.content,
+      coverUrl: article.coverUrl || '',
+      tags: Array.isArray(article.tags) ? article.tags : [],
+      date: article.date,
+      readTime: article.readTime,
+      status: article.status || 'published',
+      category: article.category || '学习笔记',
+      noteCollection: article.noteCollection || '',
+      notePath: article.notePath || '',
+      pinned: Boolean(article.pinned),
+      ...overrides
+    };
+  }
+
+  async function manageArticlesBulk(selectedArticles, action) {
+    const targets = Array.isArray(selectedArticles) ? selectedArticles.filter(Boolean) : [];
+    if (!targets.length) {
+      setAdminMessage('请先选择要批量处理的文章');
+      return;
+    }
+    if (!authToken) {
+      setAdminMessage('请先登录管理员账号');
+      setActiveView('login');
+      return;
+    }
+
+    const actionLabel = action === 'delete' ? '删除' : action === 'draft' ? '改为草稿' : '发布';
+    if (action === 'delete' && !window.confirm(`确定批量删除 ${targets.length} 篇文章吗？这个操作不可撤销。`)) {
+      setAdminMessage('已取消批量删除');
+      return;
+    }
+
+    setIsSavingArticle(true);
+    setAdminMessage(`正在批量${actionLabel} ${targets.length} 篇文章...`);
+    let successCount = 0;
+    try {
+      for (const article of targets) {
+        const response = action === 'delete'
+          ? await fetch(`/api/admin/articles/${article.id}`, {
+              method: 'DELETE',
+              headers: getAuthHeaders()
+            })
+          : await fetch(`/api/admin/articles/${article.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+              body: JSON.stringify(buildArticlePayload(article, { status: action === 'draft' ? 'draft' : 'published' }))
+            });
+        if (response.ok) {
+          successCount += 1;
+        }
+      }
+
+      if (action === 'delete' && targets.some((article) => article.id === editingArticleId)) {
+        resetArticleForm();
+      }
+      await refreshArticles();
+      await refreshAdminAuditLogs();
+      setAdminMessage(`批量${actionLabel}完成：${successCount} / ${targets.length} 篇`);
+    } catch {
+      setAdminMessage(`批量${actionLabel}中断，请稍后再试`);
+    } finally {
+      setIsSavingArticle(false);
+    }
+  }
+
   async function refreshUploadedImages({ resetMessage = true } = {}) {
     if (!authToken) return;
 
@@ -3195,6 +3292,7 @@ function App() {
             tracks={musicTracks}
             queue={musicQueue}
             currentTrack={currentMusicTrack}
+            recentTracks={recentMusicTracks}
             isPlaying={musicIsPlaying}
             progress={musicProgress}
             duration={musicDuration}
@@ -3308,6 +3406,7 @@ function App() {
             resetArticleForm={resetArticleForm}
             startEditingArticle={startEditingArticle}
             deleteArticle={deleteArticle}
+            manageArticlesBulk={manageArticlesBulk}
             adminComments={adminComments}
             adminCommentPage={adminCommentPage}
             setAdminCommentPage={setAdminCommentPage}
@@ -6605,6 +6704,7 @@ function MusicWorkspace({
   tracks,
   queue,
   currentTrack,
+  recentTracks,
   isPlaying,
   progress,
   duration,
@@ -6689,6 +6789,31 @@ function MusicWorkspace({
           </button>
         </div>
       </section>
+
+      {recentTracks.length > 0 && (
+        <section className="music-recent-panel">
+          <div className="admin-panel-heading compact-heading">
+            <div>
+              <h2>最近播放</h2>
+              <span>从上次听过的歌继续</span>
+            </div>
+          </div>
+          <div className="music-recent-list">
+            {recentTracks.slice(0, 6).map((track) => (
+              <button
+                className={track.filename === currentTrack?.filename ? 'music-recent-card active' : 'music-recent-card'}
+                type="button"
+                key={track.filename}
+                onClick={() => playTrack(track, 'all')}
+              >
+                <span><Music size={16} /></span>
+                <strong>{track.title}</strong>
+                <em>{formatFileSize(track.size)}</em>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="music-library-panel">
         <div className="admin-panel-heading">
@@ -7394,6 +7519,7 @@ function AdminWorkspace({
   resetArticleForm,
   startEditingArticle,
   deleteArticle,
+  manageArticlesBulk,
   adminComments,
   adminCommentPage,
   setAdminCommentPage,
@@ -7492,6 +7618,7 @@ function AdminWorkspace({
   const [articleManagerQuery, setArticleManagerQuery] = useState('');
   const [articleManagerStatus, setArticleManagerStatus] = useState('all');
   const [articleManagerCategory, setArticleManagerCategory] = useState('all');
+  const [selectedManagerArticleIds, setSelectedManagerArticleIds] = useState([]);
   const [imageManagerQuery, setImageManagerQuery] = useState('');
   const [imageManagerSort, setImageManagerSort] = useState('newest');
   const [draftHistory, setDraftHistory] = useState(readDraftHistory);
@@ -7522,6 +7649,30 @@ function AdminWorkspace({
       (articleManagerCategory === 'all' || (article.category || '未分类') === articleManagerCategory)
     );
   });
+  const selectedManagerArticles = filteredManagerArticles.filter((article) => selectedManagerArticleIds.includes(article.id));
+  const isAllManagerArticlesSelected = filteredManagerArticles.length > 0
+    && filteredManagerArticles.every((article) => selectedManagerArticleIds.includes(article.id));
+
+  function toggleManagerArticleSelection(articleId) {
+    setSelectedManagerArticleIds((current) => (
+      current.includes(articleId)
+        ? current.filter((id) => id !== articleId)
+        : [...current, articleId]
+    ));
+  }
+
+  function toggleAllManagerArticles() {
+    if (isAllManagerArticlesSelected) {
+      setSelectedManagerArticleIds((current) => current.filter((id) => !filteredManagerArticles.some((article) => article.id === id)));
+      return;
+    }
+    setSelectedManagerArticleIds((current) => Array.from(new Set([...current, ...filteredManagerArticles.map((article) => article.id)])));
+  }
+
+  async function runManagerBulkAction(action) {
+    await manageArticlesBulk(selectedManagerArticles, action);
+    setSelectedManagerArticleIds([]);
+  }
   const filteredUploadedImages = uploadedImages
     .filter((image) => {
       const query = imageManagerQuery.trim().toLowerCase();
@@ -8759,11 +8910,45 @@ function AdminWorkspace({
             </select>
           </div>
 
+          <div className="manager-bulk-bar">
+            <label className="checkbox-control">
+              <input
+                type="checkbox"
+                checked={isAllManagerArticlesSelected}
+                disabled={filteredManagerArticles.length === 0}
+                onChange={toggleAllManagerArticles}
+              />
+              <span>选择当前筛选结果</span>
+            </label>
+            <strong>{selectedManagerArticles.length} 篇已选</strong>
+            <div className="manager-actions">
+              <button type="button" onClick={() => runManagerBulkAction('published')} disabled={!selectedManagerArticles.length || isSavingArticle}>
+                <CheckCircle2 size={16} />
+                <span>批量发布</span>
+              </button>
+              <button type="button" onClick={() => runManagerBulkAction('draft')} disabled={!selectedManagerArticles.length || isSavingArticle}>
+                <FilePenLine size={16} />
+                <span>转为草稿</span>
+              </button>
+              <button className="danger-button" type="button" onClick={() => runManagerBulkAction('delete')} disabled={!selectedManagerArticles.length || isSavingArticle}>
+                <Trash2 size={16} />
+                <span>批量删除</span>
+              </button>
+            </div>
+          </div>
+
           <div className="manager-list">
             {filteredManagerArticles.length === 0 ? (
               <p className="empty-state">没有符合条件的文章</p>
             ) : filteredManagerArticles.map((article) => (
-              <article className="manager-row" key={article.id}>
+              <article className="manager-row article-manager-row" key={article.id}>
+                <label className="manager-select-box" aria-label={`选择 ${article.title}`}>
+                  <input
+                    type="checkbox"
+                    checked={selectedManagerArticleIds.includes(article.id)}
+                    onChange={() => toggleManagerArticleSelection(article.id)}
+                  />
+                </label>
                 <div>
                   <div className="manager-title-line">
                     <h3>{article.title}</h3>
