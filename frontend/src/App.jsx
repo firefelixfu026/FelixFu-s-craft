@@ -391,6 +391,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v5.4.3',
+    title: '正文预览对齐',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['写作台正文输入和预览改为左右并排', '正文滚动时预览按比例同步滚动', '草稿历史移到编辑区下方避免顶开预览']
+  },
+  {
     version: 'v5.4.2',
     title: '侧栏性能、音乐续播与批量管理',
     date: '2026-08-09',
@@ -7612,6 +7619,7 @@ function AdminWorkspace({
     { id: 'security', label: '安全', detail: '操作日志和删除保护', icon: ShieldCheck, count: `${adminAuditLogs.length} 条` }
   ];
   const contentTextareaRef = useRef(null);
+  const previewScrollRef = useRef(null);
   const [aiInsertMode, setAiInsertMode] = useState('append');
   const [activeAdminPage, setActiveAdminPage] = useState(readStoredAdminPage);
   const [adminStatsRange, setAdminStatsRange] = useState('7d');
@@ -7766,6 +7774,15 @@ function AdminWorkspace({
   function insertImageMarkdown(url, filename = '文章图片') {
     const altText = filename.replace(/\.[^.]+$/, '') || '文章图片';
     insertContentSnippet(`![${altText}](${url})`);
+  }
+
+  function syncPreviewScroll(event) {
+    const source = event.currentTarget;
+    const target = previewScrollRef.current;
+    if (!source || !target) return;
+    const sourceRange = source.scrollHeight - source.clientHeight;
+    const targetRange = target.scrollHeight - target.clientHeight;
+    target.scrollTop = sourceRange > 0 ? (source.scrollTop / sourceRange) * Math.max(0, targetRange) : 0;
   }
 
   function handleRunArticleAiTask(task) {
@@ -8558,7 +8575,7 @@ function AdminWorkspace({
       )}
 
       {shouldShowAdminLayout && (
-      <div className={activeAdminPage === 'editor' ? 'admin-layout' : 'admin-layout admin-layout-single'}>
+      <div className={activeAdminPage === 'editor' ? 'admin-layout editor-layout' : 'admin-layout admin-layout-single'}>
         {activeAdminPage === 'editor' && (
         <form className="admin-panel admin-form" onSubmit={submitArticleForm}>
           <div className="admin-panel-heading">
@@ -8658,37 +8675,58 @@ function AdminWorkspace({
             </div>
           )}
 
-          <label>
-            <span>正文</span>
-            <div className="markdown-toolbar" aria-label="Markdown 工具栏">
-              <button type="button" title="二级标题" onClick={() => insertIntoContent('## ', '', '小标题')}>
-                <Heading2 size={16} />
-              </button>
-              <button type="button" title="加粗" onClick={() => insertIntoContent('**', '**', '加粗文字')}>
-                <strong>B</strong>
-              </button>
-              <button type="button" title="列表" onClick={() => insertIntoContent('- ', '', '列表项')}>
-                <List size={16} />
-              </button>
-              <button type="button" title="引用" onClick={() => insertIntoContent('> ', '', '引用内容')}>
-                <Quote size={16} />
-              </button>
-              <button type="button" title="代码块" onClick={() => insertIntoContent('```js\n', '\n```', 'console.log("Hello Felix")')}>
-                <Code2 size={16} />
-              </button>
-              <button type="button" title="公式" onClick={() => insertIntoContent('\n$$\n', '\n$$\n', 'E = mc^2')}>
-                <Sigma size={16} />
-              </button>
+          <section className="editor-compose-block" aria-label="正文编辑和预览">
+            <div className="editor-compose-heading">
+              <span>正文</span>
+              <em>Markdown / LaTeX 实时预览</em>
             </div>
-            <textarea
-              ref={contentTextareaRef}
-              value={articleForm.content}
-              onChange={(event) => updateArticleForm('content', event.target.value)}
-              placeholder="先支持纯文本/Markdown 内容，后续再加预览"
-              rows={10}
-              required
-            />
-          </label>
+            <div className="editor-compose-grid">
+              <div className="editor-source-pane">
+                <div className="markdown-toolbar" aria-label="Markdown 工具栏">
+                  <button type="button" title="二级标题" onClick={() => insertIntoContent('## ', '', '小标题')}>
+                    <Heading2 size={16} />
+                  </button>
+                  <button type="button" title="加粗" onClick={() => insertIntoContent('**', '**', '加粗文字')}>
+                    <strong>B</strong>
+                  </button>
+                  <button type="button" title="列表" onClick={() => insertIntoContent('- ', '', '列表项')}>
+                    <List size={16} />
+                  </button>
+                  <button type="button" title="引用" onClick={() => insertIntoContent('> ', '', '引用内容')}>
+                    <Quote size={16} />
+                  </button>
+                  <button type="button" title="代码块" onClick={() => insertIntoContent('```js\n', '\n```', 'console.log("Hello Felix")')}>
+                    <Code2 size={16} />
+                  </button>
+                  <button type="button" title="公式" onClick={() => insertIntoContent('\n$$\n', '\n$$\n', 'E = mc^2')}>
+                    <Sigma size={16} />
+                  </button>
+                </div>
+                <textarea
+                  ref={contentTextareaRef}
+                  value={articleForm.content}
+                  onChange={(event) => updateArticleForm('content', event.target.value)}
+                  onScroll={syncPreviewScroll}
+                  placeholder="在这里写 Markdown，右侧会像 VS Code 预览一样同步显示"
+                  rows={18}
+                  required
+                />
+              </div>
+              <section className="article-preview-panel editor-inline-preview" aria-label="正文预览">
+                <div className="admin-panel-heading">
+                  <h3>正文预览</h3>
+                  <span>跟随正文</span>
+                </div>
+                <div className="editor-preview-scroll" ref={previewScrollRef}>
+                  {articleForm.content.trim() ? (
+                    <MarkdownContent content={articleForm.content} title={articleForm.title || '文章预览'} />
+                  ) : (
+                    <p className="empty-state">左侧开始写正文后，这里会实时预览。</p>
+                  )}
+                </div>
+              </section>
+            </div>
+          </section>
 
           <div className="admin-inline-tools">
             <label className="file-upload-control">
@@ -8985,18 +9023,6 @@ function AdminWorkspace({
 
         {activeAdminPage === 'editor' && (
         <aside className="editor-side-stack">
-          <section className="article-preview-panel" aria-label="文章预览">
-            <div className="admin-panel-heading">
-              <h3>正文预览</h3>
-              <span>Markdown / LaTeX</span>
-            </div>
-            {articleForm.content.trim() ? (
-              <MarkdownContent content={articleForm.content} title={articleForm.title || '文章预览'} />
-            ) : (
-              <p className="empty-state">左侧开始写正文后，这里会实时预览。</p>
-            )}
-          </section>
-
           <section className="admin-panel draft-history-panel">
             <div className="admin-panel-heading compact-heading">
               <h3>草稿版本历史</h3>

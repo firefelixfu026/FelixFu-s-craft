@@ -3940,6 +3940,10 @@ h3 {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.editor-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .admin-page-nav {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -5108,6 +5112,78 @@ h3 {
   border: 1px dashed #b7c7d8;
   border-radius: 8px;
   background: #f8fafc;
+}
+
+.editor-compose-block {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.editor-compose-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.editor-compose-heading span {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.editor-compose-heading em {
+  color: #6a7685;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.editor-compose-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.editor-source-pane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+.editor-source-pane textarea {
+  height: min(68vh, 760px);
+  min-height: 560px;
+  resize: none;
+  font-family: "Cascadia Code", "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+}
+
+.editor-inline-preview {
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border-style: solid;
+}
+
+.editor-inline-preview .admin-panel-heading {
+  padding: 12px 14px;
+  border-bottom: 1px solid #d8e0e9;
+}
+
+.editor-preview-scroll {
+  min-height: 560px;
+  height: min(68vh, 760px);
+  overflow: auto;
+  padding: 14px;
+}
+
+.editor-preview-scroll .markdown-content {
+  min-height: 100%;
 }
 
 .release-major-block .release-version-card::before {
@@ -6738,6 +6814,7 @@ h3 {
 :root[data-theme='dark'] .summer-goal-card textarea,
 :root[data-theme='dark'] .weekly-plan-row input[type='text'],
 :root[data-theme='dark'] .weekly-plan-row > input,
+:root[data-theme='dark'] .editor-inline-preview .admin-panel-heading,
 :root[data-theme='dark'] .summer-plan-table input,
 :root[data-theme='dark'] .summer-plan-table select,
 :root[data-theme='dark'] .summer-plan-table textarea {
@@ -6810,6 +6887,8 @@ h3 {
 :root[data-theme='dark'] .admin-task-card em,
 :root[data-theme='dark'] .admin-task-card small,
 :root[data-theme='dark'] .admin-form label > span,
+:root[data-theme='dark'] .editor-compose-heading span,
+:root[data-theme='dark'] .editor-compose-heading em,
 :root[data-theme='dark'] .analytics-grid p,
 :root[data-theme='dark'] .template-card span,
 :root[data-theme='dark'] .template-card small,
@@ -7157,6 +7236,7 @@ h3 {
   .article-section-switch,
   .note-reading-grid,
   .note-import-grid,
+  .editor-compose-grid,
   .manager-bulk-bar,
   .manager-row {
     grid-template-columns: 1fr;
