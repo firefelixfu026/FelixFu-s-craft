@@ -6508,6 +6508,8 @@ h3 {
 :root[data-theme='dark'] .ai-result-panel,
 :root[data-theme='dark'] .ai-reference-panel,
 :root[data-theme='dark'] .ai-result-card,
+:root[data-theme='dark'] .admin-session,
+:root[data-theme='dark'] .auth-user,
 :root[data-theme='dark'] .admin-page-card,
 :root[data-theme='dark'] .admin-panel,
 :root[data-theme='dark'] .admin-pulse-card,
@@ -6546,6 +6548,7 @@ h3 {
 :root[data-theme='dark'] .empty-state,
 :root[data-theme='dark'] .file-upload-control,
 :root[data-theme='dark'] .ghost-button,
+:root[data-theme='dark'] .danger-button,
 :root[data-theme='dark'] .manager-actions button,
 :root[data-theme='dark'] .compact-icon-button {
   border-color: var(--border);
@@ -6789,6 +6792,31 @@ h3 {
 
 :root[data-theme='dark'] .owner-login-details summary {
   color: var(--text-soft);
+}
+
+:root[data-theme='dark'] .admin-session > div,
+:root[data-theme='dark'] .admin-session svg,
+:root[data-theme='dark'] .admin-message {
+  color: var(--accent);
+}
+
+:root[data-theme='dark'] .admin-message {
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  background: rgba(52, 211, 153, 0.12);
+}
+
+:root[data-theme='dark'] .danger-button {
+  color: #fda4af !important;
+  border-color: rgba(251, 113, 133, 0.36) !important;
+  background: rgba(251, 113, 133, 0.12) !important;
+}
+
+:root[data-theme='dark'] .file-upload-control:hover,
+:root[data-theme='dark'] .ghost-button:hover,
+:root[data-theme='dark'] .manager-actions button:hover {
+  border-color: rgba(52, 211, 153, 0.44);
+  color: var(--accent);
+  background: rgba(52, 211, 153, 0.1);
 }
 
 :root[data-theme='dark'] .tag-button,

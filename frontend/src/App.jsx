@@ -391,6 +391,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v5.4.4',
+    title: '后台夜间模式补漏',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['修复管理后台登录状态卡片夜间模式仍为浅色的问题', '补齐提示条、登录用户块和危险按钮的深色样式', '统一后台常用控件在夜间模式下的边框和背景']
+  },
+  {
     version: 'v5.4.3',
     title: '正文预览对齐',
     date: '2026-08-09',
