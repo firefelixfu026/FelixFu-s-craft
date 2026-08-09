@@ -4240,6 +4240,110 @@ h3 {
   grid-column: 1 / -1;
 }
 
+.visual-audit-panel {
+  grid-column: 1 / -1;
+}
+
+.visual-audit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.visual-audit-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.visual-audit-card.wide {
+  grid-column: 1 / -1;
+}
+
+.visual-card-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 14px;
+  color: #102033;
+}
+
+.visual-card-head svg {
+  color: #1f8a7a;
+}
+
+.visual-card-head strong {
+  font-size: 17px;
+}
+
+.visual-checklist,
+.visual-token-row,
+.visual-component-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.visual-checklist span,
+.visual-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  color: #415066;
+  background: #ffffff;
+  font-weight: 800;
+}
+
+.visual-checklist span svg {
+  color: #1f8a7a;
+}
+
+.visual-swatch.accent {
+  color: #0f766e;
+  border-color: rgba(20, 184, 166, 0.28);
+  background: rgba(20, 184, 166, 0.12);
+}
+
+.visual-swatch.ready {
+  color: #15803d;
+  border-color: rgba(34, 197, 94, 0.25);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.visual-swatch.warn {
+  color: #a16207;
+  border-color: rgba(245, 158, 11, 0.28);
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.visual-swatch.danger {
+  color: #be123c;
+  border-color: rgba(244, 63, 94, 0.28);
+  background: rgba(244, 63, 94, 0.12);
+}
+
+.visual-component-row input,
+.visual-component-row select {
+  min-width: 170px;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  color: #102033;
+  background: #ffffff;
+}
+
+.visual-message {
+  margin: 14px 0 0;
+}
+
 .ops-metric-grid,
 .ops-bottom-grid {
   display: grid;
@@ -6516,6 +6620,10 @@ h3 {
 :root[data-theme='dark'] .admin-task-card,
 :root[data-theme='dark'] .admin-insight-grid > div,
 :root[data-theme='dark'] .security-rule-grid article,
+:root[data-theme='dark'] .visual-audit-card,
+:root[data-theme='dark'] .visual-checklist span,
+:root[data-theme='dark'] .visual-component-row input,
+:root[data-theme='dark'] .visual-component-row select,
 :root[data-theme='dark'] .manager-row,
 :root[data-theme='dark'] .manager-bulk-bar,
 :root[data-theme='dark'] .image-resource,
@@ -6560,6 +6668,39 @@ h3 {
 :root[data-theme='dark'] .plan-calendar-popover::before {
   border-color: var(--border);
   background: var(--panel-bg);
+}
+
+:root[data-theme='dark'] .visual-card-head {
+  color: var(--text-main);
+}
+
+:root[data-theme='dark'] .visual-card-head svg,
+:root[data-theme='dark'] .visual-checklist span svg {
+  color: var(--accent);
+}
+
+:root[data-theme='dark'] .visual-swatch.accent {
+  color: #5eead4;
+  border-color: rgba(45, 212, 191, 0.32);
+  background: rgba(45, 212, 191, 0.12);
+}
+
+:root[data-theme='dark'] .visual-swatch.ready {
+  color: #86efac;
+  border-color: rgba(74, 222, 128, 0.32);
+  background: rgba(74, 222, 128, 0.12);
+}
+
+:root[data-theme='dark'] .visual-swatch.warn {
+  color: #fcd34d;
+  border-color: rgba(251, 191, 36, 0.32);
+  background: rgba(251, 191, 36, 0.12);
+}
+
+:root[data-theme='dark'] .visual-swatch.danger {
+  color: #fda4af;
+  border-color: rgba(251, 113, 133, 0.36);
+  background: rgba(251, 113, 133, 0.12);
 }
 
 :root[data-theme='dark'] .plan-date-field.active,

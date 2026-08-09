@@ -391,6 +391,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v5.4.5',
+    title: '后台视觉巡检',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['管理后台新增视觉巡检页', '集中展示卡片、按钮、输入框和提示条的日夜间样式', '总览页增加巡检入口，后续排查漏白底更直接']
+  },
+  {
     version: 'v5.4.4',
     title: '后台夜间模式补漏',
     date: '2026-08-09',
@@ -7622,6 +7629,7 @@ function AdminWorkspace({
     { id: 'comments', label: '评论', detail: '查看和删除评论', icon: MessageCircle, count: `${adminComments.length} 条` },
     { id: 'music', label: '音乐', detail: '上传歌单和管理播放', icon: Music, count: `${musicTracks.length} 首` },
     { id: 'releases', label: '版本', detail: '更新记录和路线', icon: Code2, count: releaseRoadmap[0].version },
+    { id: 'visual', label: '视觉巡检', detail: '白底、控件、夜间模式', icon: Eye, count: 'QA' },
     { id: 'ops', label: '运维', detail: '服务、部署、脚本', icon: ShieldCheck, count: '控制台' },
     { id: 'security', label: '安全', detail: '操作日志和删除保护', icon: ShieldCheck, count: `${adminAuditLogs.length} 条` }
   ];
@@ -7736,6 +7744,15 @@ function AdminWorkspace({
       page: 'ops',
       tone: 'neutral',
       icon: ShieldCheck
+    },
+    {
+      id: 'visual',
+      title: '后台视觉巡检',
+      detail: '集中看卡片、表单、按钮和提示条，避免深色模式漏白底',
+      action: '看巡检',
+      page: 'visual',
+      tone: 'ready',
+      icon: Eye
     },
     {
       id: 'notes',
@@ -8062,6 +8079,10 @@ function AdminWorkspace({
                 <Code2 size={17} />
                 <span>版本清单</span>
               </button>
+              <button className="ghost-button" type="button" onClick={() => openAdminPage('visual')}>
+                <Eye size={17} />
+                <span>视觉巡检</span>
+              </button>
               <button className="ghost-button" type="button" onClick={() => openAdminPage('security')}>
                 <ShieldCheck size={17} />
                 <span>安全日志</span>
@@ -8329,6 +8350,75 @@ function AdminWorkspace({
         </form>
         {aiTestMessage && <p className="admin-message">{aiTestMessage}</p>}
       </section>
+      )}
+
+      {activeAdminPage === 'visual' && (
+        <section className="admin-panel visual-audit-panel">
+          <div className="admin-panel-heading">
+            <div>
+              <h2>后台视觉巡检</h2>
+              <span>把容易漏成白底的控件集中摆在这里，切换日夜间模式就能快速扫一遍</span>
+            </div>
+            <span className="release-badge">v5.4.5</span>
+          </div>
+
+          <div className="visual-audit-grid">
+            <article className="visual-audit-card">
+              <div className="visual-card-head">
+                <Moon size={17} />
+                <strong>深色模式重点</strong>
+              </div>
+              <div className="visual-checklist">
+                {['页面大卡片', '输入框和下拉框', '按钮 hover', '提示条', '危险操作按钮'].map((item) => (
+                  <span key={item}>
+                    <CheckCircle2 size={15} />
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </article>
+
+            <article className="visual-audit-card">
+              <div className="visual-card-head">
+                <Sun size={17} />
+                <strong>状态色板</strong>
+              </div>
+              <div className="visual-token-row">
+                <span className="visual-swatch accent">强调</span>
+                <span className="visual-swatch ready">完成</span>
+                <span className="visual-swatch warn">提醒</span>
+                <span className="visual-swatch danger">删除</span>
+              </div>
+            </article>
+
+            <article className="visual-audit-card wide">
+              <div className="visual-card-head">
+                <FilePenLine size={17} />
+                <strong>表单和按钮</strong>
+              </div>
+              <div className="visual-component-row">
+                <input value="示例输入框" readOnly aria-label="视觉巡检输入框" />
+                <select defaultValue="published" aria-label="视觉巡检下拉框">
+                  <option value="published">已发布</option>
+                  <option value="draft">草稿</option>
+                </select>
+                <button className="primary-action" type="button">
+                  <Save size={16} />
+                  <span>主操作</span>
+                </button>
+                <button className="ghost-button" type="button">
+                  <RefreshCw size={16} />
+                  <span>次操作</span>
+                </button>
+                <button className="danger-button" type="button">
+                  <Trash2 size={16} />
+                  <span>危险</span>
+                </button>
+              </div>
+              <p className="admin-message visual-message">提示条示例：如果这里在夜间模式变成刺眼白底，就说明样式又漏了。</p>
+            </article>
+          </div>
+        </section>
       )}
 
       {activeAdminPage === 'backups' && (
