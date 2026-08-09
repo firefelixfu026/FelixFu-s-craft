@@ -1,4 +1,5 @@
 import os
+import os
 from collections.abc import Generator
 
 from sqlalchemy import create_engine, inspect, text
@@ -48,6 +49,10 @@ def _ensure_schema_updates() -> None:
             connection.execute(text("ALTER TABLE articles ADD COLUMN category VARCHAR(80) DEFAULT '学习笔记' NOT NULL"))
         if "articles" in table_names and "pinned" not in article_columns:
             connection.execute(text("ALTER TABLE articles ADD COLUMN pinned BOOLEAN DEFAULT FALSE NOT NULL"))
+        if "articles" in table_names and "created_at" not in article_columns:
+            connection.execute(text("ALTER TABLE articles ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL"))
+        if "articles" in table_names and "updated_at" not in article_columns:
+            connection.execute(text("ALTER TABLE articles ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL"))
         if "comments" in table_names and "status" not in comment_columns:
             connection.execute(text("ALTER TABLE comments ADD COLUMN status VARCHAR(20) DEFAULT 'approved' NOT NULL"))
         if "comments" in table_names and "user_id" not in comment_columns:

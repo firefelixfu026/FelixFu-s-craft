@@ -24,9 +24,12 @@ import {
   LogOut,
   MessageCircle,
   Moon,
+  Music,
   PanelLeftClose,
   PanelLeftOpen,
+  Pause,
   PencilLine,
+  Play,
   PlusCircle,
   Quote,
   RefreshCw,
@@ -34,6 +37,8 @@ import {
   Search,
   ShieldCheck,
   Sigma,
+  SkipBack,
+  SkipForward,
   Star,
   Sun,
   ThumbsDown,
@@ -56,6 +61,8 @@ const createEmptyArticleForm = () => ({
   tags: '',
   date: new Date().toISOString().slice(0, 10),
   readTime: '3 min',
+  createdAt: '',
+  updatedAt: '',
   status: 'published',
   category: '学习笔记',
   pinned: false
@@ -65,6 +72,7 @@ const visitorNavItems = [
   { id: 'overview', label: '首页', icon: UserRound },
   { id: 'articles', label: '文章', icon: BookOpen },
   { id: 'plan', label: '计划', icon: List },
+  { id: 'music', label: '音乐', icon: Music },
   { id: 'game', label: '游戏', icon: Gamepad2 },
   { id: 'login', label: '登录', icon: LogIn }
 ];
@@ -73,6 +81,7 @@ const readerNavItems = [
   { id: 'overview', label: '首页', icon: UserRound },
   { id: 'articles', label: '文章', icon: BookOpen },
   { id: 'plan', label: '计划', icon: List },
+  { id: 'music', label: '音乐', icon: Music },
   { id: 'game', label: '游戏', icon: Gamepad2 }
 ];
 
@@ -84,7 +93,9 @@ const COMMENT_PAGE_UNITS = 5;
 const COMMENT_UNIT_CHARS = 60;
 const ADMIN_COMMENTS_PER_PAGE = 5;
 const IMAGE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
+const AUDIO_UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
 const ALLOWED_IMAGE_UPLOAD_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']);
+const ALLOWED_AUDIO_UPLOAD_TYPES = new Set(['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/flac', 'audio/x-flac', 'audio/mp4', 'audio/aac']);
 const ARTICLE_DRAFT_KEY = 'felix_blog_article_form_draft';
 const ARTICLE_DRAFT_HISTORY_KEY = 'felix_blog_article_draft_history';
 const FRONTEND_ERROR_LOG_KEY = 'felix_blog_frontend_error_logs';
@@ -192,7 +203,7 @@ function readStoredUser() {
 function readStoredActiveView() {
   if (typeof localStorage === 'undefined') return 'overview';
   const storedView = localStorage.getItem(ACTIVE_VIEW_KEY) || 'overview';
-  const publicViews = new Set(['overview', 'articles', 'plan', 'game', 'login', 'account', 'admin']);
+  const publicViews = new Set(['overview', 'articles', 'plan', 'music', 'game', 'login', 'account', 'admin']);
   return publicViews.has(storedView) ? storedView : 'overview';
 }
 
@@ -214,7 +225,7 @@ function readStoredSidebarCollapsed() {
 function readStoredAdminPage() {
   if (typeof localStorage === 'undefined') return 'overview';
   const storedPage = localStorage.getItem(ADMIN_PAGE_KEY) || 'overview';
-  const knownPages = new Set(['overview', 'ops', 'releases', 'editor', 'articles', 'media', 'comments', 'security', 'ai', 'backups', 'corpus', 'study']);
+  const knownPages = new Set(['overview', 'ops', 'releases', 'editor', 'articles', 'music', 'media', 'comments', 'security', 'ai', 'backups', 'corpus', 'study']);
   return knownPages.has(storedPage) ? storedPage : 'overview';
 }
 
@@ -349,6 +360,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v3.0',
+    title: '个人音乐和文章属性',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['前台新增个人音乐播放器入口', '后台支持上传和删除本地音乐文件', '文章接口补充创建时间和最后修改时间', '为后续文章/笔记分区改版打基础']
+  },
   {
     version: 'v2.8',
     title: '首页和计划体验整理',
@@ -817,6 +835,28 @@ function formatFileSize(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
+function formatArticleTimestamp(value, fallback = '保存后生成') {
+  if (!value) return fallback;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+}
+
+function formatTrackTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '00:00';
+  const totalSeconds = Math.floor(seconds);
+  const minutes = Math.floor(totalSeconds / 60);
+  const rest = totalSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
+}
+
 function aiTaskLabel(task) {
   return {
     polish: '润色',
@@ -858,6 +898,9 @@ function App() {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [isLoadingUploadedImages, setIsLoadingUploadedImages] = useState(false);
+  const [musicTracks, setMusicTracks] = useState([]);
+  const [isLoadingMusicTracks, setIsLoadingMusicTracks] = useState(false);
+  const [isUploadingMusic, setIsUploadingMusic] = useState(false);
   const [articleDraftNotice, setArticleDraftNotice] = useState('');
   const [aiGenerationHistory, setAiGenerationHistory] = useState([]);
   const [accountActivity, setAccountActivity] = useState(null);
@@ -903,7 +946,7 @@ function App() {
     }
 
     if (currentUser.role === 'admin') {
-      return [readerNavItems[0], readerNavItems[1], readerNavItems[2], readerNavItems[3], accountNavItem, adminNavItem];
+      return [...readerNavItems, accountNavItem, adminNavItem];
     }
 
     return [...readerNavItems, accountNavItem];
@@ -945,6 +988,7 @@ function App() {
           setAiNews(await newsRes.json());
         }
         await refreshArticles();
+        await refreshMusicTracks();
       } catch {
         // The MVP can run as a standalone frontend before the API is started.
       }
@@ -1006,6 +1050,7 @@ function App() {
     if (activeView === 'admin' && currentUser?.role === 'admin') {
       refreshAdminComments();
       refreshUploadedImages();
+      refreshMusicTracks();
       refreshAdminStats();
       refreshAdminAuditLogs();
       refreshAiSettings();
@@ -1044,7 +1089,7 @@ function App() {
   useEffect(() => {
     if (!currentUser) {
       if (authToken) return;
-      if (!['overview', 'articles', 'plan', 'game', 'login'].includes(activeView)) {
+      if (!['overview', 'articles', 'plan', 'music', 'game', 'login'].includes(activeView)) {
         setActiveView('overview');
       }
       return;
@@ -1070,6 +1115,21 @@ function App() {
     setArticles(articleData);
     hydrateArticleState(articleData);
     return articleData;
+  }
+
+  async function refreshMusicTracks() {
+    setIsLoadingMusicTracks(true);
+    try {
+      const response = await fetch('/api/music/tracks');
+      if (!response.ok) return [];
+      const tracks = await response.json();
+      setMusicTracks(tracks);
+      return tracks;
+    } catch {
+      return [];
+    } finally {
+      setIsLoadingMusicTracks(false);
+    }
   }
 
   function hydrateArticleState(nextArticles) {
@@ -1770,6 +1830,8 @@ function App() {
         tags: mergedTags.join(', '),
         date: current.date || new Date().toISOString().slice(0, 10),
         readTime: current.readTime || '3 min',
+        createdAt: '',
+        updatedAt: '',
         status: 'draft',
         category: current.category || 'AI 草稿',
         pinned: false
@@ -1869,6 +1931,8 @@ function App() {
       tags: article.tags.join(', '),
       date: article.date,
       readTime: article.readTime,
+      createdAt: article.createdAt || '',
+      updatedAt: article.updatedAt || '',
       status: article.status || 'published',
       category: article.category || '学习笔记',
       pinned: Boolean(article.pinned)
@@ -2027,6 +2091,74 @@ function App() {
       setAdminMessage('图片已删除');
     } catch {
       setAdminMessage('后端服务不可用，图片删除失败');
+    }
+  }
+
+  async function uploadMusicTrack(file) {
+    if (!file) return;
+    if (!authToken) {
+      setAdminMessage('请先登录管理员账号');
+      setActiveView('login');
+      return;
+    }
+    const suffix = file.name?.split('.').pop()?.toLowerCase();
+    const allowedSuffixes = new Set(['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac']);
+    if (!ALLOWED_AUDIO_UPLOAD_TYPES.has(file.type) && !allowedSuffixes.has(suffix)) {
+      setAdminMessage('音乐上传失败：只支持 MP3、WAV、OGG、FLAC、M4A 或 AAC');
+      return;
+    }
+    if (file.size > AUDIO_UPLOAD_MAX_BYTES) {
+      setAdminMessage('音乐上传失败：单个文件不能超过 50 MB');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    setIsUploadingMusic(true);
+    setAdminMessage('正在上传音乐...');
+    try {
+      const response = await fetch('/api/admin/uploads/music', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: formData
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setAdminMessage(result.detail || '音乐上传失败');
+        if (response.status === 401 || response.status === 403) {
+          setActiveView('login');
+        }
+        return;
+      }
+      await refreshMusicTracks();
+      await refreshAdminAuditLogs();
+      setAdminMessage(`音乐已加入歌单：${result.title || file.name}`);
+    } catch {
+      setAdminMessage('后端服务不可用，音乐上传失败');
+    } finally {
+      setIsUploadingMusic(false);
+    }
+  }
+
+  async function deleteMusicTrack(track) {
+    if (!window.confirm(`确定删除音乐 ${track.title || track.filename} 吗？`)) return;
+    try {
+      const response = await fetch(`/api/admin/uploads/music/${encodeURIComponent(track.filename)}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      if (!response.ok) {
+        setAdminMessage('音乐删除失败');
+        if (response.status === 401 || response.status === 403) {
+          setActiveView('login');
+        }
+        return;
+      }
+      setMusicTracks((current) => current.filter((item) => item.filename !== track.filename));
+      await refreshAdminAuditLogs();
+      setAdminMessage('音乐已删除');
+    } catch {
+      setAdminMessage('后端服务不可用，音乐删除失败');
     }
   }
 
@@ -2298,6 +2430,14 @@ function App() {
 
         {activeView === 'game' && <GameWorkspace />}
 
+        {activeView === 'music' && (
+          <MusicWorkspace
+            tracks={musicTracks}
+            isLoading={isLoadingMusicTracks}
+            refreshMusicTracks={refreshMusicTracks}
+          />
+        )}
+
         {activeView === 'plan' && <SummerPlanWorkspace currentUser={currentUser} authToken={authToken} />}
 
         {activeView === 'account' && currentUser && (
@@ -2338,6 +2478,9 @@ function App() {
             isUploadingImage={isUploadingImage}
             uploadedImages={uploadedImages}
             isLoadingUploadedImages={isLoadingUploadedImages}
+            musicTracks={musicTracks}
+            isLoadingMusicTracks={isLoadingMusicTracks}
+            isUploadingMusic={isUploadingMusic}
             articleDraftNotice={articleDraftNotice}
             adminMessage={adminMessage}
             setAdminMessage={setAdminMessage}
@@ -2367,6 +2510,9 @@ function App() {
             refreshUploadedImages={refreshUploadedImages}
             copyUploadedImageUrl={copyUploadedImageUrl}
             deleteUploadedImage={deleteUploadedImage}
+            refreshMusicTracks={refreshMusicTracks}
+            uploadMusicTrack={uploadMusicTrack}
+            deleteMusicTrack={deleteMusicTrack}
             runArticleAiTask={runArticleAiTask}
             undoLatestArticleAiResult={undoLatestArticleAiResult}
             restoreArticleDraft={restoreArticleDraft}
@@ -3007,6 +3153,8 @@ function ArticleWorkspace({
                 <span>{article.category || '学习笔记'}</span>
                 <span>{article.date}</span>
                 <span>{article.readTime}</span>
+                <span>创建 {formatArticleTimestamp(article.createdAt, article.date || '未知')}</span>
+                <span>修改 {formatArticleTimestamp(article.updatedAt, article.createdAt || article.date || '未知')}</span>
                 <span><Eye size={15} /> {article.viewCount || 0}</span>
               </div>
               <h2>{highlightText(article.title, searchMeta.terms)}</h2>
@@ -3100,6 +3248,8 @@ function ArticleDetail({
           <span>{article.category || '学习笔记'}</span>
           <span>{article.date}</span>
           <span>{article.readTime}</span>
+          <span>创建 {formatArticleTimestamp(article.createdAt, article.date || '未知')}</span>
+          <span>修改 {formatArticleTimestamp(article.updatedAt, article.createdAt || article.date || '未知')}</span>
           <span><Eye size={15} /> {article.viewCount || 0}</span>
         </div>
         <h1>{article.title}</h1>
@@ -5121,6 +5271,180 @@ function EditableTable({ columns, rows, section, disabled, updateRow, deleteRow,
   );
 }
 
+function MusicWorkspace({ tracks, isLoading, refreshMusicTracks }) {
+  const audioRef = useRef(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [repeatMode, setRepeatMode] = useState('list');
+  const currentTrack = tracks[currentIndex] || null;
+
+  useEffect(() => {
+    if (currentIndex >= tracks.length) {
+      setCurrentIndex(Math.max(0, tracks.length - 1));
+    }
+  }, [currentIndex, tracks.length]);
+
+  useEffect(() => {
+    setProgress(0);
+    setDuration(0);
+    if (isPlaying) {
+      audioRef.current?.play().catch(() => setIsPlaying(false));
+    }
+  }, [currentTrack?.url]);
+
+  function playTrack(index) {
+    setCurrentIndex(index);
+    setIsPlaying(true);
+    window.setTimeout(() => {
+      audioRef.current?.play().catch(() => setIsPlaying(false));
+    }, 0);
+  }
+
+  function togglePlayback() {
+    if (!currentTrack) return;
+    if (isPlaying) {
+      audioRef.current?.pause();
+      setIsPlaying(false);
+      return;
+    }
+    audioRef.current?.play()
+      .then(() => setIsPlaying(true))
+      .catch(() => setIsPlaying(false));
+  }
+
+  function stepTrack(direction) {
+    if (!tracks.length) return;
+    const nextIndex = (currentIndex + direction + tracks.length) % tracks.length;
+    playTrack(nextIndex);
+  }
+
+  function handleEnded() {
+    if (repeatMode === 'one') {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => setIsPlaying(false));
+      return;
+    }
+    if (currentIndex < tracks.length - 1 || repeatMode === 'list') {
+      stepTrack(1);
+      return;
+    }
+    setIsPlaying(false);
+  }
+
+  return (
+    <section className="workspace music-workspace">
+      <div className="section-heading">
+        <p className="eyebrow">Felix Music</p>
+        <h1>个人音乐台</h1>
+        <span>把喜欢的歌放进站点里，打开网页就能听。</span>
+      </div>
+
+      <section className="music-player-panel">
+        <div className="music-now">
+          <div className="music-cover" aria-hidden="true">
+            <Music size={42} />
+          </div>
+          <div>
+            <span>正在播放</span>
+            <h2>{currentTrack?.title || '等待加入第一首歌'}</h2>
+            <p>{currentTrack?.artist || '后台上传音乐后，这里会变成你的私人歌单。'}</p>
+          </div>
+        </div>
+
+        <audio
+          ref={audioRef}
+          src={currentTrack?.url || undefined}
+          preload="metadata"
+          onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || 0)}
+          onTimeUpdate={(event) => setProgress(event.currentTarget.currentTime || 0)}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onEnded={handleEnded}
+        >
+          当前浏览器不支持音频播放。
+        </audio>
+
+        <div className="music-progress">
+          <span>{formatTrackTime(progress)}</span>
+          <input
+            type="range"
+            min="0"
+            max={duration || 0}
+            value={Math.min(progress, duration || 0)}
+            disabled={!currentTrack}
+            onChange={(event) => {
+              const nextTime = Number(event.target.value);
+              if (audioRef.current) {
+                audioRef.current.currentTime = nextTime;
+              }
+              setProgress(nextTime);
+            }}
+            aria-label="播放进度"
+          />
+          <span>{formatTrackTime(duration)}</span>
+        </div>
+
+        <div className="music-controls">
+          <button className="ghost-button" type="button" onClick={() => stepTrack(-1)} disabled={!tracks.length}>
+            <SkipBack size={17} />
+            <span>上一首</span>
+          </button>
+          <button className="primary-action" type="button" onClick={togglePlayback} disabled={!currentTrack}>
+            {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+            <span>{isPlaying ? '暂停' : '播放'}</span>
+          </button>
+          <button className="ghost-button" type="button" onClick={() => stepTrack(1)} disabled={!tracks.length}>
+            <SkipForward size={17} />
+            <span>下一首</span>
+          </button>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => setRepeatMode((current) => (current === 'list' ? 'one' : current === 'one' ? 'none' : 'list'))}
+          >
+            <RefreshCw size={16} />
+            <span>{repeatMode === 'list' ? '列表循环' : repeatMode === 'one' ? '单曲循环' : '播完停止'}</span>
+          </button>
+        </div>
+      </section>
+
+      <section className="music-library-panel">
+        <div className="admin-panel-heading">
+          <div>
+            <h2>歌单</h2>
+            <span>{isLoading ? '正在读取音乐' : `${tracks.length} 首`}</span>
+          </div>
+          <button className="ghost-button" type="button" onClick={refreshMusicTracks}>
+            <RefreshCw size={16} />
+            <span>刷新</span>
+          </button>
+        </div>
+
+        {tracks.length === 0 ? (
+          <p className="empty-state">还没有音乐。登录后台后，在“音乐”里上传 MP3、WAV、OGG、FLAC、M4A 或 AAC。</p>
+        ) : (
+          <div className="music-track-list">
+            {tracks.map((track, index) => (
+              <button
+                className={index === currentIndex ? 'music-track active' : 'music-track'}
+                type="button"
+                key={track.filename}
+                onClick={() => playTrack(index)}
+              >
+                <span>{String(index + 1).padStart(2, '0')}</span>
+                <strong>{track.title}</strong>
+                <em>{formatFileSize(track.size)}</em>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+    </section>
+  );
+}
+
 function GameWorkspace() {
   const [frameKey, setFrameKey] = useState(0);
 
@@ -5596,6 +5920,9 @@ function AdminWorkspace({
   isUploadingImage,
   uploadedImages,
   isLoadingUploadedImages,
+  musicTracks,
+  isLoadingMusicTracks,
+  isUploadingMusic,
   articleDraftNotice,
   adminMessage,
   setAdminMessage,
@@ -5625,6 +5952,9 @@ function AdminWorkspace({
   refreshUploadedImages,
   copyUploadedImageUrl,
   deleteUploadedImage,
+  refreshMusicTracks,
+  uploadMusicTrack,
+  deleteMusicTrack,
   runArticleAiTask,
   undoLatestArticleAiResult,
   restoreArticleDraft,
@@ -5676,7 +6006,7 @@ function AdminWorkspace({
     { label: '已发布文章', value: `${publishedCount} 篇` },
     { label: '草稿', value: `${draftCount} 篇` },
     { label: '待审评论', value: `${pendingCommentCount} 条` },
-    { label: '图片资源', value: `${uploadedImages.length} 张` },
+    { label: '音乐', value: `${musicTracks.length} 首` },
     { label: 'AI 生成记录', value: `${aiGenerationHistory.length} 条` },
   ];
   const readinessItems = [
@@ -5718,8 +6048,9 @@ function AdminWorkspace({
     { id: 'releases', label: '版本', detail: '更新记录和路线', icon: Code2, count: releaseRoadmap[0].version },
     { id: 'editor', label: '写文章', detail: editingArticleId ? '继续编辑当前文章' : '发布新内容', icon: FilePenLine, count: draftCount ? `${draftCount} 草稿` : 'Markdown' },
     { id: 'articles', label: '文章库', detail: '编辑、删除、置顶', icon: BookOpen, count: `${articles.length} 篇` },
-    { id: 'media', label: '图片', detail: '上传资源和插入正文', icon: ImageIcon, count: `${uploadedImages.length} 张` },
-    { id: 'comments', label: '评论', detail: '筛选、通过、删除', icon: MessageCircle, count: pendingCommentCount ? `${pendingCommentCount} 待审` : `${adminComments.length} 条` },
+    { id: 'music', label: '音乐', detail: '上传歌单和管理播放', icon: Music, count: `${musicTracks.length} 首` },
+    { id: 'media', label: '图片', detail: '文章内嵌图片资源', icon: ImageIcon, count: `${uploadedImages.length} 张` },
+    { id: 'comments', label: '评论', detail: '查看和删除评论', icon: MessageCircle, count: `${adminComments.length} 条` },
     { id: 'security', label: '安全', detail: '操作日志和删除保护', icon: ShieldCheck, count: `${adminAuditLogs.length} 条` },
     { id: 'ai', label: 'AI', detail: '模型配置、测试和模板', icon: Bot, count: aiSettings?.configured ? '已配置' : '待配置' },
     { id: 'backups', label: '备份', detail: '备份记录和恢复清单', icon: Save, count: '本地记录' },
@@ -5743,7 +6074,7 @@ function AdminWorkspace({
   const [corpusInput, setCorpusInput] = useState('');
   const [studyState, setStudyState] = useState(readStudyState);
   const [studyInput, setStudyInput] = useState('');
-  const shouldShowAdminLayout = ['editor', 'articles', 'media', 'comments'].includes(activeAdminPage);
+  const shouldShowAdminLayout = ['editor', 'articles', 'music', 'media', 'comments'].includes(activeAdminPage);
 
   useEffect(() => {
     localStorage.setItem(ADMIN_PAGE_KEY, activeAdminPage);
@@ -6909,6 +7240,14 @@ function AdminWorkspace({
               />
             </label>
             <label>
+              <span>创建时间</span>
+              <input value={formatArticleTimestamp(articleForm.createdAt)} readOnly disabled />
+            </label>
+            <label>
+              <span>最后修改</span>
+              <input value={formatArticleTimestamp(articleForm.updatedAt)} readOnly disabled />
+            </label>
+            <label>
               <span>状态</span>
               <select
                 value={articleForm.status}
@@ -6997,6 +7336,7 @@ function AdminWorkspace({
                     <span className={article.status === 'draft' ? 'status-badge draft' : 'status-badge'}>{article.status === 'draft' ? '草稿' : '已发布'}</span>
                   </div>
                   <p>{article.summary}</p>
+                  <span className="manager-meta-line">创建 {formatArticleTimestamp(article.createdAt, article.date || '未知')} · 修改 {formatArticleTimestamp(article.updatedAt, article.createdAt || article.date || '未知')}</span>
                   <div className="tag-row">
                     {article.tags.map((tag) => (
                       <span key={tag}>{tag}</span>
@@ -7067,6 +7407,57 @@ function AdminWorkspace({
               ))}
             </div>
           )}
+        </section>
+        )}
+
+        {activeAdminPage === 'music' && (
+        <section className="admin-panel music-manager">
+          <div className="admin-panel-heading">
+            <div>
+              <h2>音乐管理</h2>
+              <span>{isLoadingMusicTracks ? '加载中' : `${musicTracks.length} 首`}</span>
+            </div>
+            <button type="button" onClick={refreshMusicTracks}>
+              <RefreshCw size={17} />
+              <span>刷新</span>
+            </button>
+          </div>
+
+          <label className="file-upload-control">
+            <Music size={17} />
+            <span>{isUploadingMusic ? '上传中' : '上传音乐'}</span>
+            <input
+              type="file"
+              accept=".mp3,.wav,.ogg,.flac,.m4a,.aac,audio/*"
+              disabled={isUploadingMusic}
+              onChange={(event) => {
+                uploadMusicTrack(event.target.files?.[0]);
+                event.target.value = '';
+              }}
+            />
+          </label>
+
+          <div className="music-admin-list">
+            {musicTracks.length === 0 ? (
+              <p className="empty-state">暂无音乐。上传后会出现在前台“音乐”页面。</p>
+            ) : (
+              musicTracks.map((track) => (
+                <article className="music-admin-row" key={track.filename}>
+                  <div>
+                    <strong>{track.title}</strong>
+                    <span>{track.filename} · {formatFileSize(track.size)} · {formatArticleTimestamp(track.createdAt, '未知时间')}</span>
+                  </div>
+                  <audio controls preload="none" src={track.url}>
+                    当前浏览器不支持音频播放。
+                  </audio>
+                  <button className="danger-button" type="button" onClick={() => deleteMusicTrack(track)}>
+                    <Trash2 size={16} />
+                    <span>删除</span>
+                  </button>
+                </article>
+              ))
+            )}
+          </div>
         </section>
         )}
 

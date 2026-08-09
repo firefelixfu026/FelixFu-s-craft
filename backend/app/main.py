@@ -55,7 +55,9 @@ ALLOW_READER_EMAIL_LOGIN = os.getenv("ALLOW_READER_EMAIL_LOGIN", "false").strip(
 LOGIN_FAILURE_LIMIT = int(os.getenv("LOGIN_FAILURE_LIMIT", "5") or "5")
 LOGIN_LOCK_SECONDS = int(os.getenv("LOGIN_LOCK_SECONDS", "60") or "60")
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "uploads"))
+MUSIC_DIR = UPLOAD_DIR / "music"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+MUSIC_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -63,8 +65,21 @@ ALLOWED_IMAGE_TYPES = {
     "image/gif": ".gif",
     "image/svg+xml": ".svg",
 }
+ALLOWED_AUDIO_TYPES = {
+    "audio/mpeg": ".mp3",
+    "audio/mp3": ".mp3",
+    "audio/wav": ".wav",
+    "audio/x-wav": ".wav",
+    "audio/ogg": ".ogg",
+    "audio/flac": ".flac",
+    "audio/x-flac": ".flac",
+    "audio/mp4": ".m4a",
+    "audio/aac": ".aac",
+}
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+MAX_AUDIO_UPLOAD_BYTES = 50 * 1024 * 1024
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
+AUDIO_SUFFIXES = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac"}
 LOGIN_FAILURES: dict[str, dict[str, Any]] = {}
 
 
@@ -714,6 +729,7 @@ def create_admin_article(
     if not title:
         raise HTTPException(status_code=400, detail="Article title is required")
 
+    now = datetime.utcnow()
     article = Article(
         id=_generate_article_id(db, title),
         title=title,
@@ -725,6 +741,8 @@ def create_admin_article(
         status=payload.status,
         category=(_optional_text(payload.category) or "学习笔记")[:80],
         pinned=payload.pinned,
+        created_at=now,
+        updated_at=now,
     )
     article.tags = [_get_or_create_tag(db, tag_name) for tag_name in _clean_tags(payload.tags)]
     article.reactions = [
@@ -754,6 +772,7 @@ def update_admin_article(
     article.status = payload.status
     article.category = (_optional_text(payload.category) or "学习笔记")[:80]
     article.pinned = payload.pinned
+    article.updated_at = datetime.utcnow()
     article.tags = [_get_or_create_tag(db, tag_name) for tag_name in _clean_tags(payload.tags)]
     db.commit()
     _record_admin_event(db, current_user, "更新文章", "article", article.title, f"状态：{article.status}")
@@ -833,6 +852,76 @@ def delete_admin_image(
 
     target.unlink()
     _record_admin_event(db, current_user, "删除图片", "upload", filename, "")
+    return {"status": "deleted", "filename": filename}
+
+
+@app.get("/api/music/tracks")
+def list_music_tracks() -> list[dict[str, str | int]]:
+    tracks = []
+    for path in MUSIC_DIR.iterdir():
+        if not path.is_file() or path.suffix.lower() not in AUDIO_SUFFIXES:
+            continue
+        stat = path.stat()
+        tracks.append({
+            "filename": path.name,
+            "title": _music_title_from_filename(path.name),
+            "artist": "Felix 的歌单",
+            "url": f"/uploads/music/{path.name}",
+            "size": stat.st_size,
+            "createdAt": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+        })
+    return sorted(tracks, key=lambda item: str(item["createdAt"]), reverse=True)
+
+
+@app.post("/api/admin/uploads/music")
+async def upload_admin_music(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, str | int]:
+    original_suffix = Path(file.filename or "").suffix.lower()
+    content_type = (file.content_type or "").lower()
+    suffix = original_suffix if original_suffix in AUDIO_SUFFIXES else ALLOWED_AUDIO_TYPES.get(content_type)
+    if not suffix:
+        raise HTTPException(status_code=400, detail="Only MP3, WAV, OGG, FLAC, M4A, or AAC audio files are supported")
+
+    content = await file.read(MAX_AUDIO_UPLOAD_BYTES + 1)
+    if len(content) > MAX_AUDIO_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="Audio must be 50 MB or smaller")
+    if not content:
+        raise HTTPException(status_code=400, detail="Audio file is empty")
+
+    original_stem = Path(file.filename or "track").stem.strip() or "track"
+    safe_stem = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff._-]+", "-", original_stem).strip(".-_") or "track"
+    filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{uuid4().hex[:8]}-{safe_stem[:60]}{suffix}"
+    destination = MUSIC_DIR / filename
+    destination.write_bytes(content)
+    _record_admin_event(db, current_user, "上传音乐", "upload", filename, f"{len(content)} bytes")
+    return {
+        "filename": filename,
+        "title": _music_title_from_filename(filename),
+        "artist": "Felix 的歌单",
+        "url": f"/uploads/music/{filename}",
+        "size": len(content),
+        "createdAt": datetime.utcnow().isoformat(),
+    }
+
+
+@app.delete("/api/admin/uploads/music/{filename}")
+def delete_admin_music(
+    filename: str,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    if Path(filename).name != filename or Path(filename).suffix.lower() not in AUDIO_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Invalid audio filename")
+
+    target = MUSIC_DIR / filename
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="Audio not found")
+
+    target.unlink()
+    _record_admin_event(db, current_user, "删除音乐", "upload", filename, "")
     return {"status": "deleted", "filename": filename}
 
 
@@ -1896,6 +1985,12 @@ def _get_article_or_404(db: Session, article_id: str) -> Article:
     return article
 
 
+def _music_title_from_filename(filename: str) -> str:
+    stem = Path(filename).stem
+    title = re.sub(r"^\d{14}-[0-9a-f]{8}-", "", stem)
+    return title.replace("-", " ").strip() or "未命名音乐"
+
+
 def _article_to_dict(article: Article, current_user: User | None = None) -> dict:
     return {
         "id": article.id,
@@ -1906,6 +2001,8 @@ def _article_to_dict(article: Article, current_user: User | None = None) -> dict
         "tags": [tag.name for tag in sorted(article.tags, key=lambda item: item.name)],
         "date": article.date,
         "readTime": article.read_time,
+        "createdAt": (article.created_at or datetime.utcnow()).isoformat(),
+        "updatedAt": (article.updated_at or article.created_at or datetime.utcnow()).isoformat(),
         "status": article.status,
         "category": article.category or "学习笔记",
         "pinned": bool(article.pinned),

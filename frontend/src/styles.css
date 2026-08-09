@@ -2491,6 +2491,150 @@ h3 {
   gap: 8px;
 }
 
+.music-workspace {
+  max-width: 1120px;
+}
+
+.music-player-panel,
+.music-library-panel,
+.music-manager {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--shadow-soft);
+}
+
+.music-now {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  min-width: 0;
+}
+
+.music-cover {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 8px;
+  color: #ffffff;
+  background:
+    linear-gradient(135deg, rgba(31, 122, 109, 0.95), rgba(45, 141, 240, 0.88)),
+    #1f7a6d;
+}
+
+.music-now span,
+.music-now p,
+.music-track em,
+.music-admin-row span,
+.manager-meta-line {
+  color: #6a7685;
+  font-size: 13px;
+  font-style: normal;
+}
+
+.music-now h2 {
+  margin: 4px 0;
+}
+
+.music-progress {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 52px;
+  gap: 10px;
+  align-items: center;
+  color: #516172;
+  font-variant-numeric: tabular-nums;
+}
+
+.music-progress input {
+  width: 100%;
+  accent-color: #1f7a6d;
+}
+
+.music-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.music-track-list,
+.music-admin-list {
+  display: grid;
+  gap: 10px;
+}
+
+.music-track {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  color: #18212f;
+  background: #f8fafc;
+  text-align: left;
+}
+
+.music-track strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-track span {
+  color: #1f7a6d;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.music-track.active {
+  border-color: #1f7a6d;
+  background: #eefaf6;
+}
+
+.music-admin-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.7fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.music-admin-row > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.music-admin-row strong,
+.music-admin-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-admin-row audio {
+  width: 100%;
+  min-width: 0;
+}
+
+.manager-meta-line {
+  display: block;
+  margin: 8px 0;
+}
+
 .game-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -4765,6 +4909,10 @@ h3 {
 :root[data-theme='dark'] .content-band,
 :root[data-theme='dark'] .tool-panel,
 :root[data-theme='dark'] .game-details,
+:root[data-theme='dark'] .music-player-panel,
+:root[data-theme='dark'] .music-library-panel,
+:root[data-theme='dark'] .music-track,
+:root[data-theme='dark'] .music-admin-row,
 :root[data-theme='dark'] .article-card,
 :root[data-theme='dark'] .article-detail-card,
 :root[data-theme='dark'] .reading-toolbar,
@@ -4783,6 +4931,7 @@ h3 {
 :root[data-theme='dark'] .security-rule-grid article,
 :root[data-theme='dark'] .manager-row,
 :root[data-theme='dark'] .image-resource,
+:root[data-theme='dark'] .music-manager,
 :root[data-theme='dark'] .ops-metric,
 :root[data-theme='dark'] .ops-live-card,
 :root[data-theme='dark'] .ops-service-card,
