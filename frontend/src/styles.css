@@ -115,6 +115,7 @@ textarea {
   --accent-soft: #fde8ee;
   --accent-blue: #637ed8;
   --shadow-soft: 0 20px 48px rgba(101, 83, 68, 0.14);
+  --cute-display-font: 'Comic Sans MS', 'YouYuan', 'Yuanti SC', 'Microsoft YaHei', system-ui, sans-serif;
   background:
     linear-gradient(120deg, rgba(255, 250, 244, 0.96), rgba(248, 242, 249, 0.96)),
     repeating-linear-gradient(135deg, rgba(216, 95, 118, 0.08) 0 1px, transparent 1px 30px);
@@ -156,7 +157,9 @@ textarea {
 
 .frontstage-shell .brand strong {
   color: #fff8f1;
+  font-family: var(--cute-display-font);
   font-size: 18px;
+  font-weight: 900;
   letter-spacing: 0;
 }
 
@@ -174,6 +177,8 @@ textarea {
   color: rgba(255, 248, 241, 0.82);
   border-color: rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.05);
+  font-family: var(--cute-display-font);
+  font-weight: 850;
   backdrop-filter: blur(8px);
 }
 
@@ -208,9 +213,45 @@ textarea {
 .frontstage-shell .section-heading h1,
 .frontstage-shell .section-heading h2,
 .frontstage-shell .home-widget-heading h2,
-.frontstage-shell .profile-copy h1 {
+.frontstage-shell .profile-copy h1,
+.frontstage-shell .article-card h2,
+.frontstage-shell .article-card h3,
+.frontstage-shell .admin-panel-heading h2,
+.frontstage-shell .summer-plan-hero h1,
+.frontstage-shell .music-now h2 {
   color: #202c3f;
+  font-family: var(--cute-display-font);
+  font-weight: 900;
   letter-spacing: 0;
+  text-shadow:
+    2px 2px 0 rgba(255, 255, 255, 0.84),
+    5px 5px 0 rgba(216, 95, 118, 0.13),
+    -2px 3px 0 rgba(47, 143, 131, 0.08);
+  text-wrap: balance;
+}
+
+.frontstage-shell .profile-copy h1,
+.frontstage-shell .section-heading h1,
+.frontstage-shell .summer-plan-hero h1 {
+  -webkit-text-stroke: 0.35px rgba(216, 95, 118, 0.34);
+}
+
+.frontstage-shell .topbar-title h1::after,
+.frontstage-shell .section-heading h1::after,
+.frontstage-shell .home-widget-heading h2::after,
+.frontstage-shell .article-card h2::after,
+.frontstage-shell .admin-panel-heading h2::after {
+  content: '';
+  display: inline-block;
+  width: 0.58em;
+  height: 0.58em;
+  margin-left: 0.28em;
+  border: 2px solid rgba(216, 95, 118, 0.42);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(253, 232, 238, 0.72)),
+    linear-gradient(45deg, transparent 46%, rgba(47, 143, 131, 0.46) 47% 53%, transparent 54%);
+  transform: rotate(-10deg) translateY(0.07em);
 }
 
 .frontstage-shell .topbar-title span,
@@ -288,6 +329,9 @@ textarea {
   border-color: rgba(216, 95, 118, 0.22);
   color: #9d4457;
   background: rgba(253, 232, 238, 0.78);
+  font-family: var(--cute-display-font);
+  font-weight: 850;
+  text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.62);
 }
 
 .frontstage-shell .reading-progress-sticky {
@@ -318,6 +362,7 @@ textarea {
   box-shadow:
     0 14px 30px rgba(100, 78, 72, 0.13),
     inset 0 -8px 18px rgba(255, 255, 255, 0.28);
+  font-family: var(--cute-display-font);
   font-size: 12px;
   font-weight: 900;
   letter-spacing: 0;
@@ -6471,8 +6516,34 @@ h3 {
 :root[data-theme='dark'] .frontstage-shell .section-heading h1,
 :root[data-theme='dark'] .frontstage-shell .section-heading h2,
 :root[data-theme='dark'] .frontstage-shell .home-widget-heading h2,
-:root[data-theme='dark'] .frontstage-shell .profile-copy h1 {
+:root[data-theme='dark'] .frontstage-shell .profile-copy h1,
+:root[data-theme='dark'] .frontstage-shell .article-card h2,
+:root[data-theme='dark'] .frontstage-shell .article-card h3,
+:root[data-theme='dark'] .frontstage-shell .admin-panel-heading h2,
+:root[data-theme='dark'] .frontstage-shell .summer-plan-hero h1,
+:root[data-theme='dark'] .frontstage-shell .music-now h2 {
   color: #fff8f1;
+  text-shadow:
+    2px 2px 0 rgba(14, 17, 28, 0.7),
+    5px 5px 0 rgba(255, 139, 167, 0.16),
+    -2px 3px 0 rgba(110, 231, 200, 0.12);
+}
+
+:root[data-theme='dark'] .frontstage-shell .profile-copy h1,
+:root[data-theme='dark'] .frontstage-shell .section-heading h1,
+:root[data-theme='dark'] .frontstage-shell .summer-plan-hero h1 {
+  -webkit-text-stroke: 0.35px rgba(255, 139, 167, 0.42);
+}
+
+:root[data-theme='dark'] .frontstage-shell .topbar-title h1::after,
+:root[data-theme='dark'] .frontstage-shell .section-heading h1::after,
+:root[data-theme='dark'] .frontstage-shell .home-widget-heading h2::after,
+:root[data-theme='dark'] .frontstage-shell .article-card h2::after,
+:root[data-theme='dark'] .frontstage-shell .admin-panel-heading h2::after {
+  border-color: rgba(255, 139, 167, 0.44);
+  background:
+    linear-gradient(135deg, rgba(255, 139, 167, 0.2), rgba(255, 255, 255, 0.08)),
+    linear-gradient(45deg, transparent 46%, rgba(110, 231, 200, 0.58) 47% 53%, transparent 54%);
 }
 
 :root[data-theme='dark'] .frontstage-shell .topbar-title span,
@@ -6519,6 +6590,7 @@ h3 {
   border-color: rgba(255, 139, 167, 0.28);
   color: #ffd5df;
   background: rgba(255, 139, 167, 0.14);
+  text-shadow: 1px 1px 0 rgba(14, 17, 28, 0.62);
 }
 
 :root[data-theme='dark'] .frontstage-shell .sidebar-music-range {

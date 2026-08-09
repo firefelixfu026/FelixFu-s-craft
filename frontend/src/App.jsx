@@ -379,6 +379,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v4.2',
+    title: '夏活字标感标题字体',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['参考开源方舟夏活字标生成器调整前台标题字效', '首页、文章、计划和音乐标题换成更圆润可爱的展示字体', '重点标签补充轻描边和错位阴影', '正文仍保留清晰易读的默认字体']
+  },
+  {
     version: 'v4.1',
     title: '原创二次元小贴纸',
     date: '2026-08-09',
