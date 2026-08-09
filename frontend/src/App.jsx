@@ -75,7 +75,6 @@ const readerNavItems = [
   { id: 'game', label: '游戏', icon: Gamepad2 }
 ];
 
-const aiNavItem = { id: 'ai', label: 'AI', icon: Bot };
 const adminNavItem = { id: 'admin', label: '管理', icon: FilePenLine };
 const accountNavItem = { id: 'account', label: '账号', icon: UserRound };
 
@@ -191,7 +190,9 @@ function readStoredUser() {
 
 function readStoredActiveView() {
   if (typeof localStorage === 'undefined') return 'overview';
-  return localStorage.getItem(ACTIVE_VIEW_KEY) || 'overview';
+  const storedView = localStorage.getItem(ACTIVE_VIEW_KEY) || 'overview';
+  const publicViews = new Set(['overview', 'articles', 'plan', 'game', 'login', 'account', 'admin']);
+  return publicViews.has(storedView) ? storedView : 'overview';
 }
 
 function readStoredTheme() {
@@ -894,7 +895,7 @@ function App() {
     }
 
     if (currentUser.role === 'admin') {
-      return [readerNavItems[0], readerNavItems[1], readerNavItems[2], aiNavItem, readerNavItems[3], accountNavItem, adminNavItem];
+      return [readerNavItems[0], readerNavItems[1], readerNavItems[2], readerNavItems[3], accountNavItem, adminNavItem];
     }
 
     return [...readerNavItems, accountNavItem];
@@ -1046,8 +1047,7 @@ function App() {
       return;
     }
 
-    if (activeView === 'ai' && currentUser.role !== 'admin') {
-      setInteractionMessage('AI 工作台仅管理员可用');
+    if (activeView === 'ai') {
       setActiveView('overview');
     }
   }, [activeView, authToken, currentUser?.role]);
@@ -2497,14 +2497,6 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
       icon: BookOpen
     },
     {
-      title: 'AI 工作台',
-      summary: '已支持灵感、摘要、标题、草稿填入、后台润色续写、可控插入和撤回历史。',
-      action: '打开 AI',
-      view: 'ai',
-      icon: Bot,
-      adminOnly: true
-    },
-    {
       title: '小游戏',
       summary: '已嵌入 Card War 在线试玩，后续可接排行榜和统一登录后的分数记录。',
       action: '试玩游戏',
@@ -2529,11 +2521,11 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
       icon: BookOpen
     },
     {
-      title: 'AI 写作与学习助手',
-      detail: '支持前端配置模型参数，围绕文章摘要、标题、润色、续写、学习计划和语料样本继续扩展。',
-      meta: currentUser?.role === 'admin' ? '后台可用' : '管理员维护中',
-      view: currentUser?.role === 'admin' ? 'ai' : 'overview',
-      icon: Bot
+      title: '暑期计划控制台',
+      detail: '时间段计划、完成记录、应用使用、睡眠饮食和记账都集中在同一个页面里。',
+      meta: '8月4日 - 8月15日',
+      view: 'plan',
+      icon: List
     },
     {
       title: '运维和备份面板',
@@ -2604,12 +2596,6 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
               <List size={17} />
               <span>看学习计划</span>
             </button>
-            {currentUser?.role === 'admin' && (
-              <button className="ghost-button" type="button" onClick={() => setActiveView('ai')}>
-                <Bot size={17} />
-                <span>打开 AI 工作台</span>
-              </button>
-            )}
           </div>
           <div className="interest-row geek-interest-row">
             {profile.interests.map((interest) => (
