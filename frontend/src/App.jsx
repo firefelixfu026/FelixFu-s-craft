@@ -383,6 +383,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v5.2.1',
+    title: '侧边栏动画优化',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['侧边栏展开折叠减少布局重排', '导航文字改为轻量淡入淡出', '移动端导航保持稳定显示']
+  },
+  {
     version: 'v5.2',
     title: '技术笔记侧栏悬浮',
     date: '2026-08-09',
