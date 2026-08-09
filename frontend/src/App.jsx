@@ -385,6 +385,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v5.4',
+    title: '版本时间线',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['版本页改为按大版本分段的时间线', '补充每个阶段的主题说明和版本数量', '记录后续优化顺序为 6 -> 3 -> 4 -> 1 -> 7']
+  },
+  {
     version: 'v5.3.2',
     title: '迷你播放器歌名滚动',
     date: '2026-08-09',
@@ -637,7 +644,6 @@ const releaseRoadmap = [
     points: ['AI 写作辅助入口', '发布状态总览', '站点统计卡片', '安全日志入口']
   }
 ];
-const RELEASE_PAGE_SIZE = 6;
 
 const toolboxCategories = ['全部', '学习', '开发', 'AI', '设计素材', '效率', '娱乐生活'];
 
@@ -7070,7 +7076,6 @@ class AdminPanelErrorBoundary extends React.Component {
 }
 
 function ReleaseWorkspace() {
-  const [releasePage, setReleasePage] = useState(0);
   const [releaseQuery, setReleaseQuery] = useState('');
   const [releaseMajor, setReleaseMajor] = useState('all');
   const [releaseStatus, setReleaseStatus] = useState('all');
@@ -7080,6 +7085,32 @@ function ReleaseWorkspace() {
   const totalPoints = releaseArchive.reduce((total, release) => total + release.points.length, 0);
   const releaseMajorOptions = Array.from(new Set(releaseArchive.map((release) => release.version.split('.')[0])))
     .sort((first, second) => Number(second.replace('v', '')) - Number(first.replace('v', '')));
+  const releaseStageMeta = {
+    v5: {
+      title: '当前个人站',
+      detail: '把博客整理成个人主页、技术笔记、计划、音乐、工具箱和后台管理的综合体。'
+    },
+    v4: {
+      title: '视觉去 AI 味',
+      detail: '从工具台感转向更有个人气质的前台视觉，加入二次元、字体和阅读细节。'
+    },
+    v3: {
+      title: '个人音乐',
+      detail: '本地音乐、常驻播放器、自建歌单和侧栏播放体验逐步成型。'
+    },
+    v2: {
+      title: '完整闭环',
+      detail: '登录、账号、互动、计划、运维和后台能力串成一个可持续维护的小型站点。'
+    },
+    v1: {
+      title: '内容系统',
+      detail: '文章详情、Markdown、评论、图片、草稿、AI 辅助和写作后台逐步稳定。'
+    },
+    v0: {
+      title: 'MVP 基建',
+      detail: '从静态博客 MVP 到数据库、Docker、OAuth、CI 和云服务器部署的底座阶段。'
+    }
+  };
   const filteredReleases = releaseArchive.filter((release) => {
     const query = releaseQuery.trim().toLowerCase();
     const searchable = [release.version, release.title, release.status, ...release.points].join(' ').toLowerCase();
@@ -7090,26 +7121,24 @@ function ReleaseWorkspace() {
       (releaseStatus === 'all' || release.status === releaseStatus)
     );
   });
-  const pageCount = Math.max(1, Math.ceil(filteredReleases.length / RELEASE_PAGE_SIZE));
-  const safeReleasePage = Math.min(releasePage, pageCount - 1);
-  const visibleReleases = filteredReleases.slice(
-    safeReleasePage * RELEASE_PAGE_SIZE,
-    safeReleasePage * RELEASE_PAGE_SIZE + RELEASE_PAGE_SIZE
-  );
+  const releaseGroups = releaseMajorOptions
+    .map((major) => ({
+      major,
+      meta: releaseStageMeta[major] || { title: `${major}.x 阶段`, detail: '阶段记录已归入版本时间线。' },
+      releases: filteredReleases.filter((release) => release.version.split('.')[0] === major)
+    }))
+    .filter((group) => group.releases.length > 0);
 
   function updateReleaseQuery(value) {
     setReleaseQuery(value);
-    setReleasePage(0);
   }
 
   function updateReleaseMajor(value) {
     setReleaseMajor(value);
-    setReleasePage(0);
   }
 
   function updateReleaseStatus(value) {
     setReleaseStatus(value);
-    setReleasePage(0);
   }
 
   return (
@@ -7121,6 +7150,22 @@ function ReleaseWorkspace() {
         </div>
         <span className="release-badge">{latestRelease.version}</span>
       </div>
+
+      <section className="release-story-hero">
+        <div>
+          <p className="eyebrow">Website Maintenance Log</p>
+          <h3>从可运行，到像付江樊自己的站</h3>
+          <span>版本清单按大版本收纳，既能查改动，也能看出这个网站是怎么一点点长出来的。</span>
+        </div>
+        <div className="release-next-order" aria-label="后续优化顺序">
+          {['6', '3', '4', '1', '7'].map((item, index) => (
+            <React.Fragment key={item}>
+              <strong>{item}</strong>
+              {index < 4 && <span>→</span>}
+            </React.Fragment>
+          ))}
+        </div>
+      </section>
 
       <div className="release-metric-grid">
         <div className="release-metric">
@@ -7164,50 +7209,44 @@ function ReleaseWorkspace() {
             <option value="已归档">已归档</option>
           </select>
         </div>
-
-        <div className="release-pager">
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={() => setReleasePage((page) => Math.max(0, page - 1))}
-            disabled={safeReleasePage === 0}
-          >
-            上一页
-          </button>
-          <span>{filteredReleases.length ? safeReleasePage + 1 : 0} / {pageCount}</span>
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={() => setReleasePage((page) => Math.min(pageCount - 1, page + 1))}
-            disabled={safeReleasePage === pageCount - 1}
-          >
-            下一页
-          </button>
-        </div>
       </div>
 
-      <div className="release-timeline">
-        {visibleReleases.length === 0 ? (
+      <div className="release-major-timeline">
+        {releaseGroups.length === 0 ? (
           <p className="empty-state">没有匹配的版本记录。</p>
-        ) : visibleReleases.map((release) => (
-          <article className="release-version-card" key={release.version}>
-            <div>
-              <span className="release-version">{release.version}</span>
-              <h3>{release.title}</h3>
-              <small>{release.date}</small>
+        ) : releaseGroups.map((group) => (
+          <section className="release-major-block" key={group.major}>
+            <div className="release-major-head">
+              <span className="release-major-mark">{group.major}</span>
+              <div>
+                <h3>{group.meta.title}</h3>
+                <p>{group.meta.detail}</p>
+              </div>
+              <strong>{group.releases.length} 个版本</strong>
             </div>
-            <span className={`ops-status ${release.status === '已上线' ? 'ready' : 'warning'}`}>
-              {release.status}
-            </span>
-            <ul>
-              {release.points.map((point) => (
-                <li key={point}>
-                  <CheckCircle2 size={15} />
-                  <span>{point}</span>
-                </li>
+            <div className="release-timeline">
+              {group.releases.map((release) => (
+                <article className="release-version-card" key={release.version}>
+                  <div>
+                    <span className="release-version">{release.version}</span>
+                    <h3>{release.title}</h3>
+                    <small>{release.date}</small>
+                  </div>
+                  <span className={`ops-status ${release.status === '已上线' ? 'ready' : 'warning'}`}>
+                    {release.status}
+                  </span>
+                  <ul>
+                    {release.points.map((point) => (
+                      <li key={point}>
+                        <CheckCircle2 size={15} />
+                        <span>{point}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </article>
               ))}
-            </ul>
-          </article>
+            </div>
+          </section>
         ))}
       </div>
     </section>

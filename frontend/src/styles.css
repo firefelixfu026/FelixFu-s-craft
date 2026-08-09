@@ -4554,7 +4554,7 @@ h3 {
 }
 
 .release-page {
-  gap: 16px;
+  gap: 18px;
 }
 
 .release-badge {
@@ -4574,9 +4574,60 @@ h3 {
   gap: 12px;
 }
 
-.release-toolbar {
+.release-story-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  min-height: 148px;
+  padding: 20px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 12% 22%, rgba(56, 189, 248, 0.14), transparent 26%),
+    linear-gradient(135deg, rgba(31, 122, 109, 0.12), rgba(236, 72, 153, 0.07)),
+    #f8fafc;
+}
+
+.release-story-hero h3 {
+  margin: 4px 0 6px;
+  color: #102033;
+  font-size: clamp(24px, 3vw, 38px);
+  line-height: 1.18;
+}
+
+.release-story-hero span {
+  color: #5b6878;
+  line-height: 1.65;
+}
+
+.release-next-order {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: max-content;
+  padding: 10px 12px;
+  border: 1px solid #d8e0e9;
+  border-radius: 999px;
+  color: #5b6878;
+  background: rgba(255, 255, 255, 0.88);
+  font-weight: 900;
+  box-shadow: 0 12px 28px rgba(31, 122, 109, 0.12);
+}
+
+.release-next-order strong {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: #fff;
+  background: #1f7a6d;
+}
+
+.release-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   align-items: center;
 }
@@ -4585,26 +4636,81 @@ h3 {
   grid-template-columns: minmax(240px, 1fr) repeat(2, minmax(140px, 0.25fr));
 }
 
-.release-pager {
-  display: flex;
+.release-major-timeline {
+  display: grid;
+  gap: 20px;
+}
+
+.release-major-block {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  padding-left: 18px;
+}
+
+.release-major-block::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 18px;
+  bottom: -20px;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #1f7a6d, rgba(45, 141, 240, 0.24));
+}
+
+.release-major-block:last-child::before {
+  bottom: 18px;
+}
+
+.release-major-head {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
   align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
+  padding: 14px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
 }
 
-.release-pager span {
-  min-width: 64px;
+.release-major-mark {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  color: #fff;
+  background: #1f7a6d;
+  font-weight: 900;
+  box-shadow: 0 12px 24px rgba(31, 122, 109, 0.2);
+}
+
+.release-major-head h3 {
+  margin: 0 0 4px;
+  color: #102033;
+}
+
+.release-major-head p {
+  margin: 0;
   color: #5b6878;
-  font-weight: 800;
-  text-align: center;
+  line-height: 1.55;
 }
 
-.release-pager button:disabled {
-  cursor: not-allowed;
-  opacity: 0.48;
+.release-major-head > strong {
+  color: #1f7a6d;
+  white-space: nowrap;
+}
+
+.release-major-block .release-timeline {
+  gap: 10px;
+  padding-left: 24px;
 }
 
 .release-version-card {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(160px, 0.3fr) auto minmax(260px, 1fr);
   gap: 14px;
@@ -4913,6 +5019,19 @@ h3 {
   border: 1px dashed #b7c7d8;
   border-radius: 8px;
   background: #f8fafc;
+}
+
+.release-major-block .release-version-card::before {
+  content: '';
+  position: absolute;
+  left: -31px;
+  top: 22px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #1f7a6d;
+  box-shadow: 0 0 0 3px rgba(31, 122, 109, 0.14);
 }
 
 .editor-side-stack {
@@ -6204,6 +6323,9 @@ h3 {
 :root[data-theme='dark'] .ops-service-card,
 :root[data-theme='dark'] .ops-list-row,
 :root[data-theme='dark'] .release-metric,
+:root[data-theme='dark'] .release-story-hero,
+:root[data-theme='dark'] .release-next-order,
+:root[data-theme='dark'] .release-major-head,
 :root[data-theme='dark'] .release-version-card,
 :root[data-theme='dark'] .analytics-grid > div,
 :root[data-theme='dark'] .account-list article,
@@ -6544,6 +6666,9 @@ h3 {
 :root[data-theme='dark'] .ops-history-row small,
 :root[data-theme='dark'] .release-metric span,
 :root[data-theme='dark'] .release-checks span,
+:root[data-theme='dark'] .release-story-hero span,
+:root[data-theme='dark'] .release-next-order,
+:root[data-theme='dark'] .release-major-head p,
 :root[data-theme='dark'] .release-version-card li,
 :root[data-theme='dark'] .release-version-card small,
 :root[data-theme='dark'] .admin-insight-grid p,
@@ -6596,6 +6721,8 @@ h3 {
 :root[data-theme='dark'] .ops-service-card strong,
 :root[data-theme='dark'] .ops-list-row strong,
 :root[data-theme='dark'] .release-metric strong,
+:root[data-theme='dark'] .release-story-hero h3,
+:root[data-theme='dark'] .release-major-head h3,
 :root[data-theme='dark'] .release-version-card h3,
 :root[data-theme='dark'] .admin-insight-grid h3,
 :root[data-theme='dark'] .completion-summary-grid strong,
@@ -6606,6 +6733,21 @@ h3 {
 :root[data-theme='dark'] .home-clock-time,
 :root[data-theme='dark'] .home-update-item strong {
   color: var(--text-main);
+}
+
+:root[data-theme='dark'] .release-major-head > strong,
+:root[data-theme='dark'] .release-version {
+  color: var(--accent);
+}
+
+:root[data-theme='dark'] .release-major-mark,
+:root[data-theme='dark'] .release-next-order strong,
+:root[data-theme='dark'] .release-major-block .release-version-card::before {
+  background: var(--accent);
+}
+
+:root[data-theme='dark'] .release-major-block .release-version-card::before {
+  border-color: var(--panel);
 }
 
 :root[data-theme='dark'] .article-section-card em,
@@ -6674,7 +6816,6 @@ h3 {
 
 :root[data-theme='dark'] .date,
 :root[data-theme='dark'] .article-meta,
-:root[data-theme='dark'] .release-pager span,
 :root[data-theme='dark'] .chart-label {
   color: var(--text-muted);
 }
@@ -6956,10 +7097,6 @@ h3 {
   .release-toolbar,
   .release-filter-bar {
     grid-template-columns: 1fr;
-  }
-
-  .release-pager {
-    justify-content: flex-start;
   }
 
   .ops-metric-grid,
