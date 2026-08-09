@@ -379,6 +379,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v4.2.2',
+    title: '夜间文章可读性修复',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['修复夜间模式下文章正文局部字体对比度不足', '补齐链接、引用、行内代码、表格和图片说明的深色样式', '文章详情和后台预览统一使用更清晰的阅读配色']
+  },
+  {
     version: 'v4.2.1',
     title: '折叠态播放器瘦身',
     date: '2026-08-09',
