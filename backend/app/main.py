@@ -31,7 +31,7 @@ from app.auth import (
 )
 from app.database import SessionLocal, get_db, init_db
 from app.github_oauth import fetch_github_identity, get_github_authorize_url
-from app.models import AdminAuditLog, AiGeneration, Article, Comment, ReactionCounter, SummerPlan, Tag, ToolboxLink, User, UserReaction
+from app.models import AdminAuditLog, AiGeneration, Article, Comment, ReactionCounter, SiteSetting, SummerPlan, Tag, ToolboxLink, User, UserReaction
 from app.seed import REACTION_TYPES, seed_database
 
 
@@ -372,6 +372,10 @@ class SummerPlanIn(BaseModel):
     payload: dict[str, Any]
 
 
+class SiteProfileIn(BaseModel):
+    avatarUrl: str = ""
+
+
 class ToolboxLinkIn(BaseModel):
     title: str
     category: str = "自定义"
@@ -442,8 +446,37 @@ def health(db: Session = Depends(get_db)) -> dict[str, str | int]:
 
 
 @app.get("/api/profile")
-def get_profile() -> dict:
-    return PROFILE
+def get_profile(db: Session = Depends(get_db)) -> dict:
+    return _get_site_profile(db)
+
+
+@app.put("/api/admin/profile")
+def update_profile(
+    payload: SiteProfileIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict:
+    avatar_url = payload.avatarUrl.strip()
+    if avatar_url and not (
+        avatar_url.startswith("/uploads/")
+        or avatar_url == "/avatar.jpg"
+        or avatar_url.startswith("http://")
+        or avatar_url.startswith("https://")
+        or avatar_url.startswith("data:image/")
+    ):
+        raise HTTPException(status_code=400, detail="Avatar URL must be an uploaded image or a valid image URL")
+
+    setting = db.get(SiteSetting, "profile")
+    next_payload = dict(setting.payload) if setting else {}
+    next_payload["avatarUrl"] = avatar_url or "/avatar.jpg"
+    if setting:
+        setting.payload = next_payload
+    else:
+        setting = SiteSetting(key="profile", payload=next_payload)
+        db.add(setting)
+    db.commit()
+    _record_admin_event(db, current_user, "更新侧边栏头像", "profile", "site avatar", next_payload["avatarUrl"])
+    return _get_site_profile(db)
 
 
 @app.get("/api/summer-plan")
@@ -2104,6 +2137,15 @@ def _load_articles(db: Session) -> list[Article]:
         .order_by(Article.pinned.desc(), Article.created_at.desc())
     )
     return list(db.scalars(statement).all())
+
+
+def _get_site_profile(db: Session) -> dict:
+    setting = db.get(SiteSetting, "profile")
+    profile = dict(PROFILE)
+    profile["avatarUrl"] = "/avatar.jpg"
+    if setting and isinstance(setting.payload, dict):
+        profile.update(setting.payload)
+    return profile
 
 
 def _get_article_or_404(db: Session, article_id: str) -> Article:

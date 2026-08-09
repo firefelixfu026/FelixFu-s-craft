@@ -4970,6 +4970,47 @@ h3 {
   gap: 8px;
 }
 
+.account-site-avatar-editor {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.account-site-avatar-editor img {
+  width: 58px;
+  height: 58px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
+}
+
+.account-site-avatar-editor div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.account-site-avatar-editor strong {
+  color: #102033;
+}
+
+.account-site-avatar-editor span,
+.account-site-avatar-editor em {
+  color: #6a7685;
+  font-style: normal;
+  line-height: 1.45;
+}
+
+.account-avatar-upload {
+  justify-self: end;
+}
+
 .account-profile p,
 .account-list span {
   color: #6a7685;
@@ -6329,6 +6370,7 @@ h3 {
 :root[data-theme='dark'] .release-version-card,
 :root[data-theme='dark'] .analytics-grid > div,
 :root[data-theme='dark'] .account-list article,
+:root[data-theme='dark'] .account-site-avatar-editor,
 :root[data-theme='dark'] .template-card,
 :root[data-theme='dark'] .study-task,
 :root[data-theme='dark'] .article-preview-panel,
@@ -6674,6 +6716,8 @@ h3 {
 :root[data-theme='dark'] .admin-insight-grid p,
 :root[data-theme='dark'] .account-profile p,
 :root[data-theme='dark'] .account-list span,
+:root[data-theme='dark'] .account-site-avatar-editor span,
+:root[data-theme='dark'] .account-site-avatar-editor em,
 :root[data-theme='dark'] .admin-panel-heading > span,
 :root[data-theme='dark'] .admin-page-card em,
 :root[data-theme='dark'] .comment-filter-row label,
@@ -6725,6 +6769,7 @@ h3 {
 :root[data-theme='dark'] .release-major-head h3,
 :root[data-theme='dark'] .release-version-card h3,
 :root[data-theme='dark'] .admin-insight-grid h3,
+:root[data-theme='dark'] .account-site-avatar-editor strong,
 :root[data-theme='dark'] .completion-summary-grid strong,
 :root[data-theme='dark'] .usage-chart-heading h3 {
   color: var(--text-main);

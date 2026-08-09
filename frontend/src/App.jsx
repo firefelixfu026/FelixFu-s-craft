@@ -385,6 +385,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v5.4.1',
+    title: '侧边栏头像可修改',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['账号中心新增侧边栏头像上传入口', '侧边栏头像改为读取后端保存的站点资料', '管理员上传后可立即同步到左侧导航']
+  },
+  {
     version: 'v5.4',
     title: '版本时间线',
     date: '2026-08-09',
@@ -1378,10 +1385,13 @@ function App() {
   const [authMessage, setAuthMessage] = useState('');
   const [interactionMessage, setInteractionMessage] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [profileAvatarMessage, setProfileAvatarMessage] = useState('');
+  const [isSavingProfileAvatar, setIsSavingProfileAvatar] = useState(false);
   const ThemeIcon = theme === 'dark' ? Moon : Sun;
   const nextThemeLabel = theme === 'dark' ? '日间模式' : '夜间模式';
   const SidebarToggleIcon = isSidebarCollapsed ? PanelLeftOpen : PanelLeftClose;
   const globalAudioRef = useRef(null);
+  const sidebarAvatarUrl = profile.avatarUrl || '/avatar.jpg';
 
   const visibleNavItems = useMemo(() => {
     if (!currentUser) {
@@ -2455,6 +2465,43 @@ function App() {
     }
   }
 
+  async function updateSidebarAvatar(file) {
+    if (!file) return;
+    if (currentUser?.role !== 'admin') {
+      setProfileAvatarMessage('只有管理员可以修改侧边栏头像');
+      return;
+    }
+
+    setProfileAvatarMessage('正在上传新头像...');
+    const image = await uploadAdminImage(file);
+    if (!image?.url) {
+      setProfileAvatarMessage('头像上传失败，请换一张 JPG、PNG、WebP、GIF 或 SVG 图片试试');
+      return;
+    }
+
+    setIsSavingProfileAvatar(true);
+    setProfileAvatarMessage('头像已上传，正在保存到网站...');
+    try {
+      const response = await fetch('/api/admin/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ avatarUrl: image.url })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setProfileAvatarMessage(result.detail || `头像保存失败：HTTP ${response.status}`);
+        return;
+      }
+      setProfile(result);
+      setProfileAvatarMessage('侧边栏头像已更新');
+      refreshAdminAuditLogs();
+    } catch {
+      setProfileAvatarMessage('后端服务不可用，头像暂时没保存成功');
+    } finally {
+      setIsSavingProfileAvatar(false);
+    }
+  }
+
   async function uploadArticleCover(file) {
     const image = await uploadAdminImage(file);
     if (!image?.url) return;
@@ -2975,7 +3022,7 @@ function App() {
     <div className={shellClassName}>
       <aside className="sidebar" aria-label="博客导航" aria-expanded={!isSidebarCollapsed}>
         <div className="brand">
-          <img className="brand-mark" src="/avatar.jpg" alt="付江樊头像" />
+          <img className="brand-mark" src={sidebarAvatarUrl} alt="付江樊头像" />
           <div className="brand-text">
             <strong>{profile.name}</strong>
             <span>{profile.englishName}</span>
@@ -3177,9 +3224,13 @@ function App() {
         {activeView === 'account' && currentUser && (
           <AccountWorkspace
             currentUser={currentUser}
+            profile={profile}
             accountActivity={accountActivity}
             refreshAccountActivity={refreshAccountActivity}
             setActiveView={setActiveView}
+            updateSidebarAvatar={updateSidebarAvatar}
+            profileAvatarMessage={profileAvatarMessage}
+            isSavingProfileAvatar={isSavingProfileAvatar || isUploadingImage}
             logout={logout}
             openArticle={(articleId) => {
               setActiveView('articles');
@@ -6793,11 +6844,23 @@ function GameWorkspace() {
   );
 }
 
-function AccountWorkspace({ currentUser, accountActivity, refreshAccountActivity, setActiveView, openArticle, logout }) {
+function AccountWorkspace({
+  currentUser,
+  profile,
+  accountActivity,
+  refreshAccountActivity,
+  setActiveView,
+  openArticle,
+  updateSidebarAvatar,
+  profileAvatarMessage,
+  isSavingProfileAvatar,
+  logout
+}) {
   const summary = accountActivity?.summary || {};
   const comments = accountActivity?.comments || [];
   const reactions = accountActivity?.reactions || [];
   const favoriteArticles = accountActivity?.favoriteArticles || [];
+  const sidebarAvatarUrl = profile?.avatarUrl || '/avatar.jpg';
 
   return (
     <section className="workspace account-workspace">
@@ -6829,6 +6892,30 @@ function AccountWorkspace({ currentUser, accountActivity, refreshAccountActivity
             </button>
           </div>
         </div>
+
+        {currentUser.role === 'admin' && (
+          <div className="account-site-avatar-editor">
+            <img src={sidebarAvatarUrl} alt="当前侧边栏头像" />
+            <div>
+              <strong>侧边栏头像</strong>
+              <span>这里会同步到左侧导航栏，不影响 GitHub 登录头像。</span>
+              {profileAvatarMessage && <em>{profileAvatarMessage}</em>}
+            </div>
+            <label className="ghost-button file-upload-control account-avatar-upload">
+              <ImageIcon size={16} />
+              <span>{isSavingProfileAvatar ? '处理中' : '上传头像'}</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                disabled={isSavingProfileAvatar}
+                onChange={(event) => {
+                  updateSidebarAvatar(event.target.files?.[0]);
+                  event.target.value = '';
+                }}
+              />
+            </label>
+          </div>
+        )}
 
         <div className="release-metric-grid">
           <div className="release-metric">

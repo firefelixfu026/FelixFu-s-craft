@@ -142,6 +142,14 @@ class SummerPlan(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class SiteSetting(Base):
+    __tablename__ = "site_settings"
+
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class ToolboxLink(Base):
     __tablename__ = "toolbox_links"
 
