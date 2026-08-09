@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -56,8 +56,10 @@ LOGIN_FAILURE_LIMIT = int(os.getenv("LOGIN_FAILURE_LIMIT", "5") or "5")
 LOGIN_LOCK_SECONDS = int(os.getenv("LOGIN_LOCK_SECONDS", "60") or "60")
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "uploads"))
 MUSIC_DIR = UPLOAD_DIR / "music"
+MUSIC_CHUNK_DIR = UPLOAD_DIR / ".music-chunks"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 MUSIC_DIR.mkdir(parents=True, exist_ok=True)
+MUSIC_CHUNK_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -78,6 +80,7 @@ ALLOWED_AUDIO_TYPES = {
 }
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 MAX_AUDIO_UPLOAD_BYTES = 50 * 1024 * 1024
+MAX_AUDIO_CHUNK_BYTES = 5 * 1024 * 1024
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
 AUDIO_SUFFIXES = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac"}
 LOGIN_FAILURES: dict[str, dict[str, Any]] = {}
@@ -903,6 +906,70 @@ async def upload_admin_music(
         "artist": "Felix 的歌单",
         "url": f"/uploads/music/{filename}",
         "size": len(content),
+        "createdAt": datetime.utcnow().isoformat(),
+    }
+
+
+@app.post("/api/admin/uploads/music/chunk")
+async def upload_admin_music_chunk(
+    upload_id: str = Form(..., alias="uploadId"),
+    filename: str = Form(...),
+    chunk_index: int = Form(..., alias="chunkIndex"),
+    total_chunks: int = Form(..., alias="totalChunks"),
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, str | int]:
+    if not re.fullmatch(r"[0-9A-Za-z._-]{8,80}", upload_id):
+        raise HTTPException(status_code=400, detail="Invalid upload id")
+    if total_chunks < 1 or total_chunks > 64:
+        raise HTTPException(status_code=400, detail="Invalid chunk count")
+    if chunk_index < 0 or chunk_index >= total_chunks:
+        raise HTTPException(status_code=400, detail="Invalid chunk index")
+
+    original_suffix = Path(filename or "").suffix.lower()
+    if original_suffix not in AUDIO_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Only MP3, WAV, OGG, FLAC, M4A, or AAC audio files are supported")
+
+    content = await file.read(MAX_AUDIO_CHUNK_BYTES + 1)
+    if len(content) > MAX_AUDIO_CHUNK_BYTES:
+        raise HTTPException(status_code=400, detail="Audio chunk is too large")
+    if not content:
+        raise HTTPException(status_code=400, detail="Audio chunk is empty")
+
+    chunk_dir = MUSIC_CHUNK_DIR / upload_id
+    chunk_dir.mkdir(parents=True, exist_ok=True)
+    (chunk_dir / f"{chunk_index:04d}.part").write_bytes(content)
+
+    part_paths = [chunk_dir / f"{index:04d}.part" for index in range(total_chunks)]
+    if not all(path.exists() for path in part_paths):
+        return {"status": "partial", "received": chunk_index + 1, "total": total_chunks}
+
+    total_size = sum(path.stat().st_size for path in part_paths)
+    if total_size > MAX_AUDIO_UPLOAD_BYTES:
+        for path in part_paths:
+            path.unlink(missing_ok=True)
+        chunk_dir.rmdir()
+        raise HTTPException(status_code=400, detail="Audio must be 50 MB or smaller")
+
+    original_stem = Path(filename or "track").stem.strip() or "track"
+    safe_stem = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff._-]+", "-", original_stem).strip(".-_") or "track"
+    output_filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{uuid4().hex[:8]}-{safe_stem[:60]}{original_suffix}"
+    destination = MUSIC_DIR / output_filename
+    with destination.open("wb") as output:
+        for path in part_paths:
+            output.write(path.read_bytes())
+            path.unlink(missing_ok=True)
+    chunk_dir.rmdir()
+
+    _record_admin_event(db, current_user, "上传音乐", "upload", output_filename, f"{total_size} bytes")
+    return {
+        "status": "complete",
+        "filename": output_filename,
+        "title": _music_title_from_filename(output_filename),
+        "artist": "Felix 的歌单",
+        "url": f"/uploads/music/{output_filename}",
+        "size": total_size,
         "createdAt": datetime.utcnow().isoformat(),
     }
 
