@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   BookOpen,
   Bot,
+  CalendarDays,
   CheckCircle2,
   Code2,
   Copy,
@@ -4503,29 +4504,7 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
             <span>新增时间段</span>
           </button>
         </div>
-        <div className="summer-date-picker">
-          <label>
-            <span>选择日期</span>
-            <select value={selectedDayPlan.date} onChange={(event) => setSelectedPlanDate(event.target.value)}>
-              {dayPlans.map((day) => (
-                <option key={day.date} value={day.date}>{day.label} · {day.theme}</option>
-              ))}
-            </select>
-          </label>
-          <div className="summer-date-tabs" aria-label="暑期计划日期">
-            {dayPlans.map((day) => (
-              <button
-                className={`summer-date-tab${day.date === selectedDayPlan.date ? ' active' : ''}`}
-                key={day.date}
-                type="button"
-                onClick={() => setSelectedPlanDate(day.date)}
-              >
-                <strong>{day.label}</strong>
-                <span>{day.theme}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        <PlanCalendarSelector days={dayPlans} value={selectedDayPlan.date} onChange={setSelectedPlanDate} />
         <EditableTable
           columns={[
             ['time', '时间段', 'input'],
@@ -4714,6 +4693,66 @@ function PlanModule({ title, count, children, wide = false }) {
       </div>
       {children}
     </section>
+  );
+}
+
+const calendarWeekdays = ['一', '二', '三', '四', '五', '六', '日'];
+
+function getCalendarDateParts(dateValue) {
+  const [year, month, day] = String(dateValue || '').split('-').map(Number);
+  if (!year || !month || !day) return null;
+  const date = new Date(year, month - 1, day);
+  return {
+    year,
+    month,
+    day,
+    weekdayIndex: (date.getDay() + 6) % 7
+  };
+}
+
+function PlanCalendarSelector({ days, value, onChange }) {
+  const selectedDay = days.find((day) => day.date === value) || days[0];
+  const parsedDays = days.map((day) => ({ ...day, dateParts: getCalendarDateParts(day.date) }));
+  const firstDay = parsedDays.find((day) => day.dateParts)?.dateParts;
+  const calendarCells = [
+    ...Array.from({ length: firstDay?.weekdayIndex || 0 }, (_, index) => ({ id: `blank-${index}`, blank: true })),
+    ...parsedDays
+  ];
+
+  return (
+    <div className="summer-calendar-picker" aria-label="暑期计划日历">
+      <div className="summer-calendar-summary">
+        <div>
+          <span className="calendar-kicker">
+            <CalendarDays size={17} />
+            {firstDay ? `${firstDay.year}年${firstDay.month}月` : '计划日期'}
+          </span>
+          <strong>{selectedDay?.label} · {selectedDay?.theme}</strong>
+        </div>
+      </div>
+      <div className="summer-calendar-grid">
+        {calendarWeekdays.map((weekday) => (
+          <span className="calendar-weekday" key={weekday}>周{weekday}</span>
+        ))}
+        {calendarCells.map((day) => (
+          day.blank ? (
+            <span className="calendar-day-cell blank" key={day.id} aria-hidden="true" />
+          ) : (
+            <button
+              className={`calendar-day-cell${day.date === value ? ' active' : ''}`}
+              key={day.date}
+              type="button"
+              onClick={() => onChange(day.date)}
+              aria-pressed={day.date === value}
+            >
+              <span className="calendar-day-number">{day.dateParts?.day || day.label}</span>
+              <span className="calendar-day-label">{day.label}</span>
+              <span className="calendar-day-theme">{day.theme}</span>
+            </button>
+          )
+        ))}
+      </div>
+    </div>
   );
 }
 

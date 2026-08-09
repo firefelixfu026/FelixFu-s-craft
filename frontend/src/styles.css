@@ -4278,78 +4278,118 @@ h3 {
   font-size: 12px;
 }
 
-.summer-date-picker {
+.summer-calendar-picker {
   display: grid;
-  gap: 12px;
-  margin: 16px 0;
+  gap: 14px;
+  margin: 16px 0 18px;
 }
 
-.summer-date-picker label {
-  display: grid;
-  grid-template-columns: auto minmax(220px, 360px);
-  gap: 10px;
+.summer-calendar-summary {
+  display: flex;
   align-items: center;
-  width: fit-content;
-  max-width: 100%;
-  color: #334155;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.summer-calendar-summary > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.calendar-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #64748b;
+  font-size: 13px;
   font-weight: 800;
 }
 
-.summer-date-picker select {
-  width: 100%;
-  min-height: 40px;
-  border: 1px solid #d8e0e9;
-  border-radius: 8px;
-  padding: 0 12px;
-  color: #18212f;
-  background: #ffffff;
-  outline: 0;
+.summer-calendar-summary strong {
+  color: #0f172a;
+  font-size: 18px;
+  line-height: 1.35;
 }
 
-.summer-date-picker select:focus {
-  border-color: #1f7a6d;
-  box-shadow: 0 0 0 3px rgba(31, 122, 109, 0.12);
-}
-
-.summer-date-tabs {
+.summer-calendar-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
 }
 
-.summer-date-tab {
+.calendar-weekday {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.calendar-day-cell {
   display: grid;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
-  min-height: 64px;
+  min-height: 96px;
   border: 1px solid #d8e0e9;
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 10px;
   color: #334155;
   background: #ffffff;
   text-align: left;
 }
 
-.summer-date-tab:hover {
+.calendar-day-cell:not(.blank):hover {
   border-color: #1f7a6d;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
 }
 
-.summer-date-tab.active {
+.calendar-day-cell.active {
   border-color: #1f7a6d;
   color: #ffffff;
   background: #1f7a6d;
 }
 
-.summer-date-tab strong,
-.summer-date-tab span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.calendar-day-cell.blank {
+  border-color: transparent;
+  background: transparent;
+  pointer-events: none;
 }
 
-.summer-date-tab span {
+.calendar-day-number {
+  width: fit-content;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #0f172a;
+  background: #e7eef5;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.calendar-day-cell.active .calendar-day-number {
+  color: #1f7a6d;
+  background: #ffffff;
+}
+
+.calendar-day-label {
+  font-weight: 900;
+}
+
+.calendar-day-theme {
+  display: -webkit-box;
+  overflow: hidden;
+  color: inherit;
   font-size: 12px;
+  line-height: 1.35;
   opacity: 0.85;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .summer-table-wrap {
@@ -4571,7 +4611,8 @@ h3 {
 :root[data-theme='dark'] .completion-summary-grid > div,
 :root[data-theme='dark'] .summer-goal-card,
 :root[data-theme='dark'] .summer-readonly-note,
-:root[data-theme='dark'] .summer-date-tab,
+:root[data-theme='dark'] .summer-calendar-summary,
+:root[data-theme='dark'] .calendar-day-cell,
 :root[data-theme='dark'] .weekly-plan-row,
 :root[data-theme='dark'] .weekly-check,
 :root[data-theme='dark'] .empty-state,
@@ -4696,7 +4737,7 @@ h3 {
 :root[data-theme='dark'] .comment-reply-button,
 :root[data-theme='dark'] .game-actions .secondary-link,
 :root[data-theme='dark'] .ai-editor-tools button,
-:root[data-theme='dark'] .summer-date-picker select,
+:root[data-theme='dark'] .summer-calendar-summary,
 :root[data-theme='dark'] .inline-date-selector select,
 :root[data-theme='dark'] .ai-generator input,
 :root[data-theme='dark'] .ai-generator textarea,
@@ -4784,7 +4825,7 @@ h3 {
 :root[data-theme='dark'] .image-resource-meta span,
 :root[data-theme='dark'] .usage-chart-heading span,
 :root[data-theme='dark'] .completion-summary-grid span,
-:root[data-theme='dark'] .summer-date-picker label,
+:root[data-theme='dark'] .calendar-kicker,
 :root[data-theme='dark'] .summer-plan-panel .admin-panel-heading p,
 :root[data-theme='dark'] .summer-plan-panel .admin-panel-heading > span,
 :root[data-theme='dark'] .inline-date-selector {
@@ -5090,15 +5131,6 @@ h3 {
     justify-content: flex-start;
   }
 
-  .summer-date-tabs {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .summer-date-tab {
-    min-height: 56px;
-    padding: 9px 10px;
-  }
-
   .summer-plan-table {
     min-width: 620px;
   }
@@ -5113,6 +5145,12 @@ h3 {
 
   .summer-plan-panel.wide .completion-table {
     min-width: 760px;
+  }
+
+  .summer-calendar-grid {
+    overflow-x: auto;
+    grid-template-columns: repeat(7, minmax(116px, 1fr));
+    padding-bottom: 4px;
   }
 
   .account-profile {
@@ -5222,6 +5260,19 @@ h3 {
     font-size: 32px;
   }
 
+  .summer-calendar-summary {
+    padding: 12px;
+  }
+
+  .summer-calendar-summary strong {
+    font-size: 16px;
+  }
+
+  .calendar-day-cell {
+    min-height: 88px;
+    padding: 9px;
+  }
+
   .profile-copy,
   .content-band,
   .article-card,
@@ -5237,15 +5288,6 @@ h3 {
 
   .live-status-card:first-child strong {
     font-size: 20px;
-  }
-
-  .summer-date-picker label {
-    grid-template-columns: 1fr;
-    width: 100%;
-  }
-
-  .summer-date-tabs {
-    grid-template-columns: 1fr;
   }
 
   .summer-table-wrap {
