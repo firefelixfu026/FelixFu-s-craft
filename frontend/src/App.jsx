@@ -94,7 +94,7 @@ const COMMENT_UNIT_CHARS = 60;
 const ADMIN_COMMENTS_PER_PAGE = 5;
 const IMAGE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 const AUDIO_UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
-const AUDIO_UPLOAD_CHUNK_BYTES = 4 * 1024 * 1024;
+const AUDIO_UPLOAD_CHUNK_BYTES = 768 * 1024;
 const ALLOWED_IMAGE_UPLOAD_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']);
 const ALLOWED_AUDIO_UPLOAD_TYPES = new Set(['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/flac', 'audio/x-flac', 'audio/mp4', 'audio/aac']);
 const ARTICLE_DRAFT_KEY = 'felix_blog_article_form_draft';
@@ -361,6 +361,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v3.0.2',
+    title: '音乐分片上传兼容',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['音乐上传分片降到 768KB 以内', '兼容服务器外层 1MB 上传限制', '后台上传错误统一转成可读提示', '修复特定 MP3 上传无反馈的问题']
+  },
   {
     version: 'v3.0.1',
     title: '音乐上传热修',
@@ -863,6 +870,18 @@ function formatTrackTime(seconds) {
   const minutes = Math.floor(totalSeconds / 60);
   const rest = totalSeconds % 60;
   return `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
+}
+
+function formatApiErrorDetail(detail, fallback) {
+  if (!detail) return fallback;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => item?.msg || item?.message || JSON.stringify(item))
+      .filter(Boolean)
+      .join('；') || fallback;
+  }
+  return detail?.message || fallback;
 }
 
 function aiTaskLabel(task) {
@@ -2140,7 +2159,7 @@ function App() {
         const fallbackMessage = response.status === 413
           ? '音乐上传失败：服务器上传上限太小，需要调整 Nginx client_max_body_size'
           : `音乐上传失败：HTTP ${response.status}`;
-        setAdminMessage(result.detail || fallbackMessage);
+        setAdminMessage(formatApiErrorDetail(result.detail, fallbackMessage));
         if (response.status === 401 || response.status === 403) {
           setActiveView('login');
         }
@@ -2183,7 +2202,7 @@ function App() {
           const fallbackMessage = response.status === 413
             ? '音乐上传失败：服务器上传上限太小，需要调整 Nginx client_max_body_size'
             : `音乐上传失败：HTTP ${response.status}`;
-          setAdminMessage(result.detail || fallbackMessage);
+          setAdminMessage(formatApiErrorDetail(result.detail, fallbackMessage));
           if (response.status === 401 || response.status === 403) {
             setActiveView('login');
           }

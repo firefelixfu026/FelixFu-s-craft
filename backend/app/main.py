@@ -80,7 +80,7 @@ ALLOWED_AUDIO_TYPES = {
 }
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 MAX_AUDIO_UPLOAD_BYTES = 50 * 1024 * 1024
-MAX_AUDIO_CHUNK_BYTES = 5 * 1024 * 1024
+MAX_AUDIO_CHUNK_BYTES = 1024 * 1024
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
 AUDIO_SUFFIXES = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac"}
 LOGIN_FAILURES: dict[str, dict[str, Any]] = {}
