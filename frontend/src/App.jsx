@@ -382,6 +382,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v4.3.3',
+    title: '账号退出入口整理',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['侧边栏登录区域不再显示退出按钮', '退出登录移动到账号中心', '导航区域更轻、更省空间']
+  },
+  {
     version: 'v4.3.2',
     title: '导航图标微调',
     date: '2026-08-09',
@@ -2776,10 +2783,6 @@ function App() {
             <>
               <span>管理员</span>
               <strong>{currentUser.displayName}</strong>
-              <button className="icon-text-button" type="button" onClick={() => logout()} title="退出" aria-label="退出">
-                <LogOut size={17} />
-                <span>退出</span>
-              </button>
             </>
           ) : (
             <>
@@ -2945,6 +2948,7 @@ function App() {
             accountActivity={accountActivity}
             refreshAccountActivity={refreshAccountActivity}
             setActiveView={setActiveView}
+            logout={logout}
             openArticle={(articleId) => {
               setActiveView('articles');
               openArticle(articleId);
@@ -6194,7 +6198,7 @@ function GameWorkspace() {
   );
 }
 
-function AccountWorkspace({ currentUser, accountActivity, refreshAccountActivity, setActiveView, openArticle }) {
+function AccountWorkspace({ currentUser, accountActivity, refreshAccountActivity, setActiveView, openArticle, logout }) {
   const summary = accountActivity?.summary || {};
   const comments = accountActivity?.comments || [];
   const reactions = accountActivity?.reactions || [];
@@ -6219,10 +6223,16 @@ function AccountWorkspace({ currentUser, accountActivity, refreshAccountActivity
             <p>{currentUser.email}</p>
             <span>{currentUser.role === 'admin' ? '管理员' : '读者'}</span>
           </div>
-          <button className="ghost-button" type="button" onClick={refreshAccountActivity}>
-            <RefreshCw size={16} />
-            <span>刷新</span>
-          </button>
+          <div className="account-profile-actions">
+            <button className="ghost-button" type="button" onClick={refreshAccountActivity}>
+              <RefreshCw size={16} />
+              <span>刷新</span>
+            </button>
+            <button className="ghost-button danger" type="button" onClick={() => logout()}>
+              <LogOut size={16} />
+              <span>退出登录</span>
+            </button>
+          </div>
         </div>
 
         <div className="release-metric-grid">

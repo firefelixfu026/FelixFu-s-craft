@@ -4400,6 +4400,13 @@ h3 {
   margin-bottom: 4px;
 }
 
+.account-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .account-profile p,
 .account-list span {
   color: #6a7685;
@@ -6489,6 +6496,11 @@ h3 {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
+  .account-profile-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
   .topbar {
     align-items: stretch;
     flex-direction: column;
@@ -6795,6 +6807,10 @@ h3 {
 
   .account-profile {
     grid-template-columns: 1fr;
+  }
+
+  .account-profile-actions {
+    grid-column: auto;
   }
 
   .game-stage {
