@@ -46,6 +46,7 @@ import {
   ThumbsDown,
   Trash2,
   UserRound,
+  Wrench,
   X,
   Zap
 } from 'lucide-react';
@@ -75,6 +76,7 @@ const visitorNavItems = [
   { id: 'articles', label: '文章', icon: BookOpen },
   { id: 'plan', label: '计划', icon: List },
   { id: 'music', label: '音乐', icon: Music },
+  { id: 'toolbox', label: '工具箱', icon: Wrench },
   { id: 'game', label: '游戏', icon: Gamepad2 },
   { id: 'login', label: '登录', icon: LogIn }
 ];
@@ -84,6 +86,7 @@ const readerNavItems = [
   { id: 'articles', label: '文章', icon: BookOpen },
   { id: 'plan', label: '计划', icon: List },
   { id: 'music', label: '音乐', icon: Music },
+  { id: 'toolbox', label: '工具箱', icon: Wrench },
   { id: 'game', label: '游戏', icon: Gamepad2 }
 ];
 
@@ -379,6 +382,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v4.3',
+    title: '个人工具箱上线',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['前台新增工具箱板块', '按学习、开发、AI、设计素材和娱乐生活整理常用网站', '支持关键词搜索和分类筛选', '网站卡片补充用途说明和推荐标签']
+  },
+  {
     version: 'v4.2.2',
     title: '夜间文章可读性修复',
     date: '2026-08-09',
@@ -548,6 +558,151 @@ const releaseRoadmap = [
   }
 ];
 const RELEASE_PAGE_SIZE = 6;
+
+const toolboxCategories = ['全部', '学习', '开发', 'AI', '设计素材', '效率', '娱乐生活'];
+
+const toolboxLinks = [
+  {
+    title: 'OI Wiki',
+    category: '学习',
+    url: 'https://oi-wiki.org/',
+    description: '算法竞赛和数据结构知识库，适合预习高级数据结构与算法分析。',
+    tags: ['算法', '数据结构', '中文']
+  },
+  {
+    title: 'CP-Algorithms',
+    category: '学习',
+    url: 'https://cp-algorithms.com/',
+    description: '偏竞赛向的算法讲解，适合查复杂算法细节和模板思路。',
+    tags: ['算法', '英文', '模板']
+  },
+  {
+    title: 'Hello 算法',
+    category: '学习',
+    url: 'https://www.hello-algo.com/',
+    description: '动画图解数据结构与算法，适合把算法基础和代码实现连起来看。',
+    tags: ['算法', '图解', '入门']
+  },
+  {
+    title: '3Blue1Brown',
+    category: '学习',
+    url: 'https://www.3blue1brown.com/',
+    description: '数学可视化讲解，概率统计和线代相关内容适合作为直觉补充。',
+    tags: ['数学', '可视化', '直觉']
+  },
+  {
+    title: 'MDN Web Docs',
+    category: '开发',
+    url: 'https://developer.mozilla.org/zh-CN/',
+    description: '前端开发权威文档，查 HTML、CSS、JavaScript 很稳。',
+    tags: ['前端', '文档', '标准']
+  },
+  {
+    title: 'Compiler Explorer',
+    category: '开发',
+    url: 'https://godbolt.org/',
+    description: '在线看代码编译后的汇编，学计算机组成时很有感觉。',
+    tags: ['编译', '汇编', '组成原理']
+  },
+  {
+    title: 'Python Tutor',
+    category: '开发',
+    url: 'https://pythontutor.com/',
+    description: '逐步可视化运行代码，调理解、讲思路、看变量变化都方便。',
+    tags: ['调试', '可视化', '代码']
+  },
+  {
+    title: 'GitHub',
+    category: '开发',
+    url: 'https://github.com/',
+    description: '项目代码、开源仓库和自己的博客维护都离不开。',
+    tags: ['开源', '项目', '版本管理']
+  },
+  {
+    title: 'ChatGPT',
+    category: 'AI',
+    url: 'https://chatgpt.com/',
+    description: '整理笔记、解释概念、写代码草稿和复盘计划都可以用。',
+    tags: ['AI', '学习助手', '写作']
+  },
+  {
+    title: 'Papers with Code',
+    category: 'AI',
+    url: 'https://paperswithcode.com/',
+    description: '看论文、数据集和模型实现，适合之后做 AI 项目时查资料。',
+    tags: ['论文', 'AI', '代码']
+  },
+  {
+    title: 'Hugging Face',
+    category: 'AI',
+    url: 'https://huggingface.co/',
+    description: '模型、数据集和 Demo 聚合地，适合找开源 AI 资源。',
+    tags: ['模型', '数据集', 'Demo']
+  },
+  {
+    title: 'Excalidraw',
+    category: '设计素材',
+    url: 'https://excalidraw.com/',
+    description: '手绘风流程图工具，整理课程框架和项目结构很顺手。',
+    tags: ['画图', '流程图', '手绘']
+  },
+  {
+    title: 'Iconify',
+    category: '设计素材',
+    url: 'https://icon-sets.iconify.design/',
+    description: '大量图标合集，做网页和笔记配图时可以快速找图标。',
+    tags: ['图标', '素材', 'UI']
+  },
+  {
+    title: 'Carbon',
+    category: '设计素材',
+    url: 'https://carbon.now.sh/',
+    description: '生成漂亮代码截图，适合文章配图和分享代码片段。',
+    tags: ['代码截图', '排版', '文章']
+  },
+  {
+    title: 'Overleaf',
+    category: '效率',
+    url: 'https://www.overleaf.com/',
+    description: '在线 LaTeX 编辑器，写报告、论文模板和数学公式排版很好用。',
+    tags: ['LaTeX', '报告', '公式']
+  },
+  {
+    title: 'DeepL',
+    category: '效率',
+    url: 'https://www.deepl.com/translator',
+    description: '英文资料和文档翻译辅助，适合读英文教程时快速过一遍。',
+    tags: ['翻译', '英文', '阅读']
+  },
+  {
+    title: 'Mermaid Live',
+    category: '效率',
+    url: 'https://mermaid.live/',
+    description: '在线写流程图、时序图和架构图，适合技术笔记配图。',
+    tags: ['图表', 'Markdown', '技术笔记']
+  },
+  {
+    title: 'Bangumi',
+    category: '娱乐生活',
+    url: 'https://bgm.tv/',
+    description: '番剧、书籍和游戏进度管理，适合记录看番和补番清单。',
+    tags: ['看番', '记录', 'ACG']
+  },
+  {
+    title: 'SteamDB',
+    category: '娱乐生活',
+    url: 'https://steamdb.info/',
+    description: '查 Steam 游戏价格、史低和更新信息，买游戏前可以看一眼。',
+    tags: ['游戏', 'Steam', '价格']
+  },
+  {
+    title: 'Bilibili',
+    category: '娱乐生活',
+    url: 'https://www.bilibili.com/',
+    description: '学习视频和娱乐视频都在这，但记得配合计划表限时使用。',
+    tags: ['视频', '学习', '娱乐']
+  }
+];
 
 function parseChangelogReleases(text) {
   return text
@@ -2767,6 +2922,8 @@ function App() {
         )}
 
         {activeView === 'plan' && <SummerPlanWorkspace currentUser={currentUser} authToken={authToken} />}
+
+        {activeView === 'toolbox' && <ToolboxWorkspace />}
 
         {activeView === 'account' && currentUser && (
           <AccountWorkspace
@@ -5599,6 +5756,94 @@ function EditableTable({ columns, rows, section, disabled, updateRow, deleteRow,
   );
 }
 
+function ToolboxWorkspace() {
+  const [selectedCategory, setSelectedCategory] = useState('全部');
+  const [toolboxQuery, setToolboxQuery] = useState('');
+  const normalizedQuery = toolboxQuery.trim().toLowerCase();
+  const filteredLinks = toolboxLinks.filter((link) => {
+    const matchesCategory = selectedCategory === '全部' || link.category === selectedCategory;
+    const haystack = [link.title, link.category, link.description, ...link.tags].join(' ').toLowerCase();
+    return matchesCategory && (!normalizedQuery || haystack.includes(normalizedQuery));
+  });
+  const featuredLinks = toolboxLinks.filter((link) => ['OI Wiki', 'MDN Web Docs', 'ChatGPT', 'Excalidraw'].includes(link.title));
+
+  return (
+    <section className="workspace toolbox-workspace">
+      <div className="section-heading">
+        <p className="eyebrow">工具箱</p>
+        <h1>常用网站、学习资源和摸鱼入口</h1>
+        <p>把好用的网站集中放在这里，需要查资料、写代码、做图或者记录番剧时不用到处翻收藏夹。</p>
+      </div>
+
+      <div className="content-band toolbox-hero">
+        <div>
+          <span>Felix Links</span>
+          <h2>今天要去哪里？</h2>
+          <p>先从高频入口开始，之后可以继续把课程、项目、娱乐和生活服务都整理进来。</p>
+        </div>
+        <div className="toolbox-featured-grid" aria-label="高频工具">
+          {featuredLinks.map((link) => (
+            <a href={link.url} target="_blank" rel="noreferrer" key={link.title}>
+              <strong>{link.title}</strong>
+              <span>{link.category}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      <div className="toolbox-controls">
+        <label className="toolbox-search">
+          <Search size={18} />
+          <input
+            value={toolboxQuery}
+            onChange={(event) => setToolboxQuery(event.target.value)}
+            placeholder="搜索网站、用途或标签"
+            aria-label="搜索工具箱网站"
+          />
+        </label>
+        <div className="tag-filter" aria-label="工具箱分类">
+          {toolboxCategories.map((category) => (
+            <button
+              className={selectedCategory === category ? 'tag-button active' : 'tag-button'}
+              type="button"
+              key={category}
+              onClick={() => setSelectedCategory(category)}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="toolbox-grid">
+        {filteredLinks.map((link) => (
+          <a className="toolbox-card" href={link.url} target="_blank" rel="noreferrer" key={link.url}>
+            <span className="toolbox-card-category">{link.category}</span>
+            <div>
+              <h2>{link.title}</h2>
+              <ExternalLink size={17} />
+            </div>
+            <p>{link.description}</p>
+            <span className="toolbox-url">{new URL(link.url).hostname.replace(/^www\./, '')}</span>
+            <div className="toolbox-tags">
+              {link.tags.map((tag) => (
+                <span key={tag}>{tag}</span>
+              ))}
+            </div>
+          </a>
+        ))}
+      </div>
+
+      {!filteredLinks.length && (
+        <div className="empty-state">
+          <strong>没有找到对应网站</strong>
+          <span>换个关键词，或者先切回全部分类看看。</span>
+        </div>
+      )}
+    </section>
+  );
+}
+
 const stickerSets = {
   overview: [
     { variant: 'terminal', label: 'SANITY +1', icon: '◇' },
@@ -5619,6 +5864,11 @@ const stickerSets = {
     { variant: 'guitar', label: 'PLAYLIST', icon: '♪' },
     { variant: 'terminal', label: 'AUDIO LOG', icon: '◇' },
     { variant: 'memo', label: 'LOOP ON', icon: '✦' }
+  ],
+  toolbox: [
+    { variant: 'terminal', label: 'PORTAL', icon: '◇' },
+    { variant: 'memo', label: 'LINKS', icon: '✦' },
+    { variant: 'guitar', label: 'TOOLS', icon: '♪' }
   ],
   game: [
     { variant: 'terminal', label: 'STAGE READY', icon: '◇' },

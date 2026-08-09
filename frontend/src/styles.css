@@ -216,6 +216,8 @@ textarea {
 .frontstage-shell .profile-copy h1,
 .frontstage-shell .article-card h2,
 .frontstage-shell .article-card h3,
+.frontstage-shell .toolbox-card h2,
+.frontstage-shell .toolbox-hero h2,
 .frontstage-shell .admin-panel-heading h2,
 .frontstage-shell .summer-plan-hero h1,
 .frontstage-shell .music-now h2 {
@@ -240,6 +242,8 @@ textarea {
 .frontstage-shell .section-heading h1::after,
 .frontstage-shell .home-widget-heading h2::after,
 .frontstage-shell .article-card h2::after,
+.frontstage-shell .toolbox-card h2::after,
+.frontstage-shell .toolbox-hero h2::after,
 .frontstage-shell .admin-panel-heading h2::after {
   content: '';
   display: inline-block;
@@ -267,6 +271,8 @@ textarea {
 .frontstage-shell .home-update-panel,
 .frontstage-shell .latest-article-strip,
 .frontstage-shell .article-card,
+.frontstage-shell .toolbox-card,
+.frontstage-shell .toolbox-search,
 .frontstage-shell .tool-panel,
 .frontstage-shell .music-player-panel,
 .frontstage-shell .music-library-panel,
@@ -2964,6 +2970,178 @@ h3 {
   gap: 8px;
 }
 
+.toolbox-workspace {
+  gap: 24px;
+}
+
+.toolbox-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(280px, 1fr);
+  gap: 24px;
+  align-items: center;
+}
+
+.toolbox-hero > div:first-child {
+  display: grid;
+  gap: 10px;
+}
+
+.toolbox-hero > div:first-child > span {
+  width: fit-content;
+  padding: 6px 10px;
+  border: 1px solid rgba(31, 122, 109, 0.2);
+  border-radius: 8px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.toolbox-hero h2 {
+  margin: 0;
+  font-size: clamp(30px, 4vw, 48px);
+}
+
+.toolbox-hero p {
+  margin: 0;
+  color: var(--text-soft);
+  line-height: 1.7;
+}
+
+.toolbox-featured-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.toolbox-featured-grid a {
+  display: grid;
+  gap: 4px;
+  min-height: 78px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.54);
+  text-decoration: none;
+}
+
+.toolbox-featured-grid a:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-soft);
+}
+
+.toolbox-featured-grid span {
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.toolbox-controls {
+  display: grid;
+  gap: 14px;
+}
+
+.toolbox-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-soft);
+  background: var(--panel-bg);
+}
+
+.toolbox-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(31, 122, 109, 0.12);
+}
+
+.toolbox-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: var(--text-main);
+  background: transparent;
+}
+
+.toolbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.toolbox-card {
+  display: grid;
+  gap: 12px;
+  min-height: 230px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-main);
+  background: var(--panel-bg);
+  text-decoration: none;
+  box-shadow: var(--shadow-soft);
+}
+
+.toolbox-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent);
+}
+
+.toolbox-card-category {
+  width: fit-content;
+  padding: 5px 9px;
+  border: 1px solid rgba(31, 122, 109, 0.16);
+  border-radius: 8px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.toolbox-card > div:first-of-type {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.toolbox-card h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.toolbox-card p {
+  margin: 0;
+  color: var(--text-soft);
+  line-height: 1.65;
+}
+
+.toolbox-url {
+  color: var(--text-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.toolbox-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: auto;
+}
+
+.toolbox-tags span {
+  padding: 5px 8px;
+  border-radius: 8px;
+  color: var(--text-soft);
+  background: var(--panel-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .music-workspace {
   max-width: 1120px;
 }
@@ -5502,6 +5680,9 @@ h3 {
 :root[data-theme='dark'] .game-details,
 :root[data-theme='dark'] .music-player-panel,
 :root[data-theme='dark'] .music-library-panel,
+:root[data-theme='dark'] .toolbox-card,
+:root[data-theme='dark'] .toolbox-search,
+:root[data-theme='dark'] .toolbox-featured-grid a,
 :root[data-theme='dark'] .music-track,
 :root[data-theme='dark'] .playlist-chip,
 :root[data-theme='dark'] .playlist-create-row input,
@@ -5938,6 +6119,25 @@ h3 {
   color: var(--accent);
 }
 
+:root[data-theme='dark'] .toolbox-card p,
+:root[data-theme='dark'] .toolbox-hero p,
+:root[data-theme='dark'] .toolbox-featured-grid span,
+:root[data-theme='dark'] .toolbox-url,
+:root[data-theme='dark'] .toolbox-tags span {
+  color: var(--text-soft);
+}
+
+:root[data-theme='dark'] .toolbox-card-category,
+:root[data-theme='dark'] .toolbox-hero > div:first-child > span {
+  border-color: rgba(110, 231, 200, 0.22);
+  color: #bbf7d0;
+  background: rgba(110, 231, 200, 0.12);
+}
+
+:root[data-theme='dark'] .toolbox-tags span {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 :root[data-theme='dark'] .story-step strong,
 :root[data-theme='dark'] .project-showcase-card span,
 :root[data-theme='dark'] .project-showcase-card svg {
@@ -6043,6 +6243,15 @@ h3 {
   .frontstage-shell .sticker-memo {
     right: 12px;
     bottom: 92px;
+  }
+
+  .toolbox-hero,
+  .toolbox-featured-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbox-grid {
+    grid-template-columns: 1fr;
   }
 
   .app-shell.sidebar-collapsed {
@@ -6616,6 +6825,8 @@ h3 {
 :root[data-theme='dark'] .frontstage-shell .profile-copy h1,
 :root[data-theme='dark'] .frontstage-shell .article-card h2,
 :root[data-theme='dark'] .frontstage-shell .article-card h3,
+:root[data-theme='dark'] .frontstage-shell .toolbox-card h2,
+:root[data-theme='dark'] .frontstage-shell .toolbox-hero h2,
 :root[data-theme='dark'] .frontstage-shell .admin-panel-heading h2,
 :root[data-theme='dark'] .frontstage-shell .summer-plan-hero h1,
 :root[data-theme='dark'] .frontstage-shell .music-now h2 {
@@ -6636,6 +6847,8 @@ h3 {
 :root[data-theme='dark'] .frontstage-shell .section-heading h1::after,
 :root[data-theme='dark'] .frontstage-shell .home-widget-heading h2::after,
 :root[data-theme='dark'] .frontstage-shell .article-card h2::after,
+:root[data-theme='dark'] .frontstage-shell .toolbox-card h2::after,
+:root[data-theme='dark'] .frontstage-shell .toolbox-hero h2::after,
 :root[data-theme='dark'] .frontstage-shell .admin-panel-heading h2::after {
   border-color: rgba(255, 139, 167, 0.44);
   background:
@@ -6656,6 +6869,8 @@ h3 {
 :root[data-theme='dark'] .frontstage-shell .home-update-panel,
 :root[data-theme='dark'] .frontstage-shell .latest-article-strip,
 :root[data-theme='dark'] .frontstage-shell .article-card,
+:root[data-theme='dark'] .frontstage-shell .toolbox-card,
+:root[data-theme='dark'] .frontstage-shell .toolbox-search,
 :root[data-theme='dark'] .frontstage-shell .tool-panel,
 :root[data-theme='dark'] .frontstage-shell .music-player-panel,
 :root[data-theme='dark'] .frontstage-shell .music-library-panel,
