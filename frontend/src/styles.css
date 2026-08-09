@@ -4143,30 +4143,6 @@ h3 {
   margin-bottom: 14px;
 }
 
-.inline-date-selector {
-  display: grid;
-  gap: 7px;
-  min-width: min(360px, 100%);
-  color: #334155;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.inline-date-selector select {
-  min-height: 40px;
-  border: 1px solid #d8e0e9;
-  border-radius: 8px;
-  padding: 0 12px;
-  color: #18212f;
-  background: #ffffff;
-  outline: 0;
-}
-
-.inline-date-selector select:focus {
-  border-color: #1f7a6d;
-  box-shadow: 0 0 0 3px rgba(31, 122, 109, 0.12);
-}
-
 .usage-chart-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4873,7 +4849,6 @@ h3 {
 :root[data-theme='dark'] .game-actions .secondary-link,
 :root[data-theme='dark'] .ai-editor-tools button,
 :root[data-theme='dark'] .plan-date-field,
-:root[data-theme='dark'] .inline-date-selector select,
 :root[data-theme='dark'] .ai-generator input,
 :root[data-theme='dark'] .ai-generator textarea,
 :root[data-theme='dark'] .ai-generator select,
@@ -4963,8 +4938,7 @@ h3 {
 :root[data-theme='dark'] .plan-date-field small,
 :root[data-theme='dark'] .plan-date-current-theme,
 :root[data-theme='dark'] .summer-plan-panel .admin-panel-heading p,
-:root[data-theme='dark'] .summer-plan-panel .admin-panel-heading > span,
-:root[data-theme='dark'] .inline-date-selector {
+:root[data-theme='dark'] .summer-plan-panel .admin-panel-heading > span {
   color: var(--text-soft);
 }
 

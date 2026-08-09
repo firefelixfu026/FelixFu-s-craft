@@ -4506,7 +4506,7 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
             <span>新增时间段</span>
           </button>
         </div>
-        <PlanCalendarSelector days={dayPlans} value={selectedDayPlan.date} onChange={setSelectedPlanDate} />
+        <PlanCalendarSelector days={dayPlans} value={selectedDayPlan.date} onChange={setSelectedPlanDate} label="选择日期" />
         <EditableTable
           columns={[
             ['time', '时间段', 'input'],
@@ -4525,7 +4525,7 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
       <div className="summer-module-grid">
         <PlanModule title="完成记录与完成度" count={`今日完成度 ${completionRate}%`} wide>
           <div className="module-toolbar">
-            <DateSelector days={completionDays} value={selectedCompletionDay.date} onChange={setSelectedCompletionDate} label="选择完成日期" />
+            <PlanCalendarSelector days={completionDays} value={selectedCompletionDay.date} onChange={setSelectedCompletionDate} label="完成日期" />
           </div>
           <div className="completion-summary-grid">
             <div>
@@ -4567,7 +4567,7 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
 
         <PlanModule title="手机应用使用时间" count={`今日 ${totalAppActual || 0} / 目标 ${totalAppLimit || 0} 分钟`} wide>
           <div className="module-toolbar">
-            <DateSelector days={appUsageDays} value={selectedAppUsageDay.date} onChange={setSelectedAppDate} label="选择记录日期" />
+            <PlanCalendarSelector days={appUsageDays} value={selectedAppUsageDay.date} onChange={setSelectedAppDate} label="记录日期" />
             <button className="ghost-button module-add-button" type="button" onClick={() => addAppUsage(selectedAppUsageDay.date, { name: '新增应用', limit: '', actual: '' })} disabled={!canEdit}>
               <PlusCircle size={16} />
               <span>新增应用</span>
@@ -4719,7 +4719,7 @@ function getPlanMonth(dateValue) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-function PlanCalendarSelector({ days, value, onChange }) {
+function PlanCalendarSelector({ days, value, onChange, label = '选择日期' }) {
   const pickerRef = useRef(null);
   const [isOpen, setIsOpen] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() => getPlanMonth(value || days[0]?.date));
@@ -4818,14 +4818,14 @@ function PlanCalendarSelector({ days, value, onChange }) {
           <CalendarDays size={17} />
         </span>
         <span>
-          <small>选择日期</small>
+          <small>{label}</small>
           <strong>{selectedDay?.label || '未选择日期'}</strong>
         </span>
       </button>
       <span className="plan-date-current-theme">{selectedDay?.theme}</span>
 
       {isOpen && (
-        <div className="plan-calendar-popover" role="dialog" aria-label="选择每日计划日期">
+        <div className="plan-calendar-popover" role="dialog" aria-label={label}>
           <div className="plan-calendar-head">
             <button type="button" onClick={() => moveMonth(-1)} disabled={!canMovePrev} aria-label="上个月">
               <ChevronLeft size={17} />
@@ -4865,19 +4865,6 @@ function PlanCalendarSelector({ days, value, onChange }) {
         </div>
       )}
     </div>
-  );
-}
-
-function DateSelector({ days, value, onChange, label }) {
-  return (
-    <label className="inline-date-selector">
-      <span>{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        {days.map((day) => (
-          <option key={day.date} value={day.date}>{day.label} · {day.theme}</option>
-        ))}
-      </select>
-    </label>
   );
 }
 
