@@ -449,6 +449,117 @@ mark {
   white-space: nowrap;
 }
 
+.home-pulse-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.home-clock-card,
+.home-updates-card {
+  align-content: start;
+}
+
+.home-widget-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.home-widget-heading > span {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  color: #ffffff;
+  background: #1f7a6d;
+}
+
+.home-widget-heading h2 {
+  margin-bottom: 0;
+}
+
+.home-clock-time {
+  color: #102033;
+  font-size: clamp(42px, 7vw, 76px);
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-clock-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #6a7685;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.home-clock-meta em {
+  padding: 5px 8px;
+  border-radius: 8px;
+  color: #1f7a6d;
+  background: #effbf5;
+  font-style: normal;
+}
+
+.home-update-list {
+  display: grid;
+  gap: 10px;
+}
+
+.home-update-item {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.72fr) minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.home-update-item > div {
+  display: grid;
+  gap: 5px;
+  align-content: start;
+  min-width: 0;
+}
+
+.home-update-item span {
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 8px;
+  color: #ffffff;
+  background: #1f7a6d;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.home-update-item strong {
+  color: #102033;
+  font-size: 16px;
+}
+
+.home-update-item em {
+  color: #6a7685;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.home-update-item ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: #5b6878;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .workspace {
   display: grid;
   gap: 28px;
@@ -4642,6 +4753,7 @@ h3 {
 :root[data-theme='dark'] .popular-panel,
 :root[data-theme='dark'] .popular-list button,
 :root[data-theme='dark'] .live-status-card,
+:root[data-theme='dark'] .home-update-item,
 :root[data-theme='dark'] .latest-article-strip,
 :root[data-theme='dark'] .metric,
 :root[data-theme='dark'] .skill-pillar-card,
@@ -4740,6 +4852,13 @@ h3 {
 :root[data-theme='dark'] .plan-calendar-foot {
   border-color: var(--border);
   color: var(--text-soft);
+}
+
+:root[data-theme='dark'] .home-widget-heading > span,
+:root[data-theme='dark'] .home-clock-meta em,
+:root[data-theme='dark'] .home-update-item span {
+  color: #06151b;
+  background: var(--accent);
 }
 
 :root[data-theme='dark'] .reading-toolbar {
@@ -4897,6 +5016,9 @@ h3 {
 :root[data-theme='dark'] .popular-list em,
 :root[data-theme='dark'] .live-status-card span,
 :root[data-theme='dark'] .live-status-card p,
+:root[data-theme='dark'] .home-clock-meta,
+:root[data-theme='dark'] .home-update-item em,
+:root[data-theme='dark'] .home-update-item ul,
 :root[data-theme='dark'] .latest-article-strip span,
 :root[data-theme='dark'] .latest-article-strip em,
 :root[data-theme='dark'] .article-card p,
@@ -4978,6 +5100,11 @@ h3 {
 :root[data-theme='dark'] .admin-insight-grid h3,
 :root[data-theme='dark'] .completion-summary-grid strong,
 :root[data-theme='dark'] .usage-chart-heading h3 {
+  color: var(--text-main);
+}
+
+:root[data-theme='dark'] .home-clock-time,
+:root[data-theme='dark'] .home-update-item strong {
   color: var(--text-main);
 }
 
@@ -5239,6 +5366,7 @@ h3 {
   .ai-test-form,
   .ai-config-form,
   .template-grid,
+  .home-pulse-grid,
   .summer-plan-hero,
   .summer-goal-grid,
   .summer-module-grid,
@@ -5402,6 +5530,10 @@ h3 {
 
   .live-status-card:first-child strong {
     font-size: 20px;
+  }
+
+  .home-update-item {
+    grid-template-columns: 1fr;
   }
 
   .summer-table-wrap {

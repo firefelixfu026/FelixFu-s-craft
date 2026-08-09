@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Code2,
   Copy,
   Eye,
@@ -348,6 +349,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v2.8',
+    title: '首页和计划体验整理',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['首页新增时钟模块和最近更新说明', '前台隐藏 AI 工作台入口但保留代码', '文章阅读进度改为滚动吸顶', '计划相关日期选择统一为小日历浮层']
+  },
   {
     version: 'v2.7.4',
     title: '首页秒级计时热修',
@@ -2481,6 +2489,10 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
   const totalViews = publishedArticles.reduce((sum, article) => sum + Number(article.viewCount || 0), 0);
   const totalComments = publishedArticles.reduce((sum, article) => sum + (article.comments?.length || 0), 0);
   const currentMonthCount = publishedArticles.filter((article) => getArticleMonth(article.date) === getArticleMonth(new Date().toISOString())).length;
+  const clockTime = homeNow.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const clockDate = homeNow.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+  const clockZone = Intl.DateTimeFormat().resolvedOptions().timeZone || '本地时间';
+  const latestUpdates = releaseArchive.slice(0, 3);
   const liveStats = [
     { label: '上线时间', value: formatLaunchDuration(homeNow), detail: '精准到秒' },
     { label: '公开文章', value: `${publishedArticles.length} 篇`, detail: currentMonthCount ? `本月 ${currentMonthCount} 篇` : '等待新内容' },
@@ -2611,6 +2623,53 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
             ))}
           </div>
         </div>
+      </section>
+
+      <section className="home-pulse-grid" aria-label="时钟和最近更新">
+        <article className="content-band home-clock-card">
+          <div className="home-widget-heading">
+            <span>
+              <Clock size={18} />
+            </span>
+            <div>
+              <p className="eyebrow">时钟</p>
+              <h2>此刻</h2>
+            </div>
+          </div>
+          <strong className="home-clock-time">{clockTime}</strong>
+          <div className="home-clock-meta">
+            <span>{clockDate}</span>
+            <em>{clockZone}</em>
+          </div>
+        </article>
+
+        <article className="content-band home-updates-card">
+          <div className="home-widget-heading">
+            <span>
+              <Code2 size={18} />
+            </span>
+            <div>
+              <p className="eyebrow">最近更新</p>
+              <h2>刚改了什么</h2>
+            </div>
+          </div>
+          <div className="home-update-list">
+            {latestUpdates.map((release) => (
+              <div className="home-update-item" key={release.version}>
+                <div>
+                  <span>{release.version}</span>
+                  <strong>{release.title}</strong>
+                  <em>{release.date}</em>
+                </div>
+                <ul>
+                  {release.points.slice(0, 3).map((point) => (
+                    <li key={point}>{point}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </article>
       </section>
 
       <section className="content-band live-status-band">
