@@ -3199,6 +3199,54 @@ h3 {
   gap: 16px;
 }
 
+.toolbox-editor {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-soft);
+}
+
+.toolbox-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.toolbox-editor-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.toolbox-editor-grid label > span {
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.toolbox-editor-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.toolbox-editor-grid input,
+.toolbox-editor-grid textarea {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-main);
+  background: var(--panel-soft);
+}
+
+.toolbox-editor-grid textarea {
+  padding: 10px 11px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
 .toolbox-card {
   display: grid;
   gap: 12px;
@@ -3210,6 +3258,10 @@ h3 {
   background: var(--panel-bg);
   text-decoration: none;
   box-shadow: var(--shadow-soft);
+}
+
+.toolbox-card.custom {
+  border-color: rgba(31, 122, 109, 0.32);
 }
 
 .toolbox-card:hover {
@@ -3233,6 +3285,19 @@ h3 {
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
+}
+
+.toolbox-card > div:first-of-type a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--accent);
+  background: var(--panel-soft);
 }
 
 .toolbox-card h2 {
@@ -3265,6 +3330,26 @@ h3 {
   color: var(--text-soft);
   background: var(--panel-soft);
   font-size: 12px;
+  font-weight: 800;
+}
+
+.toolbox-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.toolbox-card-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-main);
+  background: var(--panel-soft);
   font-weight: 800;
 }
 
@@ -6476,6 +6561,10 @@ h3 {
   }
 
   .toolbox-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbox-editor-grid {
     grid-template-columns: 1fr;
   }
 

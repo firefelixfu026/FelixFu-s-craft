@@ -7,7 +7,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any, Literal
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
@@ -31,7 +31,7 @@ from app.auth import (
 )
 from app.database import SessionLocal, get_db, init_db
 from app.github_oauth import fetch_github_identity, get_github_authorize_url
-from app.models import AdminAuditLog, AiGeneration, Article, Comment, ReactionCounter, SummerPlan, Tag, User, UserReaction
+from app.models import AdminAuditLog, AiGeneration, Article, Comment, ReactionCounter, SummerPlan, Tag, ToolboxLink, User, UserReaction
 from app.seed import REACTION_TYPES, seed_database
 
 
@@ -370,6 +370,15 @@ class SummerPlanIn(BaseModel):
     payload: dict[str, Any]
 
 
+class ToolboxLinkIn(BaseModel):
+    title: str
+    category: str = "自定义"
+    url: str
+    description: str = ""
+    tags: list[str] = []
+    pinned: bool = False
+
+
 class RegisterIn(BaseModel):
     email: str
     password: str
@@ -457,6 +466,62 @@ def update_summer_plan(
     db.refresh(plan)
     _record_admin_event(db, current_user, "更新学习计划", "summer-plan", "current", "保存暑假计划云端数据")
     return plan.payload
+
+
+@app.get("/api/toolbox-links")
+def list_toolbox_links(db: Session = Depends(get_db)) -> list[dict]:
+    links = db.scalars(select(ToolboxLink).order_by(ToolboxLink.pinned.desc(), ToolboxLink.created_at.desc())).all()
+    return [_toolbox_link_to_dict(link) for link in links]
+
+
+@app.post("/api/admin/toolbox-links")
+def create_toolbox_link(
+    payload: ToolboxLinkIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict:
+    link = ToolboxLink(**_clean_toolbox_payload(payload))
+    db.add(link)
+    db.commit()
+    db.refresh(link)
+    _record_admin_event(db, current_user, "新增工具箱链接", "toolbox", link.title, link.url)
+    return _toolbox_link_to_dict(link)
+
+
+@app.put("/api/admin/toolbox-links/{link_id}")
+def update_toolbox_link(
+    link_id: int,
+    payload: ToolboxLinkIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict:
+    link = db.get(ToolboxLink, link_id)
+    if not link:
+        raise HTTPException(status_code=404, detail="Toolbox link not found")
+    values = _clean_toolbox_payload(payload)
+    for field, value in values.items():
+        setattr(link, field, value)
+    link.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(link)
+    _record_admin_event(db, current_user, "更新工具箱链接", "toolbox", link.title, link.url)
+    return _toolbox_link_to_dict(link)
+
+
+@app.delete("/api/admin/toolbox-links/{link_id}")
+def delete_toolbox_link(
+    link_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict[str, int]:
+    link = db.get(ToolboxLink, link_id)
+    if not link:
+        raise HTTPException(status_code=404, detail="Toolbox link not found")
+    title = link.title
+    db.delete(link)
+    db.commit()
+    _record_admin_event(db, current_user, "删除工具箱链接", "toolbox", title, str(link_id))
+    return {"deleted": link_id}
 
 
 @app.get("/api/articles")
@@ -2056,6 +2121,37 @@ def _music_title_from_filename(filename: str) -> str:
     stem = Path(filename).stem
     title = re.sub(r"^\d{14}-[0-9a-f]{8}-", "", stem)
     return title.replace("-", " ").strip() or "未命名音乐"
+
+
+def _clean_toolbox_payload(payload: ToolboxLinkIn) -> dict[str, Any]:
+    title = _required_text(payload.title, "Toolbox title is required")[:120]
+    url = _required_text(payload.url, "Toolbox URL is required")
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise HTTPException(status_code=400, detail="Toolbox URL must start with http:// or https://")
+    return {
+        "title": title,
+        "category": (_optional_text(payload.category) or "自定义")[:60],
+        "url": url[:1000],
+        "description": (_optional_text(payload.description) or "")[:500],
+        "tags": _clean_tags(payload.tags)[:8],
+        "pinned": bool(payload.pinned),
+    }
+
+
+def _toolbox_link_to_dict(link: ToolboxLink) -> dict[str, Any]:
+    return {
+        "id": link.id,
+        "title": link.title,
+        "category": link.category or "自定义",
+        "url": link.url,
+        "description": link.description or "",
+        "tags": link.tags or [],
+        "pinned": bool(link.pinned),
+        "createdAt": (link.created_at or datetime.utcnow()).isoformat(),
+        "updatedAt": (link.updated_at or link.created_at or datetime.utcnow()).isoformat(),
+        "custom": True,
+    }
 
 
 def _article_to_dict(article: Article, current_user: User | None = None) -> dict:

@@ -383,6 +383,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v5.1',
+    title: '工具箱自定义链接',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['工具箱支持管理员新增自定义网址', '自定义链接保存到后端数据库并公开展示', '支持编辑、删除、置顶、分类和标签维护']
+  },
+  {
     version: 'v5.0.1',
     title: '仓库文档同步',
     date: '2026-08-09',
@@ -597,7 +604,7 @@ const RELEASE_PAGE_SIZE = 6;
 
 const toolboxCategories = ['全部', '学习', '开发', 'AI', '设计素材', '效率', '娱乐生活'];
 
-const toolboxLinks = [
+const defaultToolboxLinks = [
   {
     title: 'OI Wiki',
     category: '学习',
@@ -3070,7 +3077,7 @@ function App() {
 
         {activeView === 'plan' && <SummerPlanWorkspace currentUser={currentUser} authToken={authToken} />}
 
-        {activeView === 'toolbox' && <ToolboxWorkspace />}
+        {activeView === 'toolbox' && <ToolboxWorkspace currentUser={currentUser} authToken={authToken} />}
 
         {activeView === 'account' && currentUser && (
           <AccountWorkspace
@@ -6008,16 +6015,162 @@ function EditableTable({ columns, rows, section, disabled, updateRow, deleteRow,
   );
 }
 
-function ToolboxWorkspace() {
+function createEmptyToolboxForm() {
+  return {
+    title: '',
+    category: '自定义',
+    url: '',
+    description: '',
+    tags: '',
+    pinned: false
+  };
+}
+
+function normalizeToolboxLink(link, index = 0) {
+  return {
+    ...link,
+    id: link.id ?? `default-${index}`,
+    tags: Array.isArray(link.tags) ? link.tags : [],
+    custom: Boolean(link.custom)
+  };
+}
+
+function ToolboxWorkspace({ currentUser, authToken }) {
   const [selectedCategory, setSelectedCategory] = useState('全部');
   const [toolboxQuery, setToolboxQuery] = useState('');
+  const [customLinks, setCustomLinks] = useState([]);
+  const [toolboxForm, setToolboxForm] = useState(createEmptyToolboxForm);
+  const [editingToolboxLinkId, setEditingToolboxLinkId] = useState(null);
+  const [toolboxMessage, setToolboxMessage] = useState('');
+  const [isLoadingToolboxLinks, setIsLoadingToolboxLinks] = useState(false);
+  const [isSavingToolboxLink, setIsSavingToolboxLink] = useState(false);
+  const canManageToolbox = currentUser?.role === 'admin';
+  const allToolboxLinks = [
+    ...customLinks.map((link) => ({ ...normalizeToolboxLink(link), custom: true })),
+    ...defaultToolboxLinks.map((link, index) => normalizeToolboxLink(link, index))
+  ];
+  const dynamicCategories = ['全部', ...Array.from(new Set([
+    ...toolboxCategories.filter((category) => category !== '全部'),
+    ...allToolboxLinks.map((link) => link.category || '自定义')
+  ])).sort((first, second) => first.localeCompare(second, 'zh-CN'))];
   const normalizedQuery = toolboxQuery.trim().toLowerCase();
-  const filteredLinks = toolboxLinks.filter((link) => {
+  const filteredLinks = allToolboxLinks.filter((link) => {
     const matchesCategory = selectedCategory === '全部' || link.category === selectedCategory;
     const haystack = [link.title, link.category, link.description, ...link.tags].join(' ').toLowerCase();
     return matchesCategory && (!normalizedQuery || haystack.includes(normalizedQuery));
   });
-  const featuredLinks = toolboxLinks.filter((link) => ['OI Wiki', 'MDN Web Docs', 'ChatGPT', 'Excalidraw'].includes(link.title));
+  const featuredLinks = allToolboxLinks
+    .filter((link) => link.pinned || ['OI Wiki', 'MDN Web Docs', 'ChatGPT', 'Excalidraw'].includes(link.title))
+    .slice(0, 6);
+
+  useEffect(() => {
+    refreshToolboxLinks();
+  }, []);
+
+  async function refreshToolboxLinks() {
+    setIsLoadingToolboxLinks(true);
+    try {
+      const response = await fetch('/api/toolbox-links');
+      if (!response.ok) return;
+      setCustomLinks(await response.json());
+    } catch {
+      setToolboxMessage('自定义链接暂时加载失败，先显示预置工具。');
+    } finally {
+      setIsLoadingToolboxLinks(false);
+    }
+  }
+
+  function updateToolboxForm(field, value) {
+    setToolboxForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function resetToolboxForm(message = '') {
+    setToolboxForm(createEmptyToolboxForm());
+    setEditingToolboxLinkId(null);
+    setToolboxMessage(message);
+  }
+
+  function startEditingToolboxLink(link) {
+    setEditingToolboxLinkId(link.id);
+    setToolboxForm({
+      title: link.title || '',
+      category: link.category || '自定义',
+      url: link.url || '',
+      description: link.description || '',
+      tags: (link.tags || []).join(', '),
+      pinned: Boolean(link.pinned)
+    });
+    setToolboxMessage(`正在编辑：${link.title}`);
+  }
+
+  async function submitToolboxLink(event) {
+    event.preventDefault();
+    if (!canManageToolbox || !authToken) {
+      setToolboxMessage('请先登录管理员账号');
+      return;
+    }
+    const payload = {
+      title: toolboxForm.title.trim(),
+      category: toolboxForm.category.trim() || '自定义',
+      url: toolboxForm.url.trim(),
+      description: toolboxForm.description.trim(),
+      tags: toolboxForm.tags
+        .split(/[,，]/)
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      pinned: toolboxForm.pinned
+    };
+    if (!payload.title || !payload.url) {
+      setToolboxMessage('标题和网址都要填');
+      return;
+    }
+
+    setIsSavingToolboxLink(true);
+    try {
+      const endpoint = editingToolboxLinkId
+        ? `/api/admin/toolbox-links/${editingToolboxLinkId}`
+        : '/api/admin/toolbox-links';
+      const response = await fetch(endpoint, {
+        method: editingToolboxLinkId ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setToolboxMessage(result.detail || '保存失败');
+        return;
+      }
+      await refreshToolboxLinks();
+      resetToolboxForm(editingToolboxLinkId ? '链接已更新' : '链接已添加');
+    } catch {
+      setToolboxMessage('后端服务不可用，保存失败');
+    } finally {
+      setIsSavingToolboxLink(false);
+    }
+  }
+
+  async function deleteToolboxLink(link) {
+    if (!canManageToolbox || !authToken || !link.custom) return;
+    if (!window.confirm(`确定删除工具箱链接：${link.title}？`)) return;
+    try {
+      const response = await fetch(`/api/admin/toolbox-links/${link.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        setToolboxMessage(result.detail || '删除失败');
+        return;
+      }
+      await refreshToolboxLinks();
+      resetToolboxForm('链接已删除');
+    } catch {
+      setToolboxMessage('后端服务不可用，删除失败');
+    }
+  }
 
   return (
     <section className="workspace toolbox-workspace">
@@ -6031,7 +6184,7 @@ function ToolboxWorkspace() {
         <div>
           <span>Felix Links</span>
           <h2>今天要去哪里？</h2>
-          <p>先从高频入口开始，之后可以继续把课程、项目、娱乐和生活服务都整理进来。</p>
+          <p>先从高频入口开始，登录管理员后可以继续把课程、项目、娱乐和生活服务都整理进来。</p>
         </div>
         <div className="toolbox-featured-grid" aria-label="高频工具">
           {featuredLinks.map((link) => (
@@ -6054,7 +6207,7 @@ function ToolboxWorkspace() {
           />
         </label>
         <div className="tag-filter" aria-label="工具箱分类">
-          {toolboxCategories.map((category) => (
+          {dynamicCategories.map((category) => (
             <button
               className={selectedCategory === category ? 'tag-button active' : 'tag-button'}
               type="button"
@@ -6067,22 +6220,95 @@ function ToolboxWorkspace() {
         </div>
       </div>
 
+      {canManageToolbox && (
+        <form className="toolbox-editor" onSubmit={submitToolboxLink}>
+          <div className="admin-panel-heading compact-heading">
+            <div>
+              <h3>{editingToolboxLinkId ? '编辑自定义网址' : '添加自定义网址'}</h3>
+              <span>{isLoadingToolboxLinks ? '正在同步链接' : `${customLinks.length} 个自定义链接`}</span>
+            </div>
+            {editingToolboxLinkId && (
+              <button className="ghost-button" type="button" onClick={() => resetToolboxForm('已取消编辑')}>
+                <X size={16} />
+                <span>取消</span>
+              </button>
+            )}
+          </div>
+          <div className="toolbox-editor-grid">
+            <label>
+              <span>标题</span>
+              <input value={toolboxForm.title} onChange={(event) => updateToolboxForm('title', event.target.value)} placeholder="网站名称" />
+            </label>
+            <label>
+              <span>分类</span>
+              <input value={toolboxForm.category} onChange={(event) => updateToolboxForm('category', event.target.value)} placeholder="学习 / 开发 / 自定义" />
+            </label>
+            <label className="wide">
+              <span>网址</span>
+              <input value={toolboxForm.url} onChange={(event) => updateToolboxForm('url', event.target.value)} placeholder="https://example.com" />
+            </label>
+            <label className="wide">
+              <span>用途说明</span>
+              <textarea value={toolboxForm.description} onChange={(event) => updateToolboxForm('description', event.target.value)} rows={2} placeholder="这个网站适合用来做什么" />
+            </label>
+            <label className="wide">
+              <span>标签</span>
+              <input value={toolboxForm.tags} onChange={(event) => updateToolboxForm('tags', event.target.value)} placeholder="用逗号分隔，比如 文档, 课程, 工具" />
+            </label>
+            <label className="checkbox-control">
+              <input type="checkbox" checked={toolboxForm.pinned} onChange={(event) => updateToolboxForm('pinned', event.target.checked)} />
+              <span>置顶到高频入口</span>
+            </label>
+          </div>
+          <div className="admin-actions">
+            <button className="primary-action" type="submit" disabled={isSavingToolboxLink}>
+              <Save size={17} />
+              <span>{isSavingToolboxLink ? '保存中' : editingToolboxLinkId ? '保存修改' : '添加网址'}</span>
+            </button>
+            <button className="ghost-button" type="button" onClick={() => resetToolboxForm('')}>
+              <X size={17} />
+              <span>清空</span>
+            </button>
+            <button className="ghost-button" type="button" onClick={refreshToolboxLinks}>
+              <RefreshCw size={17} />
+              <span>刷新</span>
+            </button>
+          </div>
+          {toolboxMessage && <p className="admin-message">{toolboxMessage}</p>}
+        </form>
+      )}
+
       <div className="toolbox-grid">
         {filteredLinks.map((link) => (
-          <a className="toolbox-card" href={link.url} target="_blank" rel="noreferrer" key={link.url}>
+          <article className={link.custom ? 'toolbox-card custom' : 'toolbox-card'} key={`${link.custom ? 'custom' : 'default'}-${link.id || link.url}`}>
             <span className="toolbox-card-category">{link.category}</span>
             <div>
               <h2>{link.title}</h2>
-              <ExternalLink size={17} />
+              <a href={link.url} target="_blank" rel="noreferrer" aria-label={`打开 ${link.title}`}>
+                <ExternalLink size={17} />
+              </a>
             </div>
             <p>{link.description}</p>
             <span className="toolbox-url">{new URL(link.url).hostname.replace(/^www\./, '')}</span>
             <div className="toolbox-tags">
+              {link.custom && <span>自定义</span>}
               {link.tags.map((tag) => (
                 <span key={tag}>{tag}</span>
               ))}
             </div>
-          </a>
+            {canManageToolbox && link.custom && (
+              <div className="toolbox-card-actions">
+                <button type="button" onClick={() => startEditingToolboxLink(link)}>
+                  <PencilLine size={16} />
+                  <span>编辑</span>
+                </button>
+                <button className="danger-button" type="button" onClick={() => deleteToolboxLink(link)}>
+                  <Trash2 size={16} />
+                  <span>删除</span>
+                </button>
+              </div>
+            )}
+          </article>
         ))}
       </div>
 
