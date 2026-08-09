@@ -385,6 +385,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v5.3.1',
+    title: '版本清单修复',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['恢复 v2.0 之前的 v1.x 和 v0.x 历史版本', '版本筛选改为自动识别全部大版本', 'CHANGELOG 重新串起早期项目演进记录']
+  },
+  {
     version: 'v5.3',
     title: '技术笔记收纳目录',
     date: '2026-08-09',
@@ -7061,6 +7068,8 @@ function ReleaseWorkspace() {
   const shippedCount = releaseArchive.filter((release) => release.status === '已上线').length;
   const archivedCount = releaseArchive.filter((release) => release.status === '已归档').length;
   const totalPoints = releaseArchive.reduce((total, release) => total + release.points.length, 0);
+  const releaseMajorOptions = Array.from(new Set(releaseArchive.map((release) => release.version.split('.')[0])))
+    .sort((first, second) => Number(second.replace('v', '')) - Number(first.replace('v', '')));
   const filteredReleases = releaseArchive.filter((release) => {
     const query = releaseQuery.trim().toLowerCase();
     const searchable = [release.version, release.title, release.status, ...release.points].join(' ').toLowerCase();
@@ -7135,9 +7144,9 @@ function ReleaseWorkspace() {
           />
           <select value={releaseMajor} onChange={(event) => updateReleaseMajor(event.target.value)}>
             <option value="all">全部大版本</option>
-            <option value="v2">v2.x</option>
-            <option value="v1">v1.x</option>
-            <option value="v0">v0.x</option>
+            {releaseMajorOptions.map((major) => (
+              <option key={major} value={major}>{major}.x</option>
+            ))}
           </select>
           <select value={releaseStatus} onChange={(event) => updateReleaseStatus(event.target.value)}>
             <option value="all">全部状态</option>
