@@ -385,6 +385,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v5.3.2',
+    title: '迷你播放器歌名滚动',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['侧边栏迷你播放器歌名改为循环横向滚动', '长歌名不再只显示省略号', '悬停歌名时暂停动画方便阅读']
+  },
+  {
     version: 'v5.3.1',
     title: '版本清单修复',
     date: '2026-08-09',
@@ -6503,8 +6510,11 @@ function SidebarMusicPlayer({ track, isPlaying, progress, duration, togglePlayba
         <span className="sidebar-music-disc">
           <Music size={18} />
         </span>
-        <span>
-          <strong>{track?.title || 'Felix Music'}</strong>
+        <span className="sidebar-music-info">
+          <strong className="sidebar-music-title" title={track?.title || 'Felix Music'}>
+            <span>{track?.title || 'Felix Music'}</span>
+            <span aria-hidden="true">{track?.title || 'Felix Music'}</span>
+          </strong>
           <em>{track ? `${formatTrackTime(progress)} / ${formatTrackTime(duration)}` : '去音乐页选一首歌'}</em>
         </span>
       </button>

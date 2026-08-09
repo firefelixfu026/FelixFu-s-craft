@@ -648,7 +648,60 @@ textarea {
   }
 }
 
-.sidebar-music-main strong,
+.sidebar-music-info {
+  min-width: 0;
+}
+
+.sidebar-music-title {
+  position: relative;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.sidebar-music-title::before,
+.sidebar-music-title::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  z-index: 1;
+  width: 18px;
+  height: 100%;
+  pointer-events: none;
+}
+
+.sidebar-music-title::before {
+  left: 0;
+  background: linear-gradient(90deg, rgba(31, 41, 55, 0.9), transparent);
+}
+
+.sidebar-music-title::after {
+  right: 0;
+  background: linear-gradient(270deg, rgba(31, 41, 55, 0.9), transparent);
+}
+
+.sidebar-music-title span {
+  display: inline-block;
+  padding-right: 34px;
+  font-weight: 900;
+  animation: musicTitleMarquee 11s linear infinite;
+  will-change: transform;
+}
+
+.sidebar-music-title:hover span {
+  animation-play-state: paused;
+}
+
+@keyframes musicTitleMarquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
 .sidebar-music-main em {
   display: block;
   overflow: hidden;
@@ -7445,5 +7498,13 @@ h3 {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+
+  .sidebar-music-title span {
+    animation: none !important;
+  }
+
+  .sidebar-music-title span + span {
+    display: none;
   }
 }
