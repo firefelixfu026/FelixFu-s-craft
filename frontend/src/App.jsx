@@ -91,7 +91,7 @@ const readerNavItems = [
 ];
 
 const adminNavItem = { id: 'admin', label: '管理', icon: FilePenLine };
-const accountNavItem = { id: 'account', label: '账号', icon: UserRound };
+const accountNavItem = { id: 'account', label: '账号', icon: ShieldCheck };
 
 const COMMENT_MAX_LENGTH = 300;
 const COMMENT_PAGE_UNITS = 5;
@@ -381,6 +381,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v4.3.2',
+    title: '导航图标微调',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['账号入口换成身份确认图标', '避免首页和账号导航图标重复', '侧边栏识别度更清楚']
+  },
   {
     version: 'v4.3.1',
     title: '写作台布局整理',
