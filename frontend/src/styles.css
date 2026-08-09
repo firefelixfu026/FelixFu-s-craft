@@ -1625,6 +1625,46 @@ h3 {
   gap: 8px;
 }
 
+.article-section-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.article-section-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  color: #102033;
+  text-align: left;
+  background: #ffffff;
+}
+
+.article-section-card span {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.article-section-card strong {
+  color: #1f7a6d;
+  font-size: 28px;
+}
+
+.article-section-card em {
+  color: #5b6878;
+  font-style: normal;
+  line-height: 1.65;
+}
+
+.article-section-card.active,
+.article-section-card:hover {
+  border-color: #1f7a6d;
+  background: #edf8f4;
+}
+
 .popular-list button {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) auto;
@@ -2141,6 +2181,92 @@ h3 {
 
 .article-detail-workspace {
   max-width: 980px;
+}
+
+.article-reading-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.note-detail-workspace {
+  max-width: none;
+}
+
+.note-reading-grid {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.72fr) minmax(0, 1.7fr) minmax(220px, 0.78fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.note-tree,
+.note-side-panel {
+  position: sticky;
+  top: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.note-tree {
+  max-height: calc(100vh - 28px);
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.note-tree-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1f7a6d;
+  font-weight: 900;
+}
+
+.note-tree-group {
+  display: grid;
+  gap: 8px;
+}
+
+.note-tree-group strong {
+  color: #102033;
+  font-size: 13px;
+}
+
+.note-tree-group button {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #334155;
+  text-align: left;
+  background: #f8fafc;
+}
+
+.note-tree-group button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+}
+
+.note-tree-group button em {
+  color: #8190a3;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.note-tree-group button.active,
+.note-tree-group button:hover {
+  border-color: #1f7a6d;
+  background: #edf8f4;
+}
+
+.note-side-panel .reading-toolbar {
+  position: static;
 }
 
 .article-detail-card {
@@ -3554,6 +3680,56 @@ h3 {
   border: 1px solid #d8e0e9;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.note-import-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.note-import-card {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  min-height: 190px;
+  padding: 18px;
+  border: 1px dashed #9fb0c3;
+  border-radius: 8px;
+  color: #102033;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.note-import-card:hover {
+  border-color: #1f7a6d;
+  background: #edf8f4;
+}
+
+.note-import-card svg {
+  color: #1f7a6d;
+}
+
+.note-import-card strong {
+  font-size: 20px;
+}
+
+.note-import-card span {
+  color: #5b6878;
+  line-height: 1.65;
+}
+
+.note-import-card input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.comment-manager-note {
+  margin: 0;
+  color: #5b6878;
+  line-height: 1.7;
 }
 
 .ops-panel {
@@ -5689,6 +5865,7 @@ h3 {
 :root[data-theme='dark'] .profile-copy,
 :root[data-theme='dark'] .archive-filter,
 :root[data-theme='dark'] .archive-button,
+:root[data-theme='dark'] .article-section-card,
 :root[data-theme='dark'] .popular-panel,
 :root[data-theme='dark'] .popular-list button,
 :root[data-theme='dark'] .live-status-card,
@@ -5720,6 +5897,9 @@ h3 {
 :root[data-theme='dark'] .article-detail-card,
 :root[data-theme='dark'] .reading-toolbar,
 :root[data-theme='dark'] .article-toc,
+:root[data-theme='dark'] .note-tree,
+:root[data-theme='dark'] .note-tree-group button,
+:root[data-theme='dark'] .note-import-card,
 :root[data-theme='dark'] .comment-insight-grid > div,
 :root[data-theme='dark'] .comment-form,
 :root[data-theme='dark'] .ai-generator,
@@ -6117,6 +6297,9 @@ h3 {
 :root[data-theme='dark'] .story-step h3,
 :root[data-theme='dark'] .project-showcase-card strong,
 :root[data-theme='dark'] .admin-page-card strong,
+:root[data-theme='dark'] .article-section-card span,
+:root[data-theme='dark'] .note-tree-group strong,
+:root[data-theme='dark'] .note-import-card strong,
 :root[data-theme='dark'] .admin-pulse-card strong,
 :root[data-theme='dark'] .admin-task-card strong,
 :root[data-theme='dark'] .security-rule-grid strong,
@@ -6139,6 +6322,22 @@ h3 {
 :root[data-theme='dark'] .home-clock-time,
 :root[data-theme='dark'] .home-update-item strong {
   color: var(--text-main);
+}
+
+:root[data-theme='dark'] .article-section-card em,
+:root[data-theme='dark'] .note-import-card span,
+:root[data-theme='dark'] .comment-manager-note,
+:root[data-theme='dark'] .note-tree-group button em {
+  color: #b7c6da;
+}
+
+:root[data-theme='dark'] .article-section-card.active,
+:root[data-theme='dark'] .article-section-card:hover,
+:root[data-theme='dark'] .note-tree-group button.active,
+:root[data-theme='dark'] .note-tree-group button:hover,
+:root[data-theme='dark'] .note-import-card:hover {
+  border-color: rgba(125, 211, 252, 0.62);
+  background: rgba(31, 122, 109, 0.18);
 }
 
 :root[data-theme='dark'] .ops-list-row code {
@@ -6386,8 +6585,17 @@ h3 {
   .split-grid,
   .ai-workbench-grid,
   .admin-layout,
+  .article-section-switch,
+  .note-reading-grid,
+  .note-import-grid,
   .manager-row {
     grid-template-columns: 1fr;
+  }
+
+  .note-tree,
+  .note-side-panel {
+    position: static;
+    max-height: none;
   }
 
   .editor-side-stack {

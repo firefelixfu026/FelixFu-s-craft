@@ -532,7 +532,7 @@ def create_comment(
             raise HTTPException(status_code=400, detail="Reply target is invalid")
         parent_id = parent.id
 
-    comment_status = "pending" if current_user.role != "admin" or ADMIN_COMMENTS_REQUIRE_APPROVAL else "approved"
+    comment_status = "pending" if ADMIN_COMMENTS_REQUIRE_APPROVAL and current_user.role != "admin" else "approved"
     db.add(
         Comment(
             article_id=article.id,
@@ -549,7 +549,7 @@ def create_comment(
     return {
         "articleId": article_id,
         "comments": [_comment_to_dict(item) for item in _visible_comments(article, current_user)],
-        "message": "管理员评论已直接公开" if comment_status == "approved" else "评论已提交，审核通过后会公开显示",
+        "message": "评论已发布" if comment_status == "approved" else "评论已提交，审核通过后会公开显示",
     }
 
 

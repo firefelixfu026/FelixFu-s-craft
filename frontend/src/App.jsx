@@ -102,6 +102,7 @@ const AUDIO_UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
 const AUDIO_UPLOAD_CHUNK_BYTES = 768 * 1024;
 const ALLOWED_IMAGE_UPLOAD_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']);
 const ALLOWED_AUDIO_UPLOAD_TYPES = new Set(['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/flac', 'audio/x-flac', 'audio/mp4', 'audio/aac']);
+const TECH_NOTE_KEYWORDS = ['技术', '笔记', '学习', 'React', '前端', '后端', 'FastAPI', 'Git', '网络', '算法', '数据结构', '计算机', '代码', '项目文档'];
 const ARTICLE_DRAFT_KEY = 'felix_blog_article_form_draft';
 const ARTICLE_DRAFT_HISTORY_KEY = 'felix_blog_article_draft_history';
 const FRONTEND_ERROR_LOG_KEY = 'felix_blog_frontend_error_logs';
@@ -232,7 +233,7 @@ function readStoredSidebarCollapsed() {
 function readStoredAdminPage() {
   if (typeof localStorage === 'undefined') return 'overview';
   const storedPage = localStorage.getItem(ADMIN_PAGE_KEY) || 'overview';
-  const knownPages = new Set(['overview', 'ops', 'releases', 'editor', 'articles', 'music', 'media', 'comments', 'security', 'ai', 'backups', 'corpus', 'study']);
+  const knownPages = new Set(['overview', 'ops', 'releases', 'editor', 'notes', 'articles', 'music', 'comments', 'security']);
   return knownPages.has(storedPage) ? storedPage : 'overview';
 }
 
@@ -381,6 +382,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v5.0',
+    title: '内容架构重组',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['文章中心拆成随笔娱乐和技术笔记两个入口', '技术笔记阅读页改成目录树、正文、阅读进度三栏结构', '后台精简为写作、笔记上传、内容管理和必要工具', '笔记上传支持 Markdown 与相对图片路径自动导入']
+  },
   {
     version: 'v4.3.3',
     title: '账号退出入口整理',
@@ -1099,6 +1107,67 @@ function formatArticleTimestamp(value, fallback = '保存后生成') {
   });
 }
 
+function isTechnicalArticle(article = {}) {
+  const haystack = [
+    article.category || '',
+    article.title || '',
+    article.summary || '',
+    ...(article.tags || [])
+  ].join(' ');
+  return TECH_NOTE_KEYWORDS.some((keyword) => haystack.toLowerCase().includes(keyword.toLowerCase()));
+}
+
+function getArticleSection(article) {
+  return isTechnicalArticle(article) ? 'notes' : 'essays';
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file, 'utf-8');
+  });
+}
+
+function normalizeUploadPath(path = '') {
+  return String(path).replace(/\\/g, '/').replace(/^\.?\//, '').trim();
+}
+
+function getRelativeImageCandidates(file) {
+  const relativePath = normalizeUploadPath(file.webkitRelativePath || file.name || '');
+  const filename = normalizeUploadPath(file.name || relativePath);
+  return Array.from(new Set([
+    relativePath,
+    filename,
+    `images/${filename}`,
+    `./images/${filename}`,
+    `assets/${filename}`,
+    `./assets/${filename}`
+  ].filter(Boolean)));
+}
+
+function replaceMarkdownRelativeImages(content, imageUrlMap) {
+  return content.replace(/!\[([^\]]*)\]\((?!https?:\/\/|\/|data:)([^)]+)\)/gi, (match, alt, rawPath) => {
+    const cleanPath = normalizeUploadPath(rawPath.replace(/^['"]|['"]$/g, ''));
+    const nextUrl = imageUrlMap.get(cleanPath) || imageUrlMap.get(decodeURIComponent(cleanPath));
+    return nextUrl ? `![${alt}](${nextUrl})` : match;
+  });
+}
+
+function extractNoteTitle(filename, content) {
+  const heading = content.match(/^#\s+(.+)$/m)?.[1]?.trim();
+  return heading || filename.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ') || '未命名技术笔记';
+}
+
+function extractNoteSummary(content) {
+  const lines = content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#') && !line.startsWith('![') && !line.startsWith('```'));
+  return (lines[0] || '从 Markdown 导入的技术笔记。').slice(0, 120);
+}
+
 function formatTrackTime(seconds) {
   if (!Number.isFinite(seconds) || seconds <= 0) return '00:00';
   const totalSeconds = Math.floor(seconds);
@@ -1158,6 +1227,7 @@ function App() {
   const [isSavingArticle, setIsSavingArticle] = useState(false);
   const [isRunningArticleAi, setIsRunningArticleAi] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isImportingNoteFiles, setIsImportingNoteFiles] = useState(false);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [isLoadingUploadedImages, setIsLoadingUploadedImages] = useState(false);
   const [musicTracks, setMusicTracks] = useState([]);
@@ -2315,6 +2385,59 @@ function App() {
     setAdminMessage('图片已上传，Markdown 图片已插入正文');
   }
 
+  async function importNoteFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return false;
+    if (!authToken) {
+      setAdminMessage('请先登录管理员账号');
+      setActiveView('login');
+      return false;
+    }
+
+    const markdownFile = files.find((file) => /\.md$/i.test(file.name));
+    if (!markdownFile) {
+      setAdminMessage('没有找到 .md 笔记文件');
+      return false;
+    }
+
+    setIsImportingNoteFiles(true);
+    setAdminMessage('正在导入 Markdown 笔记...');
+    try {
+      const imageUrlMap = new Map();
+      const imageFiles = files.filter((file) => ALLOWED_IMAGE_UPLOAD_TYPES.has(file.type));
+      for (const imageFile of imageFiles) {
+        const uploaded = await uploadAdminImage(imageFile);
+        if (!uploaded?.url) continue;
+        getRelativeImageCandidates(imageFile).forEach((candidate) => imageUrlMap.set(normalizeUploadPath(candidate), uploaded.url));
+      }
+
+      const rawContent = await readFileAsText(markdownFile);
+      const content = replaceMarkdownRelativeImages(rawContent, imageUrlMap);
+      const title = extractNoteTitle(markdownFile.name, content);
+      const summary = extractNoteSummary(content);
+      const estimatedMinutes = Math.max(2, Math.ceil(content.replace(/[#>*_`[\]()!-]/g, '').length / 500));
+
+      setEditingArticleId(null);
+      setArticleForm({
+        ...createEmptyArticleForm(),
+        title,
+        summary,
+        content,
+        tags: '技术笔记, Markdown',
+        category: '技术笔记',
+        readTime: `${estimatedMinutes} min`,
+        status: 'draft'
+      });
+      setAdminMessage(`已导入笔记：${title}。图片路径已尽量自动替换，可预览后发布。`);
+      return true;
+    } catch {
+      setAdminMessage('笔记导入失败，请确认 Markdown 文件编码为 UTF-8');
+      return false;
+    } finally {
+      setIsImportingNoteFiles(false);
+    }
+  }
+
   function startEditingArticle(article) {
     setActiveView('admin');
     setEditingArticleId(article.id);
@@ -2979,6 +3102,7 @@ function App() {
             isSavingArticle={isSavingArticle}
             isRunningArticleAi={isRunningArticleAi}
             isUploadingImage={isUploadingImage}
+            isImportingNoteFiles={isImportingNoteFiles}
             uploadedImages={uploadedImages}
             isLoadingUploadedImages={isLoadingUploadedImages}
             musicTracks={musicTracks}
@@ -3008,6 +3132,7 @@ function App() {
             refreshAiSettings={refreshAiSettings}
             aiGenerationHistory={aiGenerationHistory}
             submitArticleForm={submitArticleForm}
+            importNoteFiles={importNoteFiles}
             uploadArticleCover={uploadArticleCover}
             uploadArticleContentImage={uploadArticleContentImage}
             refreshUploadedImages={refreshUploadedImages}
@@ -3528,6 +3653,10 @@ function ArticleWorkspace({
   searchMeta = parseSearchQuery('')
 }) {
   const selectedArticle = articles.find((article) => article.id === selectedArticleId) || null;
+  const [articleSection, setArticleSection] = useState('essays');
+  const essayArticles = articles.filter((article) => getArticleSection(article) === 'essays');
+  const noteArticles = articles.filter((article) => getArticleSection(article) === 'notes');
+  const activeArticles = articleSection === 'notes' ? noteArticles : essayArticles;
   const hasSearch = query.trim().length > 0;
   const searchTips = [
     searchMeta.filters.tags.length ? `标签：${searchMeta.filters.tags.join('、')}` : '',
@@ -3535,10 +3664,19 @@ function ArticleWorkspace({
     searchMeta.filters.months.length ? `月份：${searchMeta.filters.months.join('、')}` : '',
     searchMeta.terms.length ? `关键词：${searchMeta.terms.join('、')}` : ''
   ].filter(Boolean);
-  const popularArticles = [...articles]
+  const popularArticles = [...activeArticles]
     .filter((article) => Number(article.viewCount || 0) > 0)
     .sort((first, second) => Number(second.viewCount || 0) - Number(first.viewCount || 0))
     .slice(0, 5);
+
+  useEffect(() => {
+    if (articleSection === 'essays' && essayArticles.length === 0 && noteArticles.length > 0) {
+      setArticleSection('notes');
+    }
+    if (articleSection === 'notes' && noteArticles.length === 0 && essayArticles.length > 0) {
+      setArticleSection('essays');
+    }
+  }, [articleSection, essayArticles.length, noteArticles.length]);
 
   if (selectedArticle) {
     return (
@@ -3558,6 +3696,8 @@ function ArticleWorkspace({
         commentPages={commentPages}
         setCommentPages={setCommentPages}
         onBack={() => setSelectedArticleId(null)}
+        siblingArticles={articles}
+        openArticle={openArticle}
       />
     );
   }
@@ -3566,12 +3706,39 @@ function ArticleWorkspace({
     <section className="workspace">
       <div className="section-heading">
         <p className="eyebrow">文章中心</p>
-        <h1>学习笔记、项目记录和标签搜索</h1>
+        <h1>随笔娱乐和技术笔记分开看</h1>
         {hasSearch && (
           <p className="search-result-summary">
-            找到 {articles.length} 篇文章{searchTips.length ? ` · ${searchTips.join(' · ')}` : ''}
+            找到 {activeArticles.length} 篇内容{searchTips.length ? ` · ${searchTips.join(' · ')}` : ''}
           </p>
         )}
+      </div>
+
+      <div className="article-section-switch" aria-label="文章入口">
+        <button
+          className={articleSection === 'essays' ? 'article-section-card active' : 'article-section-card'}
+          type="button"
+          onClick={() => {
+            setArticleSection('essays');
+            setSelectedArticleId(null);
+          }}
+        >
+          <span>随笔 / 娱乐文章</span>
+          <strong>{essayArticles.length} 篇</strong>
+          <em>生活、游戏、番剧、读书、小作文都放这里，保留现在的内置写作台气质。</em>
+        </button>
+        <button
+          className={articleSection === 'notes' ? 'article-section-card active' : 'article-section-card'}
+          type="button"
+          onClick={() => {
+            setArticleSection('notes');
+            setSelectedArticleId(null);
+          }}
+        >
+          <span>技术笔记</span>
+          <strong>{noteArticles.length} 篇</strong>
+          <em>课程笔记、项目文档和代码学习记录，按知识库方式阅读。</em>
+        </button>
       </div>
 
       <div className="tag-filter" aria-label="文章标签筛选">
@@ -3602,7 +3769,7 @@ function ArticleWorkspace({
             }}
           >
             <span>{category === ALL_FILTER ? '全部分类' : category}</span>
-            <strong>{category === ALL_FILTER ? articles.length : articles.filter((article) => (article.category || '学习笔记') === category).length}</strong>
+            <strong>{category === ALL_FILTER ? activeArticles.length : activeArticles.filter((article) => (article.category || '学习笔记') === category).length}</strong>
           </button>
         ))}
       </div>
@@ -3644,11 +3811,11 @@ function ArticleWorkspace({
 
       {interactionMessage && <p className="interaction-message">{interactionMessage}</p>}
 
-      {articles.length === 0 ? (
+      {activeArticles.length === 0 ? (
         <p className="empty-state">没有找到符合条件的文章</p>
       ) : (
         <div className="article-list">
-          {articles.map((article) => (
+          {activeArticles.map((article) => (
             <article className="article-card article-preview" key={article.id}>
               {article.coverUrl && <ArticleCover article={article} />}
               <div className="article-meta">
@@ -3692,7 +3859,9 @@ function ArticleDetail({
   currentUser,
   commentPages,
   setCommentPages,
-  onBack
+  onBack,
+  siblingArticles = [],
+  openArticle = () => {}
 }) {
   const articleComments = comments[article.id] || [];
   const approvedCommentCount = articleComments.filter((comment) => comment.status !== 'pending').length;
@@ -3711,6 +3880,8 @@ function ArticleDetail({
   const articleRef = useRef(null);
   const [readingProgress, setReadingProgress] = useState(0);
   const headings = useMemo(() => getMarkdownHeadings(article.content || ''), [article.content]);
+  const isNoteArticle = isTechnicalArticle(article);
+  const noteArticles = siblingArticles.filter((item) => isTechnicalArticle(item));
 
   useEffect(() => {
     function updateReadingProgress() {
@@ -3736,13 +3907,18 @@ function ArticleDetail({
   }, [article.id]);
 
   return (
-    <section className="workspace article-detail-workspace">
+    <section className={isNoteArticle ? 'workspace article-detail-workspace note-detail-workspace' : 'workspace article-detail-workspace'}>
       <button className="back-button" type="button" onClick={onBack}>
         <ArrowLeft size={18} />
         <span>返回文章列表</span>
       </button>
 
       {interactionMessage && <p className="interaction-message">{interactionMessage}</p>}
+
+      <div className={isNoteArticle ? 'note-reading-grid' : 'article-reading-grid'}>
+      {isNoteArticle && (
+        <NoteTree articles={noteArticles} activeArticleId={article.id} openArticle={openArticle} />
+      )}
 
       <article className="article-card article-detail-card" ref={articleRef}>
         {article.coverUrl && <ArticleCover article={article} size="large" />}
@@ -3763,6 +3939,7 @@ function ArticleDetail({
           ))}
         </div>
 
+        {!isNoteArticle && (
         <div className="reading-toolbar" aria-label="阅读状态">
           <div>
             <span>阅读进度</span>
@@ -3772,8 +3949,9 @@ function ArticleDetail({
             <span style={{ transform: `scaleX(${readingProgress})` }} />
           </div>
         </div>
+        )}
 
-        {headings.length > 0 && <ArticleToc headings={headings} />}
+        {!isNoteArticle && headings.length > 0 && <ArticleToc headings={headings} />}
 
         {article.content && (
           <MarkdownContent content={article.content} title={article.title} />
@@ -3931,7 +4109,56 @@ function ArticleDetail({
           </div>
         </div>
       </article>
+      {isNoteArticle && (
+        <aside className="note-side-panel">
+          <div className="reading-toolbar" aria-label="阅读状态">
+            <div>
+              <span>阅读进度</span>
+              <strong>{Math.round(readingProgress * 100)}%</strong>
+            </div>
+            <div className="reading-progress-track" aria-hidden="true">
+              <span style={{ transform: `scaleX(${readingProgress})` }} />
+            </div>
+          </div>
+          {headings.length > 0 ? <ArticleToc headings={headings} /> : <p className="empty-state">这篇笔记还没有标题目录</p>}
+        </aside>
+      )}
+      </div>
     </section>
+  );
+}
+
+function NoteTree({ articles, activeArticleId, openArticle }) {
+  const grouped = articles.reduce((groups, article) => {
+    const key = article.category || '技术笔记';
+    groups[key] = groups[key] || [];
+    groups[key].push(article);
+    return groups;
+  }, {});
+
+  return (
+    <aside className="note-tree" aria-label="技术笔记目录树">
+      <div className="note-tree-heading">
+        <BookOpen size={17} />
+        <span>技术笔记</span>
+      </div>
+      {Object.entries(grouped).map(([category, group]) => (
+        <div className="note-tree-group" key={category}>
+          <strong>{category}</strong>
+          {group.map((item) => (
+            <button
+              className={item.id === activeArticleId ? 'active' : ''}
+              key={item.id}
+              type="button"
+              onClick={() => openArticle(item.id)}
+            >
+              <span>{item.title}</span>
+              <em>{item.readTime}</em>
+            </button>
+          ))}
+        </div>
+      ))}
+    </aside>
   );
 }
 
@@ -6631,6 +6858,7 @@ function AdminWorkspace({
   isSavingArticle,
   isRunningArticleAi,
   isUploadingImage,
+  isImportingNoteFiles,
   uploadedImages,
   isLoadingUploadedImages,
   musicTracks,
@@ -6660,6 +6888,7 @@ function AdminWorkspace({
   refreshAiSettings,
   aiGenerationHistory,
   submitArticleForm,
+  importNoteFiles,
   uploadArticleCover,
   uploadArticleContentImage,
   refreshUploadedImages,
@@ -6718,16 +6947,16 @@ function AdminWorkspace({
   const releaseMetrics = [
     { label: '已发布文章', value: `${publishedCount} 篇` },
     { label: '草稿', value: `${draftCount} 篇` },
-    { label: '待审评论', value: `${pendingCommentCount} 条` },
+    { label: '技术笔记', value: `${articles.filter((article) => isTechnicalArticle(article)).length} 篇` },
+    { label: '评论', value: `${adminComments.length} 条` },
     { label: '音乐', value: `${musicTracks.length} 首` },
-    { label: 'AI 生成记录', value: `${aiGenerationHistory.length} 条` },
   ];
   const readinessItems = [
     { label: '文章系统', done: articles.length > 0 },
-    { label: '评论审核', done: true },
-    { label: '图片上传', done: true },
+    { label: '笔记上传', done: true },
+    { label: '评论删除', done: true },
     { label: '管理员登录', done: Boolean(currentUser?.role === 'admin') },
-    { label: 'AI 写作辅助', done: true },
+    { label: '音乐上传', done: true },
   ];
   const adminPulseItems = [
     {
@@ -6743,10 +6972,10 @@ function AdminWorkspace({
       tone: draftCount ? 'attention' : 'ready'
     },
     {
-      label: 'AI 状态',
-      value: aiSettings?.configured ? '已接入' : '待配置',
-      detail: aiSettings?.configured ? (aiSettings.model || '模型已保存') : '可在 AI 页配置模型',
-      tone: aiSettings?.configured ? 'ready' : 'attention'
+      label: '笔记库',
+      value: `${articles.filter((article) => isTechnicalArticle(article)).length} 篇`,
+      detail: '技术内容独立成知识库入口',
+      tone: 'ready'
     },
     {
       label: '安全日志',
@@ -6757,18 +6986,14 @@ function AdminWorkspace({
   ];
   const adminPageItems = [
     { id: 'overview', label: '总览', detail: '状态、统计、待办', icon: Star, count: `${publishedCount} 篇` },
-    { id: 'ops', label: '运维', detail: '服务、部署、脚本', icon: ShieldCheck, count: '控制台' },
-    { id: 'releases', label: '版本', detail: '更新记录和路线', icon: Code2, count: releaseRoadmap[0].version },
-    { id: 'editor', label: '写文章', detail: editingArticleId ? '继续编辑当前文章' : '发布新内容', icon: FilePenLine, count: draftCount ? `${draftCount} 草稿` : 'Markdown' },
-    { id: 'articles', label: '文章库', detail: '编辑、删除、置顶', icon: BookOpen, count: `${articles.length} 篇` },
-    { id: 'music', label: '音乐', detail: '上传歌单和管理播放', icon: Music, count: `${musicTracks.length} 首` },
-    { id: 'media', label: '图片', detail: '文章内嵌图片资源', icon: ImageIcon, count: `${uploadedImages.length} 张` },
+    { id: 'editor', label: '写文章', detail: editingArticleId ? '继续编辑当前文章' : '随笔和普通文章', icon: FilePenLine, count: draftCount ? `${draftCount} 草稿` : 'Markdown' },
+    { id: 'notes', label: '笔记上传', detail: '导入 .md 和内含图片', icon: BookOpen, count: 'MkDocs 感' },
+    { id: 'articles', label: '内容库', detail: '编辑、删除、置顶', icon: BookOpen, count: `${articles.length} 篇` },
     { id: 'comments', label: '评论', detail: '查看和删除评论', icon: MessageCircle, count: `${adminComments.length} 条` },
-    { id: 'security', label: '安全', detail: '操作日志和删除保护', icon: ShieldCheck, count: `${adminAuditLogs.length} 条` },
-    { id: 'ai', label: 'AI', detail: '模型配置、测试和模板', icon: Bot, count: aiSettings?.configured ? '已配置' : '待配置' },
-    { id: 'backups', label: '备份', detail: '备份记录和恢复清单', icon: Save, count: '本地记录' },
-    { id: 'corpus', label: '群聊语料', detail: '微信 bot 训练样本', icon: MessageCircle, count: '样本库' },
-    { id: 'study', label: '学习助手', detail: '目标、清单、复盘', icon: CheckCircle2, count: '每日' }
+    { id: 'music', label: '音乐', detail: '上传歌单和管理播放', icon: Music, count: `${musicTracks.length} 首` },
+    { id: 'releases', label: '版本', detail: '更新记录和路线', icon: Code2, count: releaseRoadmap[0].version },
+    { id: 'ops', label: '运维', detail: '服务、部署、脚本', icon: ShieldCheck, count: '控制台' },
+    { id: 'security', label: '安全', detail: '操作日志和删除保护', icon: ShieldCheck, count: `${adminAuditLogs.length} 条` }
   ];
   const contentTextareaRef = useRef(null);
   const [aiInsertMode, setAiInsertMode] = useState('append');
@@ -6787,7 +7012,7 @@ function AdminWorkspace({
   const [corpusInput, setCorpusInput] = useState('');
   const [studyState, setStudyState] = useState(readStudyState);
   const [studyInput, setStudyInput] = useState('');
-  const shouldShowAdminLayout = ['editor', 'articles', 'music', 'media', 'comments'].includes(activeAdminPage);
+  const shouldShowAdminLayout = ['editor', 'notes', 'articles', 'music', 'comments'].includes(activeAdminPage);
 
   useEffect(() => {
     localStorage.setItem(ADMIN_PAGE_KEY, activeAdminPage);
@@ -6831,11 +7056,11 @@ function AdminWorkspace({
   const adminTaskItems = [
     {
       id: 'comments',
-      title: pendingCommentCount ? '处理待审评论' : '评论区正常',
-      detail: pendingCommentCount ? `还有 ${pendingCommentCount} 条评论等待审核` : '当前没有待审评论',
-      action: pendingCommentCount ? '去处理' : '查看评论',
+      title: adminComments.length ? '评论区有互动' : '评论区很安静',
+      detail: adminComments.length ? `现在共有 ${adminComments.length} 条评论，后台只保留查看和删除` : '有新评论后可直接查看或删除',
+      action: '查看评论',
       page: 'comments',
-      tone: pendingCommentCount ? 'attention' : 'ready',
+      tone: adminComments.length ? 'ready' : 'neutral',
       icon: MessageCircle
     },
     {
@@ -6857,49 +7082,13 @@ function AdminWorkspace({
       icon: ShieldCheck
     },
     {
-      id: 'releases',
-      title: '更新档案',
-      detail: `版本清单已收录 ${releaseArchive.length} 条记录，可搜索和分页回看`,
-      action: '看版本',
-      page: 'releases',
+      id: 'notes',
+      title: '导入技术笔记',
+      detail: '上传 Markdown 和同目录图片，自动变成一篇可编辑草稿',
+      action: '上传笔记',
+      page: 'notes',
       tone: 'neutral',
-      icon: Code2
-    },
-    {
-      id: 'ai',
-      title: aiSettings?.configured ? 'AI 已配置' : 'AI 待配置',
-      detail: aiSettings?.configured ? '可以直接测试模型和使用写作辅助' : '配置后可启用真实模型辅助写作',
-      action: '打开 AI',
-      page: 'ai',
-      tone: aiSettings?.configured ? 'ready' : 'attention',
-      icon: Bot
-    },
-    {
-      id: 'backups',
-      title: backupRecords.length ? '备份有记录' : '建议做一次备份',
-      detail: backupRecords.length ? `最近记录：${new Date(backupRecords[0].createdAt).toLocaleString('zh-CN', { hour12: false })}` : '大改和上线前最好留一条备份记录',
-      action: '备份中心',
-      page: 'backups',
-      tone: backupRecords.length ? 'ready' : 'attention',
-      icon: Save
-    },
-    {
-      id: 'corpus',
-      title: '群聊 bot 语料',
-      detail: `已保存 ${botCorpusSamples.length} 组群聊样本，可继续贴聊天文本做风格分析`,
-      action: '整理语料',
-      page: 'corpus',
-      tone: botCorpusSamples.length ? 'ready' : 'neutral',
-      icon: MessageCircle
-    },
-    {
-      id: 'study',
-      title: '学习助手',
-      detail: `今日完成 ${studyState.tasks.filter((task) => task.done).length} / ${studyState.tasks.length} 项`,
-      action: '看清单',
-      page: 'study',
-      tone: studyState.tasks.every((task) => task.done) ? 'ready' : 'neutral',
-      icon: CheckCircle2
+      icon: BookOpen
     }
   ];
 
@@ -7964,6 +8153,71 @@ function AdminWorkspace({
         </form>
         )}
 
+        {activeAdminPage === 'notes' && (
+        <section className="admin-panel note-import-panel">
+          <div className="admin-panel-heading">
+            <div>
+              <h2>笔记上传</h2>
+              <span>导入 Markdown，图片会跟着变成文章里的内嵌资源</span>
+            </div>
+            <button className="ghost-button" type="button" onClick={() => openAdminPage('editor')}>
+              <FilePenLine size={17} />
+              <span>去写作台</span>
+            </button>
+          </div>
+
+          <div className="note-import-grid">
+            <label className="note-import-card">
+              <BookOpen size={24} />
+              <strong>上传单篇 .md</strong>
+              <span>适合已经整理好的单篇课程笔记或项目文档。</span>
+              <input
+                type="file"
+                accept=".md,text/markdown,text/plain"
+                disabled={isImportingNoteFiles}
+                onChange={async (event) => {
+                  const ok = await importNoteFiles(event.target.files);
+                  event.target.value = '';
+                  if (ok) openAdminPage('editor');
+                }}
+              />
+            </label>
+
+            <label className="note-import-card">
+              <ImageIcon size={24} />
+              <strong>选择笔记文件夹</strong>
+              <span>一次选择 .md 和 images 里的图片，相对路径会自动改写。</span>
+              <input
+                type="file"
+                multiple
+                webkitdirectory="true"
+                disabled={isImportingNoteFiles}
+                onChange={async (event) => {
+                  const ok = await importNoteFiles(event.target.files);
+                  event.target.value = '';
+                  if (ok) openAdminPage('editor');
+                }}
+              />
+            </label>
+          </div>
+
+          <div className="security-rule-grid">
+            <article>
+              <strong>推荐目录</strong>
+              <span>一个文件夹里放一篇 .md，图片放在 images/ 或 assets/ 下。</span>
+            </article>
+            <article>
+              <strong>导入结果</strong>
+              <span>会先生成草稿，不会直接发布，方便你预览和微调。</span>
+            </article>
+            <article>
+              <strong>图片管理</strong>
+              <span>图片作为文章/笔记的一部分上传，不再单独占一个后台入口。</span>
+            </article>
+          </div>
+        </section>
+        )}
+
         {activeAdminPage === 'articles' && (
         <section className="admin-panel article-manager">
           <div className="admin-panel-heading">
@@ -8198,14 +8452,6 @@ function AdminWorkspace({
             <h2>评论管理</h2>
             <div className="manager-actions">
               <span>{isLoadingAdminComments ? '加载中' : `${filteredAdminComments.length} / ${adminComments.length} 条`}</span>
-              <button
-                type="button"
-                disabled={filteredPendingCommentCount === 0}
-                onClick={() => approveAdminCommentsBulk(filteredAdminComments)}
-              >
-                <CheckCircle2 size={17} />
-                <span>通过当前筛选</span>
-              </button>
               <button type="button" onClick={() => refreshAdminComments()}>
                 <RefreshCw size={17} />
                 <span>刷新</span>
@@ -8213,52 +8459,7 @@ function AdminWorkspace({
             </div>
           </div>
 
-          <div className="comment-filter-row">
-            <label>
-              <span>文章</span>
-              <select
-                value={adminCommentArticleFilter}
-                onChange={(event) => {
-                  setAdminCommentArticleFilter(event.target.value);
-                  setAdminCommentPage(0);
-                }}
-              >
-                <option value="all">全部文章</option>
-                {adminCommentArticleOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>作者</span>
-              <select
-                value={adminCommentAuthorFilter}
-                onChange={(event) => {
-                  setAdminCommentAuthorFilter(event.target.value);
-                  setAdminCommentPage(0);
-                }}
-              >
-                <option value="all">全部作者</option>
-                {adminCommentAuthorOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>状态</span>
-              <select
-                value={adminCommentStatusFilter}
-                onChange={(event) => {
-                  setAdminCommentStatusFilter(event.target.value);
-                  setAdminCommentPage(0);
-                }}
-              >
-                <option value="all">全部状态</option>
-                <option value="pending">待审核</option>
-                <option value="approved">已通过</option>
-              </select>
-            </label>
-          </div>
+          <p className="comment-manager-note">评论后台只保留查看和删除；正常评论会直接显示，不再走复杂筛选和审核流程。</p>
 
           <div className="manager-list">
             {adminComments.length === 0 ? (
@@ -8280,12 +8481,6 @@ function AdminWorkspace({
                     <p>{comment.content}</p>
                   </div>
                   <div className="manager-actions">
-                    {comment.status === 'pending' && (
-                      <button type="button" onClick={() => approveAdminComment(comment)}>
-                        <CheckCircle2 size={17} />
-                        <span>通过</span>
-                      </button>
-                    )}
                     <button className="danger-button" type="button" onClick={() => deleteAdminComment(comment)}>
                       <Trash2 size={17} />
                       <span>删除</span>
