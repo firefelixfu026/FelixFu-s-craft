@@ -96,6 +96,206 @@ textarea {
   grid-template-columns: 88px minmax(0, 1fr);
 }
 
+.frontstage-shell {
+  --page-bg: #faf7f2;
+  --panel-bg: rgba(255, 253, 248, 0.92);
+  --panel-soft: #fff7ef;
+  --panel-muted: #f2edf7;
+  --text-main: #243044;
+  --text-soft: #657184;
+  --text-muted: #8c91a0;
+  --border: #eaded7;
+  --border-soft: #f0e8e1;
+  --input-bg: rgba(255, 255, 255, 0.92);
+  --sidebar-bg: #2e3238;
+  --sidebar-active: rgba(255, 255, 255, 0.16);
+  --sidebar-border: rgba(255, 255, 255, 0.16);
+  --accent: #2f8f83;
+  --accent-strong: #d85f76;
+  --accent-soft: #fde8ee;
+  --accent-blue: #637ed8;
+  --shadow-soft: 0 20px 48px rgba(101, 83, 68, 0.14);
+  background:
+    linear-gradient(120deg, rgba(255, 250, 244, 0.96), rgba(248, 242, 249, 0.96)),
+    repeating-linear-gradient(135deg, rgba(216, 95, 118, 0.08) 0 1px, transparent 1px 30px);
+}
+
+.frontstage-shell .sidebar {
+  position: sticky;
+  isolation: isolate;
+  background:
+    linear-gradient(180deg, rgba(28, 32, 38, 0.9), rgba(36, 41, 46, 0.86)),
+    url('/profile-cover.png') center / cover;
+  background-blend-mode: multiply;
+  box-shadow: 16px 0 40px rgba(39, 31, 34, 0.16);
+}
+
+.frontstage-shell .sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.12), transparent 38%),
+    repeating-linear-gradient(0deg, transparent 0 28px, rgba(255, 255, 255, 0.035) 29px 30px);
+}
+
+.frontstage-shell .brand {
+  align-items: flex-start;
+}
+
+.frontstage-shell .brand-mark {
+  width: 54px;
+  height: 54px;
+  border-color: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 0 0 4px rgba(255, 255, 255, 0.12),
+    0 10px 24px rgba(0, 0, 0, 0.24);
+}
+
+.frontstage-shell .brand strong {
+  color: #fff8f1;
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.frontstage-shell .brand span {
+  color: rgba(255, 248, 241, 0.74);
+}
+
+.frontstage-shell .nav-list {
+  gap: 10px;
+}
+
+.frontstage-shell .nav-button {
+  min-height: 46px;
+  padding-inline: 14px;
+  color: rgba(255, 248, 241, 0.82);
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
+}
+
+.frontstage-shell .nav-button.active,
+.frontstage-shell .nav-button:hover {
+  color: #fffdf8;
+  border-color: rgba(255, 218, 224, 0.54);
+  background: linear-gradient(90deg, rgba(216, 95, 118, 0.36), rgba(47, 143, 131, 0.22));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.frontstage-shell .nav-button.active::before {
+  background: #ffd8e1;
+  box-shadow: 0 0 16px rgba(255, 216, 225, 0.72);
+}
+
+.frontstage-shell .login-panel {
+  border-top-color: rgba(255, 255, 255, 0.18);
+}
+
+.frontstage-shell .main-content {
+  background:
+    linear-gradient(180deg, rgba(255, 250, 244, 0.98), rgba(247, 244, 252, 0.94)),
+    repeating-linear-gradient(135deg, rgba(99, 126, 216, 0.055) 0 1px, transparent 1px 32px);
+}
+
+.frontstage-shell .topbar {
+  padding: 10px 0 6px;
+}
+
+.frontstage-shell .topbar-title h1,
+.frontstage-shell .section-heading h1,
+.frontstage-shell .section-heading h2,
+.frontstage-shell .home-widget-heading h2,
+.frontstage-shell .profile-copy h1 {
+  color: #202c3f;
+  letter-spacing: 0;
+}
+
+.frontstage-shell .topbar-title span,
+.frontstage-shell .section-heading p,
+.frontstage-shell .home-widget-heading p,
+.frontstage-shell .profile-copy p {
+  color: #6f7482;
+}
+
+.frontstage-shell .profile-hero,
+.frontstage-shell .content-band,
+.frontstage-shell .home-clock-card,
+.frontstage-shell .home-update-panel,
+.frontstage-shell .latest-article-strip,
+.frontstage-shell .article-card,
+.frontstage-shell .tool-panel,
+.frontstage-shell .music-player-panel,
+.frontstage-shell .music-library-panel,
+.frontstage-shell .music-manager,
+.frontstage-shell .summer-plan-panel,
+.frontstage-shell .admin-panel,
+.frontstage-shell .calendar-popover {
+  border-color: rgba(216, 95, 118, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 248, 241, 0.9)),
+    linear-gradient(120deg, rgba(253, 232, 238, 0.52), rgba(232, 245, 241, 0.4));
+  box-shadow: 0 18px 42px rgba(112, 91, 78, 0.13);
+}
+
+.frontstage-shell .article-card:hover,
+.frontstage-shell .tool-panel:hover,
+.frontstage-shell .music-track:hover,
+.frontstage-shell .playlist-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 52px rgba(112, 91, 78, 0.17);
+}
+
+.frontstage-shell .profile-hero {
+  overflow: hidden;
+  border-width: 1px;
+}
+
+.frontstage-shell .profile-hero::before {
+  opacity: 0.32;
+}
+
+.frontstage-shell .profile-visual {
+  filter: saturate(1.04) contrast(0.98);
+}
+
+.frontstage-shell .metric,
+.frontstage-shell .stat-card,
+.frontstage-shell .summary-card,
+.frontstage-shell .plan-stat-card,
+.frontstage-shell .music-stat,
+.frontstage-shell .article-meta-pill {
+  border-color: rgba(47, 143, 131, 0.2);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.frontstage-shell .icon-text-button.primary,
+.frontstage-shell .primary-action,
+.frontstage-shell .calendar-day.selected,
+.frontstage-shell .playlist-chip.active {
+  border-color: transparent;
+  background: linear-gradient(135deg, #2f8f83, #637ed8);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(47, 143, 131, 0.2);
+}
+
+.frontstage-shell .tag-button.active,
+.frontstage-shell .category-tab.active,
+.frontstage-shell .article-tag,
+.frontstage-shell .release-status {
+  border-color: rgba(216, 95, 118, 0.22);
+  color: #9d4457;
+  background: rgba(253, 232, 238, 0.78);
+}
+
+.frontstage-shell .reading-progress-sticky {
+  border-color: rgba(216, 95, 118, 0.18);
+  background: rgba(255, 253, 248, 0.86);
+  backdrop-filter: blur(12px);
+}
+
 .sidebar {
   position: sticky;
   top: 0;
@@ -298,19 +498,17 @@ textarea {
   font-variant-numeric: tabular-nums;
 }
 
-.sidebar-music-progress {
-  overflow: hidden;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(248, 250, 252, 0.18);
+.sidebar-music-range {
+  width: 100%;
+  height: 14px;
+  margin: 0;
+  accent-color: #34d399;
+  cursor: pointer;
 }
 
-.sidebar-music-progress span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: #34d399;
-  transition: width 180ms ease;
+.sidebar-music-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .sidebar-music-actions {
@@ -380,7 +578,7 @@ textarea {
 }
 
 .sidebar-collapsed .sidebar-music-main > span:last-child,
-.sidebar-collapsed .sidebar-music-progress {
+.sidebar-collapsed .sidebar-music-range {
   display: none;
 }
 
@@ -6106,6 +6304,98 @@ h3 {
   .weekly-plan-row > input:last-of-type {
     grid-column: 1 / -1;
   }
+}
+
+:root[data-theme='dark'] .frontstage-shell {
+  --page-bg: #0e111c;
+  --panel-bg: rgba(21, 24, 35, 0.88);
+  --panel-soft: #191d2a;
+  --panel-muted: #242033;
+  --text-main: #f4efe8;
+  --text-soft: #c6c0ba;
+  --text-muted: #958f9d;
+  --border: rgba(255, 211, 220, 0.14);
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --input-bg: rgba(14, 17, 28, 0.78);
+  --accent: #6ee7c8;
+  --accent-strong: #ff8ba7;
+  --accent-soft: rgba(255, 139, 167, 0.14);
+  --accent-blue: #9aa8ff;
+  --shadow-soft: 0 22px 52px rgba(0, 0, 0, 0.34);
+  background:
+    linear-gradient(125deg, #0e111c, #171522 46%, #101b20),
+    repeating-linear-gradient(135deg, rgba(255, 139, 167, 0.06) 0 1px, transparent 1px 34px);
+}
+
+:root[data-theme='dark'] .frontstage-shell .main-content {
+  background:
+    linear-gradient(180deg, rgba(14, 17, 28, 0.98), rgba(22, 20, 32, 0.96)),
+    repeating-linear-gradient(135deg, rgba(154, 168, 255, 0.06) 0 1px, transparent 1px 34px);
+}
+
+:root[data-theme='dark'] .frontstage-shell .sidebar {
+  background:
+    linear-gradient(180deg, rgba(18, 19, 26, 0.9), rgba(29, 28, 35, 0.86)),
+    url('/profile-cover.png') center / cover;
+  background-blend-mode: multiply;
+}
+
+:root[data-theme='dark'] .frontstage-shell .topbar-title h1,
+:root[data-theme='dark'] .frontstage-shell .section-heading h1,
+:root[data-theme='dark'] .frontstage-shell .section-heading h2,
+:root[data-theme='dark'] .frontstage-shell .home-widget-heading h2,
+:root[data-theme='dark'] .frontstage-shell .profile-copy h1 {
+  color: #fff8f1;
+}
+
+:root[data-theme='dark'] .frontstage-shell .topbar-title span,
+:root[data-theme='dark'] .frontstage-shell .section-heading p,
+:root[data-theme='dark'] .frontstage-shell .home-widget-heading p,
+:root[data-theme='dark'] .frontstage-shell .profile-copy p {
+  color: #c8c0ba;
+}
+
+:root[data-theme='dark'] .frontstage-shell .profile-hero,
+:root[data-theme='dark'] .frontstage-shell .content-band,
+:root[data-theme='dark'] .frontstage-shell .home-clock-card,
+:root[data-theme='dark'] .frontstage-shell .home-update-panel,
+:root[data-theme='dark'] .frontstage-shell .latest-article-strip,
+:root[data-theme='dark'] .frontstage-shell .article-card,
+:root[data-theme='dark'] .frontstage-shell .tool-panel,
+:root[data-theme='dark'] .frontstage-shell .music-player-panel,
+:root[data-theme='dark'] .frontstage-shell .music-library-panel,
+:root[data-theme='dark'] .frontstage-shell .music-manager,
+:root[data-theme='dark'] .frontstage-shell .summer-plan-panel,
+:root[data-theme='dark'] .frontstage-shell .admin-panel,
+:root[data-theme='dark'] .frontstage-shell .calendar-popover {
+  border-color: rgba(255, 211, 220, 0.14);
+  background:
+    linear-gradient(180deg, rgba(29, 31, 43, 0.9), rgba(20, 23, 34, 0.88)),
+    linear-gradient(120deg, rgba(255, 139, 167, 0.1), rgba(110, 231, 200, 0.08));
+  box-shadow: 0 24px 58px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme='dark'] .frontstage-shell .metric,
+:root[data-theme='dark'] .frontstage-shell .stat-card,
+:root[data-theme='dark'] .frontstage-shell .summary-card,
+:root[data-theme='dark'] .frontstage-shell .plan-stat-card,
+:root[data-theme='dark'] .frontstage-shell .music-stat,
+:root[data-theme='dark'] .frontstage-shell .article-meta-pill {
+  border-color: rgba(110, 231, 200, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+:root[data-theme='dark'] .frontstage-shell .tag-button.active,
+:root[data-theme='dark'] .frontstage-shell .category-tab.active,
+:root[data-theme='dark'] .frontstage-shell .article-tag,
+:root[data-theme='dark'] .frontstage-shell .release-status {
+  border-color: rgba(255, 139, 167, 0.28);
+  color: #ffd5df;
+  background: rgba(255, 139, 167, 0.14);
+}
+
+:root[data-theme='dark'] .frontstage-shell .sidebar-music-range {
+  accent-color: #ff8ba7;
 }
 
 @media (prefers-reduced-motion: reduce) {

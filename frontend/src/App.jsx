@@ -379,6 +379,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v4.0',
+    title: '二次元个人站视觉改版',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['前台改成更有个人气质的轻二次元视觉', '首页、文章、计划和音乐模块降低工具台感', '侧边栏迷你播放器支持拖动进度条', '后台管理保留稳定的工作台布局']
+  },
+  {
     version: 'v3.1',
     title: '常驻音乐和自建歌单',
     date: '2026-08-09',
@@ -2520,9 +2527,16 @@ function App() {
 
   const isRestoringSession = Boolean(authToken && !currentUser);
   const showGlobalSearch = activeView === 'articles';
+  const shellClassName = [
+    'app-shell',
+    isSidebarCollapsed ? 'sidebar-collapsed' : '',
+    activeView === 'admin' ? 'admin-shell' : 'frontstage-shell'
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <div className={isSidebarCollapsed ? 'app-shell sidebar-collapsed' : 'app-shell'}>
+    <div className={shellClassName}>
       <aside className="sidebar" aria-label="博客导航" aria-expanded={!isSidebarCollapsed}>
         <div className="brand">
           <img className="brand-mark" src="/avatar.jpg" alt="付江樊头像" />
@@ -2589,6 +2603,7 @@ function App() {
             duration={musicDuration}
             togglePlayback={toggleMusicPlayback}
             stepTrack={stepMusicTrack}
+            seekTrack={seekMusicTrack}
             openMusic={() => setActiveView('music')}
           />
         )}
@@ -5554,8 +5569,9 @@ function EditableTable({ columns, rows, section, disabled, updateRow, deleteRow,
   );
 }
 
-function SidebarMusicPlayer({ track, isPlaying, progress, duration, togglePlayback, stepTrack, openMusic }) {
-  const percent = duration ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
+function SidebarMusicPlayer({ track, isPlaying, progress, duration, togglePlayback, stepTrack, seekTrack, openMusic }) {
+  const safeDuration = Number.isFinite(duration) ? duration : 0;
+  const safeProgress = safeDuration ? Math.min(safeDuration, Math.max(0, progress)) : 0;
   return (
     <div className={isPlaying ? 'sidebar-music-player playing' : 'sidebar-music-player'}>
       <button className="sidebar-music-main" type="button" onClick={openMusic} title="打开音乐">
@@ -5567,9 +5583,17 @@ function SidebarMusicPlayer({ track, isPlaying, progress, duration, togglePlayba
           <em>{track ? `${formatTrackTime(progress)} / ${formatTrackTime(duration)}` : '去音乐页选一首歌'}</em>
         </span>
       </button>
-      <div className="sidebar-music-progress" aria-hidden="true">
-        <span style={{ width: `${percent}%` }} />
-      </div>
+      <input
+        className="sidebar-music-range"
+        type="range"
+        min="0"
+        max={safeDuration || 0}
+        step="1"
+        value={safeProgress}
+        disabled={!track || !safeDuration}
+        onChange={(event) => seekTrack(Number(event.target.value))}
+        aria-label="迷你播放器播放进度"
+      />
       <div className="sidebar-music-actions">
         <button type="button" onClick={() => stepTrack(-1)} disabled={!track} aria-label="上一首">
           <SkipBack size={14} />
