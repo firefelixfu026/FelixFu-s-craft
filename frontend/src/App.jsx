@@ -5,6 +5,8 @@ import {
   Bot,
   CalendarDays,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Code2,
   Copy,
   Eye,
@@ -4696,33 +4698,122 @@ function PlanModule({ title, count, children, wide = false }) {
   );
 }
 
+const planCalendarWeekdays = ['一', '二', '三', '四', '五', '六', '日'];
+
+function parsePlanDate(dateValue) {
+  const [year, month, day] = String(dateValue || '').split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+}
+
+function formatPlanDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getPlanMonth(dateValue) {
+  const date = parsePlanDate(dateValue);
+  if (!date) return new Date();
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
 function PlanCalendarSelector({ days, value, onChange }) {
-  const dateInputRef = useRef(null);
+  const pickerRef = useRef(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => getPlanMonth(value || days[0]?.date));
   const selectedDay = days.find((day) => day.date === value) || days[0];
   const availableDates = days.map((day) => day.date).filter(Boolean).sort();
   const minDate = availableDates[0] || '';
   const maxDate = availableDates[availableDates.length - 1] || '';
+  const dayByDate = useMemo(() => new Map(days.map((day) => [day.date, day])), [days]);
+  const minMonth = getPlanMonth(minDate);
+  const maxMonth = getPlanMonth(maxDate);
+  const canMovePrev = visibleMonth > minMonth;
+  const canMoveNext = visibleMonth < maxMonth;
 
-  function handleDateChange(event) {
-    const nextDate = event.target.value;
-    if (days.some((day) => day.date === nextDate)) {
-      onChange(nextDate);
+  useEffect(() => {
+    setVisibleMonth(getPlanMonth(selectedDay?.date));
+  }, [selectedDay?.date]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    function closeOnOutside(event) {
+      if (pickerRef.current && !pickerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
     }
+
+    function closeOnEscape(event) {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener('pointerdown', closeOnOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [isOpen]);
+
+  const calendarCells = useMemo(() => {
+    const year = visibleMonth.getFullYear();
+    const month = visibleMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const leadingBlanks = (firstDay.getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const blanks = Array.from({ length: leadingBlanks }, (_, index) => ({ id: `blank-${index}`, blank: true }));
+    const monthDays = Array.from({ length: daysInMonth }, (_, index) => {
+      const date = new Date(year, month, index + 1);
+      const dateValue = formatPlanDate(date);
+      const planDay = dayByDate.get(dateValue);
+      return {
+        id: dateValue,
+        date: dateValue,
+        dayNumber: index + 1,
+        planDay,
+        selected: dateValue === selectedDay?.date
+      };
+    });
+    return [...blanks, ...monthDays];
+  }, [dayByDate, selectedDay?.date, visibleMonth]);
+
+  function moveMonth(offset) {
+    setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
   }
 
-  function openDatePicker() {
-    const input = dateInputRef.current;
-    if (!input) return;
-    if (typeof input.showPicker === 'function') {
-      input.showPicker();
-      return;
-    }
-    input.focus();
+  function selectDate(day) {
+    if (!day.planDay) return;
+    onChange(day.date);
+    setIsOpen(false);
+  }
+
+  function getDateRangeText() {
+    const minPlanDate = parsePlanDate(minDate);
+    const maxPlanDate = parsePlanDate(maxDate);
+    if (!minPlanDate || !maxPlanDate) return '';
+    const minLabel = `${minPlanDate.getMonth() + 1}月${minPlanDate.getDate()}日`;
+    const maxLabel = `${maxPlanDate.getMonth() + 1}月${maxPlanDate.getDate()}日`;
+    return `${minLabel} - ${maxLabel}`;
+  }
+
+  function getMonthTitle() {
+    return `${visibleMonth.getFullYear()}年${String(visibleMonth.getMonth() + 1).padStart(2, '0')}月`;
   }
 
   return (
-    <div className="compact-plan-date-picker">
-      <button className="plan-date-field" type="button" onClick={openDatePicker} aria-label="打开日期选择器">
+    <div className="compact-plan-date-picker" ref={pickerRef}>
+      <button
+        className={`plan-date-field${isOpen ? ' active' : ''}`}
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+      >
         <span className="plan-date-icon">
           <CalendarDays size={17} />
         </span>
@@ -4731,17 +4822,48 @@ function PlanCalendarSelector({ days, value, onChange }) {
           <strong>{selectedDay?.label || '未选择日期'}</strong>
         </span>
       </button>
-      <input
-        className="plan-date-native-input"
-        ref={dateInputRef}
-        type="date"
-        value={selectedDay?.date || ''}
-        min={minDate}
-        max={maxDate}
-        onChange={handleDateChange}
-        aria-label="选择每日计划日期"
-      />
       <span className="plan-date-current-theme">{selectedDay?.theme}</span>
+
+      {isOpen && (
+        <div className="plan-calendar-popover" role="dialog" aria-label="选择每日计划日期">
+          <div className="plan-calendar-head">
+            <button type="button" onClick={() => moveMonth(-1)} disabled={!canMovePrev} aria-label="上个月">
+              <ChevronLeft size={17} />
+            </button>
+            <strong>{getMonthTitle()}</strong>
+            <button type="button" onClick={() => moveMonth(1)} disabled={!canMoveNext} aria-label="下个月">
+              <ChevronRight size={17} />
+            </button>
+          </div>
+          <div className="plan-calendar-weekdays">
+            {planCalendarWeekdays.map((weekday) => (
+              <span key={weekday}>{weekday}</span>
+            ))}
+          </div>
+          <div className="plan-calendar-days">
+            {calendarCells.map((day) => (
+              day.blank ? (
+                <span className="plan-calendar-day blank" key={day.id} aria-hidden="true" />
+              ) : (
+                <button
+                  className={`plan-calendar-day${day.selected ? ' selected' : ''}${day.planDay ? '' : ' disabled'}`}
+                  key={day.id}
+                  type="button"
+                  onClick={() => selectDate(day)}
+                  disabled={!day.planDay}
+                  aria-label={day.planDay ? `选择${day.planDay.label}` : `${day.dayNumber}日不在计划范围内`}
+                >
+                  <span>{day.dayNumber}</span>
+                  {day.planDay && <small>{day.planDay.theme}</small>}
+                </button>
+              )
+            ))}
+          </div>
+          <div className="plan-calendar-foot">
+            <span>可选范围 {getDateRangeText()}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

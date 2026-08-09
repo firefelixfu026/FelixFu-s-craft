@@ -4279,6 +4279,7 @@ h3 {
 }
 
 .compact-plan-date-picker {
+  position: relative;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -4301,7 +4302,8 @@ h3 {
 }
 
 .plan-date-field:hover,
-.plan-date-field:focus-visible {
+.plan-date-field:focus-visible,
+.plan-date-field.active {
   border-color: #1f7a6d;
   outline: 0;
   box-shadow: 0 0 0 3px rgba(31, 122, 109, 0.12);
@@ -4334,14 +4336,6 @@ h3 {
   line-height: 1.2;
 }
 
-.plan-date-native-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
 .plan-date-current-theme {
   overflow: hidden;
   max-width: min(100%, 420px);
@@ -4349,6 +4343,148 @@ h3 {
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.plan-calendar-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 30;
+  width: min(360px, calc(100vw - 42px));
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  padding: 14px;
+  color: #0f172a;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+}
+
+.plan-calendar-popover::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 22px;
+  width: 12px;
+  height: 12px;
+  border-top: 1px solid #d8e0e9;
+  border-left: 1px solid #d8e0e9;
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+.plan-calendar-head {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.plan-calendar-head strong {
+  font-size: 17px;
+  text-align: center;
+}
+
+.plan-calendar-head button {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  color: #334155;
+  background: #f8fafc;
+}
+
+.plan-calendar-head button:not(:disabled):hover {
+  border-color: #1f7a6d;
+  color: #1f7a6d;
+  background: rgba(31, 122, 109, 0.08);
+}
+
+.plan-calendar-head button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.plan-calendar-weekdays,
+.plan-calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.plan-calendar-weekdays {
+  margin-bottom: 7px;
+}
+
+.plan-calendar-weekdays span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.plan-calendar-day {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+  height: 48px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px 5px;
+  color: #334155;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.plan-calendar-day:not(:disabled):hover {
+  border-color: #1f7a6d;
+  color: #1f7a6d;
+  background: rgba(31, 122, 109, 0.08);
+}
+
+.plan-calendar-day.selected {
+  border-color: #1f7a6d;
+  color: #ffffff;
+  background: #1f7a6d;
+  box-shadow: 0 10px 22px rgba(31, 122, 109, 0.24);
+}
+
+.plan-calendar-day.disabled {
+  color: #aeb8c5;
+  background: transparent;
+  cursor: not-allowed;
+}
+
+.plan-calendar-day.blank {
+  background: transparent;
+}
+
+.plan-calendar-day span {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.plan-calendar-day small {
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1.1;
+  opacity: 0.82;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-calendar-foot {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e5eaf0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .summer-table-wrap {
@@ -4571,6 +4707,8 @@ h3 {
 :root[data-theme='dark'] .summer-goal-card,
 :root[data-theme='dark'] .summer-readonly-note,
 :root[data-theme='dark'] .plan-date-field,
+:root[data-theme='dark'] .plan-calendar-popover,
+:root[data-theme='dark'] .plan-calendar-head button,
 :root[data-theme='dark'] .weekly-plan-row,
 :root[data-theme='dark'] .weekly-check,
 :root[data-theme='dark'] .empty-state,
@@ -4582,6 +4720,45 @@ h3 {
   color: var(--text-main);
   background: var(--panel-bg);
   box-shadow: none;
+}
+
+:root[data-theme='dark'] .plan-calendar-popover::before {
+  border-color: var(--border);
+  background: var(--panel-bg);
+}
+
+:root[data-theme='dark'] .plan-date-field.active,
+:root[data-theme='dark'] .plan-date-field:hover,
+:root[data-theme='dark'] .plan-date-field:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.14);
+}
+
+:root[data-theme='dark'] .plan-date-icon,
+:root[data-theme='dark'] .plan-calendar-day.selected {
+  color: #06151b;
+  background: var(--accent);
+}
+
+:root[data-theme='dark'] .plan-calendar-day {
+  color: var(--text-main);
+  background: var(--panel-soft);
+}
+
+:root[data-theme='dark'] .plan-calendar-day:not(:disabled):hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(52, 211, 153, 0.12);
+}
+
+:root[data-theme='dark'] .plan-calendar-day.disabled {
+  color: var(--text-muted);
+  background: transparent;
+}
+
+:root[data-theme='dark'] .plan-calendar-foot {
+  border-color: var(--border);
+  color: var(--text-soft);
 }
 
 :root[data-theme='dark'] .homepage-hero .profile-copy {
