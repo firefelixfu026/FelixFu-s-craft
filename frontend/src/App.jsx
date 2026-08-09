@@ -1,6 +1,8 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
+  ArrowDown,
+  ArrowUp,
   BookOpen,
   Bot,
   CalendarDays,
@@ -109,6 +111,7 @@ const AUTH_USER_KEY = 'felix_blog_user';
 const AUTH_EXPIRES_KEY = 'felix_blog_token_expires_at';
 const ACTIVE_VIEW_KEY = 'felix_blog_active_view';
 const ADMIN_PAGE_KEY = 'felix_blog_admin_page';
+const MUSIC_PLAYLISTS_KEY = 'felix_blog_music_playlists';
 const THEME_KEY = 'felix_blog_theme';
 const SIDEBAR_COLLAPSED_KEY = 'felix_blog_sidebar_collapsed';
 const AUTH_FAIL_STATE_KEY = 'felix_blog_auth_fail_state';
@@ -246,6 +249,20 @@ function writeStoredJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function readStoredMusicPlaylists() {
+  const stored = readStoredJson(MUSIC_PLAYLISTS_KEY, []);
+  if (!Array.isArray(stored)) return [];
+  return stored
+    .filter((playlist) => playlist?.id && playlist?.name)
+    .map((playlist) => ({
+      id: String(playlist.id),
+      name: String(playlist.name),
+      trackFilenames: Array.isArray(playlist.trackFilenames)
+        ? playlist.trackFilenames.map((filename) => String(filename)).filter(Boolean)
+        : []
+    }));
+}
+
 function readDraftHistory() {
   const stored = readStoredJson(ARTICLE_DRAFT_HISTORY_KEY, []);
   return Array.isArray(stored) ? stored.slice(0, 12) : [];
@@ -361,6 +378,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v3.1',
+    title: '常驻音乐和自建歌单',
+    date: '2026-08-09',
+    status: '已上线',
+    points: ['播放器提升为全站常驻状态', '离开音乐页后侧边栏显示悬浮迷你播放器', '支持创建和删除自定义歌单', '支持给歌单加歌、移除和调整顺序']
+  },
   {
     version: 'v3.0.2',
     title: '音乐分片上传兼容',
@@ -928,6 +952,13 @@ function App() {
   const [musicTracks, setMusicTracks] = useState([]);
   const [isLoadingMusicTracks, setIsLoadingMusicTracks] = useState(false);
   const [isUploadingMusic, setIsUploadingMusic] = useState(false);
+  const [musicPlaylists, setMusicPlaylists] = useState(readStoredMusicPlaylists);
+  const [selectedMusicPlaylistId, setSelectedMusicPlaylistId] = useState('all');
+  const [musicCurrentFilename, setMusicCurrentFilename] = useState('');
+  const [musicIsPlaying, setMusicIsPlaying] = useState(false);
+  const [musicProgress, setMusicProgress] = useState(0);
+  const [musicDuration, setMusicDuration] = useState(0);
+  const [musicRepeatMode, setMusicRepeatMode] = useState('list');
   const [articleDraftNotice, setArticleDraftNotice] = useState('');
   const [aiGenerationHistory, setAiGenerationHistory] = useState([]);
   const [accountActivity, setAccountActivity] = useState(null);
@@ -966,6 +997,7 @@ function App() {
   const ThemeIcon = theme === 'dark' ? Moon : Sun;
   const nextThemeLabel = theme === 'dark' ? '日间模式' : '夜间模式';
   const SidebarToggleIcon = isSidebarCollapsed ? PanelLeftOpen : PanelLeftClose;
+  const globalAudioRef = useRef(null);
 
   const visibleNavItems = useMemo(() => {
     if (!currentUser) {
@@ -979,6 +1011,124 @@ function App() {
     return [...readerNavItems, accountNavItem];
   }, [currentUser?.role]);
 
+  const selectedMusicPlaylist = useMemo(
+    () => musicPlaylists.find((playlist) => playlist.id === selectedMusicPlaylistId) || null,
+    [musicPlaylists, selectedMusicPlaylistId]
+  );
+  const musicQueue = useMemo(() => {
+    if (!selectedMusicPlaylist) return musicTracks;
+    const trackMap = new Map(musicTracks.map((track) => [track.filename, track]));
+    return selectedMusicPlaylist.trackFilenames
+      .map((filename) => trackMap.get(filename))
+      .filter(Boolean);
+  }, [musicTracks, selectedMusicPlaylist]);
+  const currentMusicTrack = useMemo(() => {
+    if (!musicQueue.length) return null;
+    return musicQueue.find((track) => track.filename === musicCurrentFilename) || musicQueue[0];
+  }, [musicCurrentFilename, musicQueue]);
+
+  function persistMusicPlaylists(nextPlaylists) {
+    setMusicPlaylists(nextPlaylists);
+    writeStoredJson(MUSIC_PLAYLISTS_KEY, nextPlaylists);
+  }
+
+  function playMusicTrack(track, playlistId = selectedMusicPlaylistId) {
+    if (!track) return;
+    setSelectedMusicPlaylistId(playlistId);
+    setMusicCurrentFilename(track.filename);
+    setMusicIsPlaying(true);
+    window.setTimeout(() => {
+      globalAudioRef.current?.play().catch(() => setMusicIsPlaying(false));
+    }, 0);
+  }
+
+  function toggleMusicPlayback() {
+    if (!currentMusicTrack) return;
+    if (musicIsPlaying) {
+      globalAudioRef.current?.pause();
+      setMusicIsPlaying(false);
+      return;
+    }
+    globalAudioRef.current?.play()
+      .then(() => setMusicIsPlaying(true))
+      .catch(() => setMusicIsPlaying(false));
+  }
+
+  function stepMusicTrack(direction) {
+    if (!musicQueue.length) return;
+    const currentIndex = Math.max(0, musicQueue.findIndex((track) => track.filename === currentMusicTrack?.filename));
+    const nextIndex = (currentIndex + direction + musicQueue.length) % musicQueue.length;
+    playMusicTrack(musicQueue[nextIndex]);
+  }
+
+  function seekMusicTrack(nextTime) {
+    if (globalAudioRef.current) {
+      globalAudioRef.current.currentTime = nextTime;
+    }
+    setMusicProgress(nextTime);
+  }
+
+  function handleMusicEnded() {
+    if (musicRepeatMode === 'one' && globalAudioRef.current) {
+      globalAudioRef.current.currentTime = 0;
+      globalAudioRef.current.play().catch(() => setMusicIsPlaying(false));
+      return;
+    }
+    const currentIndex = musicQueue.findIndex((track) => track.filename === currentMusicTrack?.filename);
+    if (currentIndex < musicQueue.length - 1 || musicRepeatMode === 'list') {
+      stepMusicTrack(1);
+      return;
+    }
+    setMusicIsPlaying(false);
+  }
+
+  function createMusicPlaylist(name) {
+    const playlistName = name.trim();
+    if (!playlistName) return;
+    const nextPlaylist = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name: playlistName,
+      trackFilenames: []
+    };
+    persistMusicPlaylists([nextPlaylist, ...musicPlaylists]);
+    setSelectedMusicPlaylistId(nextPlaylist.id);
+  }
+
+  function deleteMusicPlaylist(playlistId) {
+    const playlist = musicPlaylists.find((item) => item.id === playlistId);
+    if (!playlist) return;
+    if (!window.confirm(`确定删除歌单「${playlist.name}」吗？音乐文件不会被删除。`)) return;
+    persistMusicPlaylists(musicPlaylists.filter((item) => item.id !== playlistId));
+    setSelectedMusicPlaylistId('all');
+  }
+
+  function updateMusicPlaylistTracks(playlistId, updater) {
+    persistMusicPlaylists(musicPlaylists.map((playlist) => (
+      playlist.id === playlistId
+        ? { ...playlist, trackFilenames: updater(playlist.trackFilenames || []) }
+        : playlist
+    )));
+  }
+
+  function toggleTrackInPlaylist(playlistId, filename) {
+    updateMusicPlaylistTracks(playlistId, (filenames) => (
+      filenames.includes(filename)
+        ? filenames.filter((item) => item !== filename)
+        : [...filenames, filename]
+    ));
+  }
+
+  function moveTrackInPlaylist(playlistId, filename, direction) {
+    updateMusicPlaylistTracks(playlistId, (filenames) => {
+      const index = filenames.indexOf(filename);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= filenames.length) return filenames;
+      const next = [...filenames];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  }
+
   useEffect(() => {
     localStorage.setItem(ACTIVE_VIEW_KEY, activeView);
   }, [activeView]);
@@ -991,6 +1141,14 @@ function App() {
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
+
+  useEffect(() => {
+    setMusicProgress(0);
+    setMusicDuration(0);
+    if (musicIsPlaying) {
+      globalAudioRef.current?.play().catch(() => setMusicIsPlaying(false));
+    }
+  }, [currentMusicTrack?.url]);
 
   function toggleTheme() {
     setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'));
@@ -2422,9 +2580,34 @@ function App() {
             </>
           )}
         </div>
+
+        {activeView !== 'music' && (
+          <SidebarMusicPlayer
+            track={currentMusicTrack}
+            isPlaying={musicIsPlaying}
+            progress={musicProgress}
+            duration={musicDuration}
+            togglePlayback={toggleMusicPlayback}
+            stepTrack={stepMusicTrack}
+            openMusic={() => setActiveView('music')}
+          />
+        )}
       </aside>
 
       <main className="main-content">
+        <audio
+          ref={globalAudioRef}
+          src={currentMusicTrack?.url || undefined}
+          preload="metadata"
+          onLoadedMetadata={(event) => setMusicDuration(event.currentTarget.duration || 0)}
+          onTimeUpdate={(event) => setMusicProgress(event.currentTarget.currentTime || 0)}
+          onPlay={() => setMusicIsPlaying(true)}
+          onPause={() => setMusicIsPlaying(false)}
+          onEnded={handleMusicEnded}
+        >
+          当前浏览器不支持音频播放。
+        </audio>
+
         <header className={showGlobalSearch ? 'topbar' : 'topbar topbar-compact'}>
           {showGlobalSearch && (
             <div className="search-box">
@@ -2514,8 +2697,27 @@ function App() {
         {activeView === 'music' && (
           <MusicWorkspace
             tracks={musicTracks}
+            queue={musicQueue}
+            currentTrack={currentMusicTrack}
+            isPlaying={musicIsPlaying}
+            progress={musicProgress}
+            duration={musicDuration}
+            repeatMode={musicRepeatMode}
+            setRepeatMode={setMusicRepeatMode}
             isLoading={isLoadingMusicTracks}
             refreshMusicTracks={refreshMusicTracks}
+            selectedPlaylistId={selectedMusicPlaylistId}
+            setSelectedPlaylistId={setSelectedMusicPlaylistId}
+            playlists={musicPlaylists}
+            selectedPlaylist={selectedMusicPlaylist}
+            createPlaylist={createMusicPlaylist}
+            deletePlaylist={deleteMusicPlaylist}
+            toggleTrackInPlaylist={toggleTrackInPlaylist}
+            moveTrackInPlaylist={moveTrackInPlaylist}
+            playTrack={playMusicTrack}
+            togglePlayback={toggleMusicPlayback}
+            stepTrack={stepMusicTrack}
+            seekTrack={seekMusicTrack}
           />
         )}
 
@@ -5352,67 +5554,64 @@ function EditableTable({ columns, rows, section, disabled, updateRow, deleteRow,
   );
 }
 
-function MusicWorkspace({ tracks, isLoading, refreshMusicTracks }) {
-  const audioRef = useRef(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [repeatMode, setRepeatMode] = useState('list');
-  const currentTrack = tracks[currentIndex] || null;
+function SidebarMusicPlayer({ track, isPlaying, progress, duration, togglePlayback, stepTrack, openMusic }) {
+  const percent = duration ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
+  return (
+    <div className={isPlaying ? 'sidebar-music-player playing' : 'sidebar-music-player'}>
+      <button className="sidebar-music-main" type="button" onClick={openMusic} title="打开音乐">
+        <span className="sidebar-music-disc">
+          <Music size={18} />
+        </span>
+        <span>
+          <strong>{track?.title || 'Felix Music'}</strong>
+          <em>{track ? `${formatTrackTime(progress)} / ${formatTrackTime(duration)}` : '去音乐页选一首歌'}</em>
+        </span>
+      </button>
+      <div className="sidebar-music-progress" aria-hidden="true">
+        <span style={{ width: `${percent}%` }} />
+      </div>
+      <div className="sidebar-music-actions">
+        <button type="button" onClick={() => stepTrack(-1)} disabled={!track} aria-label="上一首">
+          <SkipBack size={14} />
+        </button>
+        <button type="button" onClick={togglePlayback} disabled={!track} aria-label={isPlaying ? '暂停' : '播放'}>
+          {isPlaying ? <Pause size={15} /> : <Play size={15} />}
+        </button>
+        <button type="button" onClick={() => stepTrack(1)} disabled={!track} aria-label="下一首">
+          <SkipForward size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
-  useEffect(() => {
-    if (currentIndex >= tracks.length) {
-      setCurrentIndex(Math.max(0, tracks.length - 1));
-    }
-  }, [currentIndex, tracks.length]);
-
-  useEffect(() => {
-    setProgress(0);
-    setDuration(0);
-    if (isPlaying) {
-      audioRef.current?.play().catch(() => setIsPlaying(false));
-    }
-  }, [currentTrack?.url]);
-
-  function playTrack(index) {
-    setCurrentIndex(index);
-    setIsPlaying(true);
-    window.setTimeout(() => {
-      audioRef.current?.play().catch(() => setIsPlaying(false));
-    }, 0);
-  }
-
-  function togglePlayback() {
-    if (!currentTrack) return;
-    if (isPlaying) {
-      audioRef.current?.pause();
-      setIsPlaying(false);
-      return;
-    }
-    audioRef.current?.play()
-      .then(() => setIsPlaying(true))
-      .catch(() => setIsPlaying(false));
-  }
-
-  function stepTrack(direction) {
-    if (!tracks.length) return;
-    const nextIndex = (currentIndex + direction + tracks.length) % tracks.length;
-    playTrack(nextIndex);
-  }
-
-  function handleEnded() {
-    if (repeatMode === 'one') {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => setIsPlaying(false));
-      return;
-    }
-    if (currentIndex < tracks.length - 1 || repeatMode === 'list') {
-      stepTrack(1);
-      return;
-    }
-    setIsPlaying(false);
-  }
+function MusicWorkspace({
+  tracks,
+  queue,
+  currentTrack,
+  isPlaying,
+  progress,
+  duration,
+  repeatMode,
+  setRepeatMode,
+  isLoading,
+  refreshMusicTracks,
+  selectedPlaylistId,
+  setSelectedPlaylistId,
+  playlists,
+  selectedPlaylist,
+  createPlaylist,
+  deletePlaylist,
+  toggleTrackInPlaylist,
+  moveTrackInPlaylist,
+  playTrack,
+  togglePlayback,
+  stepTrack,
+  seekTrack
+}) {
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const selectedTrackNames = new Set(selectedPlaylist?.trackFilenames || []);
+  const displayTracks = selectedPlaylist ? queue : tracks;
 
   return (
     <section className="workspace music-workspace">
@@ -5434,19 +5633,6 @@ function MusicWorkspace({ tracks, isLoading, refreshMusicTracks }) {
           </div>
         </div>
 
-        <audio
-          ref={audioRef}
-          src={currentTrack?.url || undefined}
-          preload="metadata"
-          onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || 0)}
-          onTimeUpdate={(event) => setProgress(event.currentTarget.currentTime || 0)}
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-          onEnded={handleEnded}
-        >
-          当前浏览器不支持音频播放。
-        </audio>
-
         <div className="music-progress">
           <span>{formatTrackTime(progress)}</span>
           <input
@@ -5457,10 +5643,7 @@ function MusicWorkspace({ tracks, isLoading, refreshMusicTracks }) {
             disabled={!currentTrack}
             onChange={(event) => {
               const nextTime = Number(event.target.value);
-              if (audioRef.current) {
-                audioRef.current.currentTime = nextTime;
-              }
-              setProgress(nextTime);
+              seekTrack(nextTime);
             }}
             aria-label="播放进度"
           />
@@ -5468,7 +5651,7 @@ function MusicWorkspace({ tracks, isLoading, refreshMusicTracks }) {
         </div>
 
         <div className="music-controls">
-          <button className="ghost-button" type="button" onClick={() => stepTrack(-1)} disabled={!tracks.length}>
+          <button className="ghost-button" type="button" onClick={() => stepTrack(-1)} disabled={!queue.length}>
             <SkipBack size={17} />
             <span>上一首</span>
           </button>
@@ -5476,7 +5659,7 @@ function MusicWorkspace({ tracks, isLoading, refreshMusicTracks }) {
             {isPlaying ? <Pause size={18} /> : <Play size={18} />}
             <span>{isPlaying ? '暂停' : '播放'}</span>
           </button>
-          <button className="ghost-button" type="button" onClick={() => stepTrack(1)} disabled={!tracks.length}>
+          <button className="ghost-button" type="button" onClick={() => stepTrack(1)} disabled={!queue.length}>
             <SkipForward size={17} />
             <span>下一首</span>
           </button>
@@ -5495,7 +5678,7 @@ function MusicWorkspace({ tracks, isLoading, refreshMusicTracks }) {
         <div className="admin-panel-heading">
           <div>
             <h2>歌单</h2>
-            <span>{isLoading ? '正在读取音乐' : `${tracks.length} 首`}</span>
+            <span>{selectedPlaylist ? `${selectedPlaylist.name} · ${queue.length} 首` : `全部音乐 · ${tracks.length} 首`}</span>
           </div>
           <button className="ghost-button" type="button" onClick={refreshMusicTracks}>
             <RefreshCw size={16} />
@@ -5503,21 +5686,94 @@ function MusicWorkspace({ tracks, isLoading, refreshMusicTracks }) {
           </button>
         </div>
 
+        <div className="playlist-toolbar">
+          <button
+            className={selectedPlaylistId === 'all' ? 'playlist-chip active' : 'playlist-chip'}
+            type="button"
+            onClick={() => setSelectedPlaylistId('all')}
+          >
+            全部音乐
+          </button>
+          {playlists.map((playlist) => (
+            <button
+              className={selectedPlaylistId === playlist.id ? 'playlist-chip active' : 'playlist-chip'}
+              type="button"
+              key={playlist.id}
+              onClick={() => setSelectedPlaylistId(playlist.id)}
+            >
+              {playlist.name}
+              <small>{playlist.trackFilenames.length}</small>
+            </button>
+          ))}
+        </div>
+
+        <form
+          className="playlist-create-row"
+          onSubmit={(event) => {
+            event.preventDefault();
+            createPlaylist(newPlaylistName);
+            setNewPlaylistName('');
+          }}
+        >
+          <input
+            value={newPlaylistName}
+            onChange={(event) => setNewPlaylistName(event.target.value)}
+            placeholder="新建歌单，比如 明日方舟 / 学习用 / 睡前"
+          />
+          <button className="primary-action" type="submit">
+            <PlusCircle size={17} />
+            <span>新建歌单</span>
+          </button>
+        </form>
+
+        {selectedPlaylist && (
+          <section className="playlist-editor">
+            <div className="admin-panel-heading compact-heading">
+              <h3>编辑「{selectedPlaylist.name}」</h3>
+              <button className="danger-button" type="button" onClick={() => deletePlaylist(selectedPlaylist.id)}>
+                <Trash2 size={16} />
+                <span>删除歌单</span>
+              </button>
+            </div>
+            <div className="playlist-pick-list">
+              {tracks.map((track) => (
+                <label key={track.filename}>
+                  <input
+                    type="checkbox"
+                    checked={selectedTrackNames.has(track.filename)}
+                    onChange={() => toggleTrackInPlaylist(selectedPlaylist.id, track.filename)}
+                  />
+                  <span>{track.title}</span>
+                </label>
+              ))}
+            </div>
+          </section>
+        )}
+
         {tracks.length === 0 ? (
           <p className="empty-state">还没有音乐。登录后台后，在“音乐”里上传 MP3、WAV、OGG、FLAC、M4A 或 AAC。</p>
+        ) : displayTracks.length === 0 ? (
+          <p className="empty-state">这个歌单还没有歌。上方勾选想加入的歌曲。</p>
         ) : (
           <div className="music-track-list">
-            {tracks.map((track, index) => (
-              <button
-                className={index === currentIndex ? 'music-track active' : 'music-track'}
-                type="button"
-                key={track.filename}
-                onClick={() => playTrack(index)}
-              >
-                <span>{String(index + 1).padStart(2, '0')}</span>
-                <strong>{track.title}</strong>
-                <em>{formatFileSize(track.size)}</em>
-              </button>
+            {displayTracks.map((track, index) => (
+              <div className={track.filename === currentTrack?.filename ? 'music-track active' : 'music-track'} key={track.filename}>
+                <button type="button" onClick={() => playTrack(track, selectedPlaylistId)}>
+                  <span>{String(index + 1).padStart(2, '0')}</span>
+                  <strong>{track.title}</strong>
+                  <em>{formatFileSize(track.size)}</em>
+                </button>
+                {selectedPlaylist && (
+                  <div className="music-track-order-actions">
+                    <button type="button" onClick={() => moveTrackInPlaylist(selectedPlaylist.id, track.filename, -1)} disabled={index === 0} aria-label="上移">
+                      <ArrowUp size={15} />
+                    </button>
+                    <button type="button" onClick={() => moveTrackInPlaylist(selectedPlaylist.id, track.filename, 1)} disabled={index === displayTracks.length - 1} aria-label="下移">
+                      <ArrowDown size={15} />
+                    </button>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}
