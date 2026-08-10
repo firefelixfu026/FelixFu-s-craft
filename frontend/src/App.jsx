@@ -110,6 +110,20 @@ const ARTICLE_SECTION_PATHS = {
   notes: '/notes'
 };
 const ROUTED_VIEW_IDS = new Set(Object.keys(VIEW_PATHS));
+const LIVE2D_MODEL_URL = '/live2d/黍泡泡/黍泡泡.model3.json';
+const LIVE2D_HIDDEN_KEY = 'felix_blog_live2d_hidden';
+const LIVE2D_SCRIPT_SOURCES = [
+  'https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js',
+  'https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js',
+  'https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/index.min.js'
+];
+const mascotLines = [
+  '欢迎回来，今天也要稳稳推进。',
+  '首页已经瘦身，剩下的内容都在独立入口里。',
+  '去看看最近更新吧，我帮你守着主页。',
+  '学习累了可以切到音乐页听一首。',
+  '记得给计划表留一点弹性时间。'
+];
 
 const COMMENT_MAX_LENGTH = 300;
 const COMMENT_PAGE_UNITS = 5;
@@ -406,6 +420,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v5.7',
+    title: 'Live2D 吉祥物',
+    date: '2026-08-10',
+    status: '已上线',
+    points: ['首页新增黍泡泡 Live2D 看板娘', 'Live2D 运行库仅在首页懒加载，不影响其它页面', '支持换台词、收起和再次叫出', '页面保留模型来源：切丁鱼片']
+  },
   {
     version: 'v5.6',
     title: '首页门户化与内容体验升级',
@@ -1344,6 +1365,43 @@ function getArticlePath(articleOrId, fallbackSection = 'essays') {
   const section = article ? getArticleSection(article) : fallbackSection;
   const basePath = ARTICLE_SECTION_PATHS[section] || ARTICLE_SECTION_PATHS.essays;
   return `${basePath}/${encodeURIComponent(articleId)}`;
+}
+
+function loadExternalScript(src) {
+  if (typeof document === 'undefined') return Promise.resolve();
+  const existingScript = document.querySelector(`script[src="${src}"]`);
+  if (existingScript?.dataset.loaded === 'true') return Promise.resolve();
+  if (existingScript?.dataset.loading === 'true') {
+    return new Promise((resolve, reject) => {
+      existingScript.addEventListener('load', resolve, { once: true });
+      existingScript.addEventListener('error', reject, { once: true });
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = false;
+    script.dataset.loading = 'true';
+    script.addEventListener('load', () => {
+      script.dataset.loaded = 'true';
+      script.dataset.loading = 'false';
+      resolve();
+    }, { once: true });
+    script.addEventListener('error', reject, { once: true });
+    document.head.appendChild(script);
+  });
+}
+
+async function ensureLive2DRuntime() {
+  for (const src of LIVE2D_SCRIPT_SOURCES) {
+    await loadExternalScript(src);
+  }
+  const Live2DModel = window.PIXI?.live2d?.Live2DModel;
+  if (!window.PIXI || !Live2DModel) {
+    throw new Error('Live2D runtime is unavailable');
+  }
+  return { PIXI: window.PIXI, Live2DModel };
 }
 
 function splitNotePath(value = '') {
@@ -3455,6 +3513,8 @@ function App() {
             </div>
           </div>
         </header>
+
+        {activeView === 'overview' && <Live2DMascot />}
 
         {isRestoringSession && activeView !== 'login' && (
           <section className="admin-panel auth-restore-panel">
@@ -6920,6 +6980,116 @@ function DecorativeStickerLayer({ activeView }) {
         </span>
       ))}
     </div>
+  );
+}
+
+function Live2DMascot() {
+  const canvasRef = useRef(null);
+  const appRef = useRef(null);
+  const [status, setStatus] = useState('idle');
+  const [lineIndex, setLineIndex] = useState(0);
+  const [isHidden, setIsHidden] = useState(() => (
+    typeof localStorage !== 'undefined' && localStorage.getItem(LIVE2D_HIDDEN_KEY) === 'true'
+  ));
+
+  useEffect(() => {
+    if (isHidden || !canvasRef.current) return undefined;
+    let cancelled = false;
+
+    async function mountMascot() {
+      setStatus('loading');
+      try {
+        const { PIXI, Live2DModel } = await ensureLive2DRuntime();
+        if (cancelled || !canvasRef.current) return;
+
+        const app = new PIXI.Application({
+          view: canvasRef.current,
+          width: 260,
+          height: 340,
+          autoStart: true,
+          transparent: true,
+          antialias: true,
+          resolution: Math.min(window.devicePixelRatio || 1, 2)
+        });
+        appRef.current = app;
+
+        const model = await Live2DModel.from(encodeURI(LIVE2D_MODEL_URL), { autoInteract: true });
+        if (cancelled) {
+          app.destroy(true);
+          return;
+        }
+
+        const scale = Math.min(230 / Math.max(1, model.width), 320 / Math.max(1, model.height));
+        model.scale.set(scale);
+        model.x = Math.max(0, (260 - model.width) / 2);
+        model.y = Math.max(0, 332 - model.height);
+        model.on?.('hit', () => {
+          setLineIndex((current) => (current + 1) % mascotLines.length);
+        });
+        app.stage.addChild(model);
+        setStatus('ready');
+      } catch {
+        setStatus('error');
+      }
+    }
+
+    mountMascot();
+    return () => {
+      cancelled = true;
+      if (appRef.current) {
+        appRef.current.destroy(true);
+        appRef.current = null;
+      }
+    };
+  }, [isHidden]);
+
+  function hideMascot() {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LIVE2D_HIDDEN_KEY, 'true');
+    }
+    setIsHidden(true);
+  }
+
+  function showMascot() {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LIVE2D_HIDDEN_KEY, 'false');
+    }
+    setIsHidden(false);
+  }
+
+  if (isHidden) {
+    return (
+      <button className="live2d-mascot-tab" type="button" onClick={showMascot} title="叫出黍泡泡" aria-label="叫出黍泡泡">
+        <Bot size={19} />
+      </button>
+    );
+  }
+
+  return (
+    <aside className="live2d-mascot" aria-label="本站吉祥物黍泡泡">
+      <div className="live2d-speech">
+        <strong>黍泡泡</strong>
+        <p>{status === 'error' ? 'Live2D 加载失败，但我还在这里。' : mascotLines[lineIndex]}</p>
+        <span>模型来源：切丁鱼片</span>
+      </div>
+      <div className="live2d-stage">
+        <canvas ref={canvasRef} width="260" height="340" />
+        {status === 'loading' && <span className="live2d-loading">加载中</span>}
+        {status === 'error' && (
+          <span className="live2d-fallback">
+            <Bot size={42} />
+          </span>
+        )}
+      </div>
+      <div className="live2d-actions">
+        <button type="button" onClick={() => setLineIndex((current) => (current + 1) % mascotLines.length)}>
+          换句话
+        </button>
+        <button type="button" onClick={hideMascot}>
+          收起
+        </button>
+      </div>
+    </aside>
   );
 }
 
