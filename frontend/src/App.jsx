@@ -79,6 +79,7 @@ const visitorNavItems = [
   { id: 'plan', label: '计划', icon: List },
   { id: 'music', label: '音乐', icon: Music },
   { id: 'toolbox', label: '工具箱', icon: Wrench },
+  { id: 'links', label: '友链', icon: Heart },
   { id: 'game', label: '游戏', icon: Gamepad2 },
   { id: 'login', label: '登录', icon: LogIn }
 ];
@@ -89,6 +90,7 @@ const readerNavItems = [
   { id: 'plan', label: '计划', icon: List },
   { id: 'music', label: '音乐', icon: Music },
   { id: 'toolbox', label: '工具箱', icon: Wrench },
+  { id: 'links', label: '友链', icon: Heart },
   { id: 'game', label: '游戏', icon: Gamepad2 }
 ];
 
@@ -100,6 +102,7 @@ const VIEW_PATHS = {
   plan: '/plan',
   music: '/music',
   toolbox: '/toolbox',
+  links: '/links',
   game: '/game',
   login: '/login',
   account: '/account',
@@ -109,9 +112,22 @@ const ARTICLE_SECTION_PATHS = {
   essays: '/articles',
   notes: '/notes'
 };
+const PLAN_SECTION_PATHS = {
+  schedule: '/plan/schedule',
+  completion: '/plan/completion',
+  courses: '/plan/courses',
+  apps: '/plan/apps',
+  finance: '/plan/finance',
+  meals: '/plan/meals',
+  body: '/plan/body',
+  sleep: '/plan/sleep'
+};
 const ROUTED_VIEW_IDS = new Set(Object.keys(VIEW_PATHS));
 const LIVE2D_MODEL_URL = '/live2d/shu-bubble/model.model3.json';
 const LIVE2D_HIDDEN_KEY = 'felix_blog_live2d_hidden';
+const LIVE2D_POSITION_KEY = 'felix_blog_live2d_position';
+const LIVE2D_MODE_KEY = 'felix_blog_live2d_mode';
+const LIVE2D_SHOW_EVENT = 'felix-live2d-show';
 const LIVE2D_SCRIPT_SOURCES = [
   'https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js',
   'https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js',
@@ -266,7 +282,7 @@ function readStoredSidebarCollapsed() {
 function readStoredAdminPage() {
   if (typeof localStorage === 'undefined') return 'overview';
   const storedPage = localStorage.getItem(ADMIN_PAGE_KEY) || 'overview';
-  const knownPages = new Set(['overview', 'ops', 'releases', 'editor', 'notes', 'articles', 'music', 'comments', 'security']);
+  const knownPages = new Set(['overview', 'ops', 'releases', 'editor', 'notes', 'articles', 'music', 'toolbox', 'comments', 'visual', 'security']);
   return knownPages.has(storedPage) ? storedPage : 'overview';
 }
 
@@ -420,6 +436,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v5.8',
+    title: '站点结构与阅读体验整理',
+    date: '2026-08-10',
+    status: '已上线',
+    points: ['黍泡泡改为可拖动悬浮窗，支持点击说话、右键菜单和账号页唤回', '技术笔记索引改为不遮挡正文的左侧栏，右侧阅读进度和目录保持跟随', '计划页拆成时间安排、完成度、课程、应用、记账、饮食、身体和睡眠等独立路径', '工具箱公共页只展示资源，自定义网址移动到后台管理', '新增独立友链页、游戏库选择入口和后台文件资源管理器式内容库', '整体卡片和标题尺寸收紧，页面留白更稳']
+  },
   {
     version: 'v5.7.1',
     title: 'Live2D 加载修复',
@@ -1337,6 +1360,7 @@ function parseRoutePath(pathname = '/') {
   const [area, id] = parts;
   if (area === 'articles') return { view: 'articles', articleSection: 'essays', articleId: id || null };
   if (area === 'notes') return { view: 'articles', articleSection: 'notes', articleId: id || null };
+  if (area === 'plan') return { view: 'plan', articleSection: 'essays', articleId: null, planSection: PLAN_SECTION_PATHS[id] ? id : 'schedule' };
 
   const matchedView = Object.entries(VIEW_PATHS).find(([, viewPath]) => normalizeRoutePath(viewPath).slice(1) === area);
   if (matchedView) return { view: matchedView[0], articleSection: 'essays', articleId: null };
@@ -1361,9 +1385,17 @@ function readInitialArticleId() {
   return readCurrentRoute()?.articleId || null;
 }
 
+function readInitialPlanSection() {
+  return readCurrentRoute()?.planSection || 'schedule';
+}
+
 function getViewPath(view, articleSection = 'essays') {
   if (view === 'articles') return ARTICLE_SECTION_PATHS[articleSection] || ARTICLE_SECTION_PATHS.essays;
   return VIEW_PATHS[view] || VIEW_PATHS.overview;
+}
+
+function getPlanPath(section = 'schedule') {
+  return PLAN_SECTION_PATHS[section] || VIEW_PATHS.plan;
 }
 
 function getArticlePath(articleOrId, fallbackSection = 'essays') {
@@ -1541,6 +1573,7 @@ function aiTaskLabel(task) {
 function App() {
   const [activeView, setActiveView] = useState(readInitialActiveView);
   const [articleSection, setArticleSection] = useState(readInitialArticleSection);
+  const [planSection, setPlanSection] = useState(readInitialPlanSection);
   const [theme, setTheme] = useState(readStoredTheme);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(readStoredSidebarCollapsed);
   const [query, setQuery] = useState('');
@@ -1819,6 +1852,7 @@ function App() {
       }
       setActiveView(route.view);
       setArticleSection(route.articleSection || 'essays');
+      setPlanSection(route.planSection || 'schedule');
       setSelectedArticleId(route.articleId || null);
     }
 
@@ -1832,9 +1866,11 @@ function App() {
         articles.find((article) => String(article.id) === String(selectedArticleId)) || selectedArticleId,
         articleSection
       )
+      : activeView === 'plan'
+        ? getPlanPath(planSection)
       : getViewPath(activeView, articleSection);
     writeBrowserRoute(routePath, { replace: true });
-  }, [activeView, articleSection, selectedArticleId, articles]);
+  }, [activeView, articleSection, planSection, selectedArticleId, articles]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -3526,7 +3562,7 @@ function App() {
           </div>
         </header>
 
-        {activeView === 'overview' && <Live2DMascot />}
+        {activeView !== 'admin' && activeView !== 'login' && <Live2DMascot />}
 
         {isRestoringSession && activeView !== 'login' && (
           <section className="admin-panel auth-restore-panel">
@@ -3614,9 +3650,18 @@ function App() {
           />
         )}
 
-        {activeView === 'plan' && <SummerPlanWorkspace currentUser={currentUser} authToken={authToken} />}
+        {activeView === 'plan' && (
+          <SummerPlanWorkspace
+            authToken={authToken}
+            currentUser={currentUser}
+            planSection={planSection}
+            setPlanSection={setPlanSection}
+          />
+        )}
 
         {activeView === 'toolbox' && <ToolboxWorkspace currentUser={currentUser} authToken={authToken} />}
+
+        {activeView === 'links' && <FriendLinksWorkspace />}
 
         {activeView === 'account' && currentUser && (
           <AccountWorkspace
@@ -5685,7 +5730,18 @@ function normalizeSummerPlan(plan) {
   };
 }
 
-function SummerPlanWorkspace({ currentUser, authToken }) {
+const summerPlanSections = [
+  { id: 'schedule', label: '时间安排', detail: '每天做什么' },
+  { id: 'completion', label: '完成度', detail: '做了什么' },
+  { id: 'courses', label: '课程', detail: '预习进度' },
+  { id: 'apps', label: '应用', detail: '手机时间' },
+  { id: 'finance', label: '记账', detail: '支出记录' },
+  { id: 'meals', label: '饮食', detail: '吃了什么' },
+  { id: 'body', label: '身体', detail: '体重状态' },
+  { id: 'sleep', label: '睡眠', detail: '作息记录' }
+];
+
+function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSection }) {
   const canEdit = currentUser?.role === 'admin';
   const [plan, setPlan] = useState(() => normalizeSummerPlan(personalizedSummerPlan));
   const [selectedPlanDate, setSelectedPlanDate] = useState(personalizedDailyPlans[0].date);
@@ -5939,6 +5995,13 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
   const totalAppLimit = (selectedAppUsageDay.apps || []).reduce((sum, item) => sum + parseMinutes(item.limit), 0);
   const totalAppActual = (selectedAppUsageDay.apps || []).reduce((sum, item) => sum + parseMinutes(item.actual), 0);
   const totalExpense = plan.expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+  const activePlanSection = PLAN_SECTION_PATHS[planSection] ? planSection : 'schedule';
+
+  function navigatePlanSection(section) {
+    const nextSection = PLAN_SECTION_PATHS[section] ? section : 'schedule';
+    setPlanSection(nextSection);
+    writeBrowserRoute(getPlanPath(nextSection));
+  }
 
   return (
     <section className="workspace summer-plan-workspace">
@@ -5968,12 +6031,21 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
         <p className="summer-readonly-note">当前是查看模式。登录管理员账号后，修改会自动保存到后端数据库，并同步到不同设备。</p>
       )}
 
-      <div className="summer-goal-grid">
-        <PlanTextarea title="学习主线" value={plan.goals.study} disabled={!canEdit} onChange={(value) => updateNested('goals', 'study', value)} />
-        <PlanTextarea title="运动与身体" value={plan.goals.body} disabled={!canEdit} onChange={(value) => updateNested('goals', 'body', value)} />
-        <PlanTextarea title="娱乐边界" value={plan.goals.life} disabled={!canEdit} onChange={(value) => updateNested('goals', 'life', value)} />
-      </div>
+      <nav className="plan-section-tabs" aria-label="计划模块">
+        {summerPlanSections.map((section) => (
+          <button
+            className={activePlanSection === section.id ? 'active' : ''}
+            key={section.id}
+            type="button"
+            onClick={() => navigatePlanSection(section.id)}
+          >
+            <strong>{section.label}</strong>
+            <span>{section.detail}</span>
+          </button>
+        ))}
+      </nav>
 
+      {activePlanSection === 'schedule' && (
       <section className="content-band summer-plan-panel">
         <div className="admin-panel-heading">
           <div>
@@ -6000,8 +6072,9 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
           deleteRow={deleteDailySlot}
         />
       </section>
+      )}
 
-      <div className="summer-module-grid">
+      {activePlanSection === 'completion' && (
         <PlanModule title="完成记录与完成度" count={`今日完成度 ${completionRate}%`} wide>
           <div className="module-toolbar">
             <PlanCalendarSelector days={completionDays} value={selectedCompletionDay.date} onChange={setSelectedCompletionDate} label="完成日期" />
@@ -6027,7 +6100,15 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
             updateRow={updateCompletionTask}
           />
         </PlanModule>
+      )}
 
+      {activePlanSection === 'courses' && (
+      <>
+        <div className="summer-goal-grid">
+          <PlanTextarea title="学习主线" value={plan.goals.study} disabled={!canEdit} onChange={(value) => updateNested('goals', 'study', value)} />
+          <PlanTextarea title="运动与身体" value={plan.goals.body} disabled={!canEdit} onChange={(value) => updateNested('goals', 'body', value)} />
+          <PlanTextarea title="娱乐边界" value={plan.goals.life} disabled={!canEdit} onChange={(value) => updateNested('goals', 'life', value)} />
+        </div>
         <PlanModule title="课程预习进度" count={`${plan.courses.length} 门`}>
           <EditableTable
             compact
@@ -6043,7 +6124,10 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
             deleteRow={deleteRow}
           />
         </PlanModule>
+      </>
+      )}
 
+      {activePlanSection === 'apps' && (
         <PlanModule title="手机应用使用时间" count={`今日 ${totalAppActual || 0} / 目标 ${totalAppLimit || 0} 分钟`} wide>
           <div className="module-toolbar">
             <PlanCalendarSelector days={appUsageDays} value={selectedAppUsageDay.date} onChange={setSelectedAppDate} label="记录日期" />
@@ -6069,7 +6153,9 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
             deleteRow={deleteAppUsage}
           />
         </PlanModule>
+      )}
 
+      {activePlanSection === 'finance' && (
         <PlanModule title="记账" count={`合计 ${totalExpense.toFixed(1)} 元`} wide>
           <button className="ghost-button module-add-button" type="button" onClick={() => addRow('expenses', { date: '8月4日', item: '', amount: '', note: '' })} disabled={!canEdit}>
             <PlusCircle size={16} />
@@ -6089,7 +6175,9 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
             deleteRow={deleteRow}
           />
         </PlanModule>
+      )}
 
+      {activePlanSection === 'meals' && (
         <PlanModule title="饮食记录" count={`${plan.meals.length} 天`} wide>
           <button className="ghost-button module-add-button" type="button" onClick={() => addRow('meals', { date: '8月4日', breakfast: '', lunch: '', dinner: '', snack: '' })} disabled={!canEdit}>
             <PlusCircle size={16} />
@@ -6110,7 +6198,9 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
             deleteRow={deleteRow}
           />
         </PlanModule>
+      )}
 
+      {activePlanSection === 'body' && (
         <PlanModule title="体重与状态" count={`${plan.bodyMetrics.length} 条`} wide>
           <button className="ghost-button module-add-button" type="button" onClick={() => addRow('bodyMetrics', { date: '8月4日', weight: '', exercise: '', mood: '' })} disabled={!canEdit}>
             <PlusCircle size={16} />
@@ -6134,7 +6224,9 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
             deleteRow={deleteRow}
           />
         </PlanModule>
+      )}
 
+      {activePlanSection === 'sleep' && (
         <PlanModule title="睡眠记录" count={`${plan.sleep.length} 条`} wide>
           <button className="ghost-button module-add-button" type="button" onClick={() => addRow('sleep', { date: '8月4-5日', bed: '', wake: '', hours: '', quality: '' })} disabled={!canEdit}>
             <PlusCircle size={16} />
@@ -6159,7 +6251,7 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
             deleteRow={deleteRow}
           />
         </PlanModule>
-      </div>
+      )}
     </section>
   );
 }
@@ -6655,7 +6747,109 @@ function normalizeToolboxLink(link, index = 0) {
   };
 }
 
-function ToolboxWorkspace({ currentUser, authToken }) {
+const defaultFriendLinks = [
+  {
+    title: "BruceJin's Notebook",
+    description: '课程笔记与个人站点，适合参考内容组织方式。',
+    url: 'https://brucejqs.github.io/MyNotebook/',
+    avatar: 'BJ',
+    tone: 'blue'
+  },
+  {
+    title: "Wcowin's Web",
+    description: 'MkDocs 主题与教程，文档结构和站点审美都值得看。',
+    url: 'https://wcowin.work/',
+    avatar: 'W',
+    tone: 'cyan'
+  },
+  {
+    title: 'Chenji Learning Hub',
+    description: '同学的全栈学习工作台，和这台服务器一起成长中。',
+    url: 'https://chenji.felixfu.xyz/',
+    avatar: 'CJ',
+    tone: 'green'
+  },
+  {
+    title: 'ZJU CS-All Sum In One',
+    description: '浙大 CS 课程资料集合，查课设和复习资料很方便。',
+    url: 'https://qsctech.github.io/zju-icicles/',
+    avatar: 'CS',
+    tone: 'purple'
+  },
+  {
+    title: 'MkDocs Material',
+    description: '技术笔记站的经典参考，后面整理课程笔记可以借鉴。',
+    url: 'https://squidfunk.github.io/mkdocs-material/',
+    avatar: 'MD',
+    tone: 'teal'
+  },
+  {
+    title: 'GitHub',
+    description: '项目、笔记和小工具的公开仓库入口。',
+    url: 'https://github.com/firefelixfu026',
+    avatar: 'GH',
+    tone: 'gray'
+  }
+];
+
+function FriendLinksWorkspace() {
+  const [customFriendLinks, setCustomFriendLinks] = useState([]);
+
+  useEffect(() => {
+    async function loadFriendLinks() {
+      try {
+        const response = await fetch('/api/toolbox-links');
+        if (!response.ok) return;
+        const links = await response.json();
+        setCustomFriendLinks(
+          links
+            .filter((link) => ['友链', '推荐链接', '朋友', '博客'].includes(link.category))
+            .map((link, index) => ({
+              title: link.title,
+              description: link.description || '站点推荐',
+              url: link.url,
+              avatar: (link.title || 'Link').slice(0, 2).toUpperCase(),
+              tone: ['cyan', 'green', 'purple', 'teal', 'gray', 'blue'][index % 6]
+            }))
+        );
+      } catch {
+        setCustomFriendLinks([]);
+      }
+    }
+
+    loadFriendLinks();
+  }, []);
+
+  const links = [...customFriendLinks, ...defaultFriendLinks];
+
+  return (
+    <section className="workspace friend-page-workspace">
+      <div className="section-heading">
+        <p className="eyebrow">友情链接</p>
+        <h1>友链</h1>
+      </div>
+      <section className="friend-page-panel">
+        <div className="friend-page-side">
+          <strong>Links</strong>
+          <span>朋友、前辈、资料站和我常去的地方。</span>
+        </div>
+        <div className="friend-page-list">
+          {links.map((link) => (
+            <a className={`friend-page-row ${link.tone || 'blue'}`} href={link.url} target="_blank" rel="noreferrer" key={`${link.title}-${link.url}`}>
+              <span className="friend-page-avatar">{link.avatar}</span>
+              <span>
+                <strong>{link.title}</strong>
+                <em>{link.description}</em>
+              </span>
+            </a>
+          ))}
+        </div>
+      </section>
+    </section>
+  );
+}
+
+function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
   const [selectedCategory, setSelectedCategory] = useState('全部');
   const [toolboxQuery, setToolboxQuery] = useState('');
   const [customLinks, setCustomLinks] = useState([]);
@@ -6792,19 +6986,118 @@ function ToolboxWorkspace({ currentUser, authToken }) {
     }
   }
 
+  const toolboxEditor = canManageToolbox ? (
+    <form className="toolbox-editor" onSubmit={submitToolboxLink}>
+      <div className="admin-panel-heading compact-heading">
+        <div>
+          <h3>{editingToolboxLinkId ? '编辑自定义网址' : '添加自定义网址'}</h3>
+          <span>{isLoadingToolboxLinks ? '正在同步链接' : `${customLinks.length} 个自定义链接`}</span>
+        </div>
+        {editingToolboxLinkId && (
+          <button className="ghost-button" type="button" onClick={() => resetToolboxForm('已取消编辑')}>
+            <X size={16} />
+            <span>取消</span>
+          </button>
+        )}
+      </div>
+      <div className="toolbox-editor-grid">
+        <label>
+          <span>标题</span>
+          <input value={toolboxForm.title} onChange={(event) => updateToolboxForm('title', event.target.value)} placeholder="网站名称" />
+        </label>
+        <label>
+          <span>分类</span>
+          <input value={toolboxForm.category} onChange={(event) => updateToolboxForm('category', event.target.value)} placeholder="学习 / 开发 / 友链" />
+        </label>
+        <label className="wide">
+          <span>网址</span>
+          <input value={toolboxForm.url} onChange={(event) => updateToolboxForm('url', event.target.value)} placeholder="https://example.com" />
+        </label>
+        <label className="wide">
+          <span>说明</span>
+          <textarea value={toolboxForm.description} onChange={(event) => updateToolboxForm('description', event.target.value)} rows={2} placeholder="这个网站适合用来做什么" />
+        </label>
+        <label className="wide">
+          <span>标签</span>
+          <input value={toolboxForm.tags} onChange={(event) => updateToolboxForm('tags', event.target.value)} placeholder="用逗号分隔，比如 文档, 课程, 工具" />
+        </label>
+        <label className="checkbox-control">
+          <input type="checkbox" checked={toolboxForm.pinned} onChange={(event) => updateToolboxForm('pinned', event.target.checked)} />
+          <span>置顶到高频入口</span>
+        </label>
+      </div>
+      <div className="admin-actions">
+        <button className="primary-action" type="submit" disabled={isSavingToolboxLink}>
+          <Save size={17} />
+          <span>{isSavingToolboxLink ? '保存中' : editingToolboxLinkId ? '保存修改' : '添加网址'}</span>
+        </button>
+        <button className="ghost-button" type="button" onClick={() => resetToolboxForm('')}>
+          <X size={17} />
+          <span>清空</span>
+        </button>
+        <button className="ghost-button" type="button" onClick={refreshToolboxLinks}>
+          <RefreshCw size={17} />
+          <span>刷新</span>
+        </button>
+      </div>
+      {toolboxMessage && <p className="admin-message">{toolboxMessage}</p>}
+    </form>
+  ) : (
+    <p className="empty-state">需要管理员登录后才能管理自定义网址。</p>
+  );
+
+  if (manageOnly) {
+    return (
+      <section className="admin-panel toolbox-admin-panel">
+        <div className="admin-panel-heading">
+          <div>
+            <h2>工具箱网址管理</h2>
+            <span>分类填“友链”会同步到友链页。</span>
+          </div>
+          <button className="ghost-button" type="button" onClick={refreshToolboxLinks}>
+            <RefreshCw size={17} />
+            <span>刷新</span>
+          </button>
+        </div>
+        {toolboxEditor}
+        <div className="toolbox-admin-list">
+          {customLinks.length === 0 ? (
+            <p className="empty-state">还没有自定义网址。</p>
+          ) : customLinks.map((link) => (
+            <article className="toolbox-admin-row" key={link.id}>
+              <div>
+                <strong>{link.title}</strong>
+                <span>{link.category || '自定义'} · {link.url}</span>
+                {link.description && <p>{link.description}</p>}
+              </div>
+              <div className="manager-actions">
+                <button type="button" onClick={() => startEditingToolboxLink(link)}>
+                  <PencilLine size={16} />
+                  <span>编辑</span>
+                </button>
+                <button className="danger-button" type="button" onClick={() => deleteToolboxLink({ ...link, custom: true })}>
+                  <Trash2 size={16} />
+                  <span>删除</span>
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="workspace toolbox-workspace">
       <div className="section-heading">
         <p className="eyebrow">工具箱</p>
         <h1>常用网站、学习资源和摸鱼入口</h1>
-        <p>把好用的网站集中放在这里，需要查资料、写代码、做图或者记录番剧时不用到处翻收藏夹。</p>
       </div>
 
       <div className="content-band toolbox-hero">
         <div>
           <span>Felix Links</span>
           <h2>今天要去哪里？</h2>
-          <p>先从高频入口开始，登录管理员后可以继续把课程、项目、娱乐和生活服务都整理进来。分类填“友链”时，首页会自动展示。</p>
         </div>
         <div className="toolbox-featured-grid" aria-label="高频工具">
           {featuredLinks.map((link) => (
@@ -6840,67 +7133,9 @@ function ToolboxWorkspace({ currentUser, authToken }) {
         </div>
       </div>
 
-      {canManageToolbox && (
-        <form className="toolbox-editor" onSubmit={submitToolboxLink}>
-          <div className="admin-panel-heading compact-heading">
-            <div>
-              <h3>{editingToolboxLinkId ? '编辑自定义网址' : '添加自定义网址'}</h3>
-              <span>{isLoadingToolboxLinks ? '正在同步链接' : `${customLinks.length} 个自定义链接`}</span>
-            </div>
-            {editingToolboxLinkId && (
-              <button className="ghost-button" type="button" onClick={() => resetToolboxForm('已取消编辑')}>
-                <X size={16} />
-                <span>取消</span>
-              </button>
-            )}
-          </div>
-          <div className="toolbox-editor-grid">
-            <label>
-              <span>标题</span>
-              <input value={toolboxForm.title} onChange={(event) => updateToolboxForm('title', event.target.value)} placeholder="网站名称" />
-            </label>
-            <label>
-              <span>分类</span>
-              <input value={toolboxForm.category} onChange={(event) => updateToolboxForm('category', event.target.value)} placeholder="学习 / 开发 / 自定义" />
-            </label>
-            <label className="wide">
-              <span>网址</span>
-              <input value={toolboxForm.url} onChange={(event) => updateToolboxForm('url', event.target.value)} placeholder="https://example.com" />
-            </label>
-            <label className="wide">
-              <span>用途说明</span>
-              <textarea value={toolboxForm.description} onChange={(event) => updateToolboxForm('description', event.target.value)} rows={2} placeholder="这个网站适合用来做什么" />
-            </label>
-            <label className="wide">
-              <span>标签</span>
-              <input value={toolboxForm.tags} onChange={(event) => updateToolboxForm('tags', event.target.value)} placeholder="用逗号分隔，比如 文档, 课程, 工具" />
-            </label>
-            <label className="checkbox-control">
-              <input type="checkbox" checked={toolboxForm.pinned} onChange={(event) => updateToolboxForm('pinned', event.target.checked)} />
-              <span>置顶到高频入口</span>
-            </label>
-          </div>
-          <div className="admin-actions">
-            <button className="primary-action" type="submit" disabled={isSavingToolboxLink}>
-              <Save size={17} />
-              <span>{isSavingToolboxLink ? '保存中' : editingToolboxLinkId ? '保存修改' : '添加网址'}</span>
-            </button>
-            <button className="ghost-button" type="button" onClick={() => resetToolboxForm('')}>
-              <X size={17} />
-              <span>清空</span>
-            </button>
-            <button className="ghost-button" type="button" onClick={refreshToolboxLinks}>
-              <RefreshCw size={17} />
-              <span>刷新</span>
-            </button>
-          </div>
-          {toolboxMessage && <p className="admin-message">{toolboxMessage}</p>}
-        </form>
-      )}
-
       <div className="toolbox-grid">
         {filteredLinks.map((link) => (
-          <article className={link.custom ? 'toolbox-card custom' : 'toolbox-card'} key={`${link.custom ? 'custom' : 'default'}-${link.id || link.url}`}>
+          <article className="toolbox-card" key={`${link.custom ? 'custom' : 'default'}-${link.id || link.url}`}>
             <span className="toolbox-card-category">{link.category}</span>
             <div>
               <h2>{link.title}</h2>
@@ -6911,23 +7146,10 @@ function ToolboxWorkspace({ currentUser, authToken }) {
             <p>{link.description}</p>
             <span className="toolbox-url">{new URL(link.url).hostname.replace(/^www\./, '')}</span>
             <div className="toolbox-tags">
-              {link.custom && <span>自定义</span>}
               {link.tags.map((tag) => (
                 <span key={tag}>{tag}</span>
               ))}
             </div>
-            {canManageToolbox && link.custom && (
-              <div className="toolbox-card-actions">
-                <button type="button" onClick={() => startEditingToolboxLink(link)}>
-                  <PencilLine size={16} />
-                  <span>编辑</span>
-                </button>
-                <button className="danger-button" type="button" onClick={() => deleteToolboxLink(link)}>
-                  <Trash2 size={16} />
-                  <span>删除</span>
-                </button>
-              </div>
-            )}
           </article>
         ))}
       </div>
@@ -6968,6 +7190,11 @@ const stickerSets = {
     { variant: 'memo', label: 'LINKS', icon: '✦' },
     { variant: 'guitar', label: 'TOOLS', icon: '♪' }
   ],
+  links: [
+    { variant: 'memo', label: 'FRIENDS', icon: '✦' },
+    { variant: 'terminal', label: 'BLOGROLL', icon: '◇' },
+    { variant: 'guitar', label: 'VISIT', icon: '♪' }
+  ],
   game: [
     { variant: 'terminal', label: 'STAGE READY', icon: '◇' },
     { variant: 'guitar', label: 'BREAK', icon: '♪' },
@@ -6998,12 +7225,61 @@ function DecorativeStickerLayer({ activeView }) {
 function Live2DMascot() {
   const canvasRef = useRef(null);
   const appRef = useRef(null);
+  const mascotRef = useRef(null);
+  const dragRef = useRef(null);
+  const speechTimerRef = useRef(null);
   const [status, setStatus] = useState('idle');
   const [lineIndex, setLineIndex] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
+  const [speechVisible, setSpeechVisible] = useState(false);
+  const [closedNotice, setClosedNotice] = useState(false);
+  const [menuPosition, setMenuPosition] = useState(null);
+  const [mode, setMode] = useState(() => {
+    if (typeof localStorage === 'undefined') return 'pet';
+    return localStorage.getItem(LIVE2D_MODE_KEY) === 'window' ? 'window' : 'pet';
+  });
+  const [position, setPosition] = useState(() => {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return { x: 0, y: 0 };
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem(LIVE2D_POSITION_KEY) || 'null');
+      if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) return saved;
+    } catch {
+      localStorage.removeItem(LIVE2D_POSITION_KEY);
+    }
+    return {
+      x: Math.max(24, window.innerWidth - 310),
+      y: Math.max(92, window.innerHeight - 300)
+    };
+  });
   const [isHidden, setIsHidden] = useState(() => (
     typeof localStorage !== 'undefined' && localStorage.getItem(LIVE2D_HIDDEN_KEY) === 'true'
   ));
+
+  function savePosition(nextPosition) {
+    setPosition(nextPosition);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LIVE2D_POSITION_KEY, JSON.stringify(nextPosition));
+    }
+  }
+
+  function clampPosition(rawPosition) {
+    if (typeof window === 'undefined') return rawPosition;
+    const width = mascotRef.current?.offsetWidth || (mode === 'window' ? 236 : 208);
+    const height = mascotRef.current?.offsetHeight || (mode === 'window' ? 264 : 230);
+    return {
+      x: Math.min(Math.max(12, rawPosition.x), Math.max(12, window.innerWidth - width - 12)),
+      y: Math.min(Math.max(70, rawPosition.y), Math.max(70, window.innerHeight - height - 12))
+    };
+  }
+
+  function speak(nextIndex = null) {
+    setLineIndex((current) => (nextIndex === null ? (current + 1) % mascotLines.length : nextIndex));
+    setSpeechVisible(true);
+    if (speechTimerRef.current) window.clearTimeout(speechTimerRef.current);
+    speechTimerRef.current = window.setTimeout(() => setSpeechVisible(false), 5200);
+  }
 
   useEffect(() => {
     if (isHidden || !canvasRef.current) return undefined;
@@ -7050,6 +7326,10 @@ function Live2DMascot() {
     mountMascot();
     return () => {
       cancelled = true;
+      if (speechTimerRef.current) {
+        window.clearTimeout(speechTimerRef.current);
+        speechTimerRef.current = null;
+      }
       if (appRef.current) {
         appRef.current.destroy(true);
         appRef.current = null;
@@ -7057,36 +7337,114 @@ function Live2DMascot() {
     };
   }, [isHidden, reloadKey]);
 
+  useEffect(() => {
+    function showMascotFromAccount() {
+      setIsHidden(false);
+      setClosedNotice(false);
+      setSpeechVisible(true);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(LIVE2D_HIDDEN_KEY, 'false');
+      }
+    }
+    window.addEventListener(LIVE2D_SHOW_EVENT, showMascotFromAccount);
+    return () => window.removeEventListener(LIVE2D_SHOW_EVENT, showMascotFromAccount);
+  }, []);
+
+  useEffect(() => {
+    function closeMenu() {
+      setMenuPosition(null);
+    }
+    window.addEventListener('click', closeMenu);
+    window.addEventListener('scroll', closeMenu, true);
+    return () => {
+      window.removeEventListener('click', closeMenu);
+      window.removeEventListener('scroll', closeMenu, true);
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleResize() {
+      savePosition(clampPosition(position));
+    }
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [position, mode]);
+
   function hideMascot() {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(LIVE2D_HIDDEN_KEY, 'true');
     }
     setIsHidden(true);
+    setMenuPosition(null);
+    setClosedNotice(true);
+    window.setTimeout(() => setClosedNotice(false), 3600);
   }
 
-  function showMascot() {
+  function toggleMode() {
+    const nextMode = mode === 'window' ? 'pet' : 'window';
+    setMode(nextMode);
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(LIVE2D_HIDDEN_KEY, 'false');
+      localStorage.setItem(LIVE2D_MODE_KEY, nextMode);
     }
-    setIsHidden(false);
+    setMenuPosition(null);
   }
 
   if (isHidden) {
     return (
-      <button className="live2d-mascot-tab" type="button" onClick={showMascot} title="叫出黍泡泡" aria-label="叫出黍泡泡">
-        <Bot size={19} />
-      </button>
+      closedNotice && (
+        <div className="live2d-closed-toast">
+          已关闭黍泡泡，可以在账号页重新显示。
+        </div>
+      )
     );
   }
 
   return (
-    <aside className="live2d-mascot" aria-label="本站吉祥物黍泡泡">
-      <div className="live2d-speech">
-        <strong>黍泡泡</strong>
-        <p>{status === 'error' ? 'Live2D 加载失败，但我还在这里。' : mascotLines[lineIndex]}</p>
-        <span>模型来源：切丁鱼片</span>
-      </div>
-      <div className="live2d-stage">
+    <aside
+      ref={mascotRef}
+      className={`live2d-mascot ${mode === 'window' ? 'windowed' : 'pet'}`}
+      style={{ left: `${position.x}px`, top: `${position.y}px` }}
+      aria-label="本站吉祥物黍泡泡"
+      onContextMenu={(event) => {
+        event.preventDefault();
+        setMenuPosition({ x: event.clientX, y: event.clientY });
+      }}
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        dragRef.current = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          originX: position.x,
+          originY: position.y,
+          moved: false
+        };
+      }}
+      onPointerMove={(event) => {
+        const drag = dragRef.current;
+        if (!drag || drag.pointerId !== event.pointerId) return;
+        const dx = event.clientX - drag.startX;
+        const dy = event.clientY - drag.startY;
+        if (Math.abs(dx) + Math.abs(dy) > 5) drag.moved = true;
+        savePosition(clampPosition({ x: drag.originX + dx, y: drag.originY + dy }));
+      }}
+      onPointerUp={(event) => {
+        const drag = dragRef.current;
+        if (!drag || drag.pointerId !== event.pointerId) return;
+        dragRef.current = null;
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        if (!drag.moved) speak();
+      }}
+    >
+      {speechVisible && (
+        <div className="live2d-speech">
+          <strong>黍泡泡</strong>
+          <p>{status === 'error' ? 'Live2D 加载失败，右键可以重试。' : mascotLines[lineIndex]}</p>
+          <span>模型来源：切丁鱼片</span>
+        </div>
+      )}
+      <div className="live2d-stage" title="拖动我，点击我说话，右键打开菜单">
         <canvas ref={canvasRef} width="260" height="340" />
         {status === 'loading' && <span className="live2d-loading">加载中</span>}
         {status === 'error' && (
@@ -7095,19 +7453,18 @@ function Live2DMascot() {
           </span>
         )}
       </div>
-      <div className="live2d-actions">
-        {status === 'error' && (
-          <button type="button" onClick={() => setReloadKey((current) => current + 1)}>
-            重试
-          </button>
-        )}
-        <button type="button" onClick={() => setLineIndex((current) => (current + 1) % mascotLines.length)}>
-          换句话
-        </button>
-        <button type="button" onClick={hideMascot}>
-          收起
-        </button>
-      </div>
+      {menuPosition && (
+        <div
+          className="live2d-context-menu"
+          style={{ left: `${menuPosition.x - position.x}px`, top: `${menuPosition.y - position.y}px` }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button type="button" onClick={() => speak()}>说句话</button>
+          <button type="button" onClick={toggleMode}>{mode === 'window' ? '切回贴边模式' : '变成悬浮窗'}</button>
+          <button type="button" onClick={() => { setReloadKey((current) => current + 1); setMenuPosition(null); }}>重新加载</button>
+          <button className="danger" type="button" onClick={hideMascot}>关闭</button>
+        </div>
+      )}
     </aside>
   );
 }
@@ -7196,7 +7553,6 @@ function MusicWorkspace({
       <div className="section-heading">
         <p className="eyebrow">Felix Music</p>
         <h1>个人音乐台</h1>
-        <span>把喜欢的歌放进站点里，打开网页就能听。</span>
       </div>
 
       <section className="music-player-panel">
@@ -7413,44 +7769,101 @@ function MusicWorkspace({
 
 function GameWorkspace() {
   const [frameKey, setFrameKey] = useState(0);
+  const [selectedGameId, setSelectedGameId] = useState('card-war');
+  const gameCatalog = [
+    {
+      id: 'card-war',
+      title: '决斗小游戏',
+      subtitle: 'Card War',
+      status: gameModule.status || '已嵌入',
+      plan: gameModule.plan,
+      repository: gameModule.repository,
+      playUrl: gameModule.playUrl
+    },
+    {
+      id: 'isaac-notes',
+      title: '以撒道具速查',
+      subtitle: '计划中',
+      status: '构思中',
+      plan: '以后可以做成休息时用的小工具，记录道具、角色和流派组合。',
+      repository: '',
+      playUrl: ''
+    },
+    {
+      id: 'daily-clicker',
+      title: '暑假打卡小游戏',
+      subtitle: '计划中',
+      status: '空位',
+      plan: '把计划完成度做成轻量小游戏，完成任务就点亮当天进度。',
+      repository: '',
+      playUrl: ''
+    }
+  ];
+  const selectedGame = gameCatalog.find((game) => game.id === selectedGameId) || gameCatalog[0];
 
   return (
-    <section className="workspace">
+    <section className="workspace game-workspace">
       <div className="section-heading">
         <p className="eyebrow">小游戏</p>
-        <h1>{gameModule.title}</h1>
+        <h1>游戏库</h1>
+      </div>
+
+      <div className="game-selector-grid" aria-label="选择游戏">
+        {gameCatalog.map((game) => (
+          <button
+            className={selectedGame.id === game.id ? 'game-selector-card active' : 'game-selector-card'}
+            type="button"
+            key={game.id}
+            onClick={() => {
+              setSelectedGameId(game.id);
+              setFrameKey((current) => current + 1);
+            }}
+          >
+            <span>{game.status}</span>
+            <strong>{game.title}</strong>
+            <em>{game.subtitle}</em>
+          </button>
+        ))}
       </div>
 
       <div className="game-layout">
         <div className="game-details">
-          <span className="status-pill inline">{gameModule.status}</span>
+          <span className="status-pill inline">{selectedGame.status}</span>
           <div className="game-copy">
-            <h2>Card War 在线试玩</h2>
-            <p>{gameModule.plan}</p>
+            <h2>{selectedGame.title}</h2>
+            <p>{selectedGame.plan}</p>
           </div>
           <div className="game-actions">
-            <button type="button" onClick={() => setFrameKey((current) => current + 1)}>
+            <button type="button" onClick={() => setFrameKey((current) => current + 1)} disabled={!selectedGame.playUrl}>
               <RefreshCw size={17} />
               <span>刷新游戏</span>
             </button>
-            <a href={gameModule.playUrl} target="_blank" rel="noreferrer">
+            {selectedGame.playUrl && <a href={selectedGame.playUrl} target="_blank" rel="noreferrer">
               <ExternalLink size={17} />
               <span>新窗口打开</span>
-            </a>
-            <a className="secondary-link" href={gameModule.repository} target="_blank" rel="noreferrer">
+            </a>}
+            {selectedGame.repository && <a className="secondary-link" href={selectedGame.repository} target="_blank" rel="noreferrer">
               <Github size={17} />
               <span>查看仓库</span>
-            </a>
+            </a>}
           </div>
         </div>
         <div className="game-stage">
-          <iframe
-            key={frameKey}
-            title="决斗小游戏"
-            src={gameModule.playUrl}
-            loading="lazy"
-            allow="fullscreen; gamepad; autoplay"
-          />
+          {selectedGame.playUrl ? (
+            <iframe
+              key={frameKey}
+              title={selectedGame.title}
+              src={selectedGame.playUrl}
+              loading="lazy"
+              allow="fullscreen; gamepad; autoplay"
+            />
+          ) : (
+            <div className="game-placeholder">
+              <Gamepad2 size={42} />
+              <strong>这个游戏还在排队</strong>
+              <span>以后有新项目时可以直接接到这里。</span>
+            </div>
+          )}
         </div>
       </div>
     </section>
@@ -7529,6 +7942,29 @@ function AccountWorkspace({
             </label>
           </div>
         )}
+
+        <div className="account-site-avatar-editor mascot-setting-row">
+          <span className="mascot-setting-icon">
+            <Bot size={20} />
+          </span>
+          <div>
+            <strong>首页小组件</strong>
+            <span>如果右键关闭了黍泡泡，可以在这里重新叫出来。</span>
+          </div>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => {
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(LIVE2D_HIDDEN_KEY, 'false');
+              }
+              window.dispatchEvent(new Event(LIVE2D_SHOW_EVENT));
+            }}
+          >
+            <Bot size={16} />
+            <span>显示黍泡泡</span>
+          </button>
+        </div>
 
         <div className="release-metric-grid">
           <div className="release-metric">
@@ -7953,6 +8389,30 @@ function ReleaseWorkspace() {
   );
 }
 
+function buildArticleExplorerGroups(articles) {
+  const groups = new Map();
+  articles.forEach((article, index) => {
+    const section = isTechnicalArticle(article) ? '技术笔记' : '随笔 / 娱乐文章';
+    const folderParts = isTechnicalArticle(article)
+      ? [article.noteCollection || article.category || '未收纳笔记', article.notePath || '未分组']
+      : [article.category || '未分类'];
+    const folder = folderParts.filter(Boolean).join(' / ');
+    const key = `${section}::${folder}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        section,
+        folder,
+        articles: []
+      });
+    }
+    groups.get(key).articles.push({ ...article, displayOrder: index + 1 });
+  });
+  return Array.from(groups.values()).sort((first, second) => (
+    `${first.section}/${first.folder}`.localeCompare(`${second.section}/${second.folder}`, 'zh-CN')
+  ));
+}
+
 function AdminWorkspace({
   articles,
   articleForm,
@@ -8095,6 +8555,7 @@ function AdminWorkspace({
     { id: 'articles', label: '内容库', detail: '编辑、删除、置顶', icon: BookOpen, count: `${articles.length} 篇` },
     { id: 'comments', label: '评论', detail: '查看和删除评论', icon: MessageCircle, count: `${adminComments.length} 条` },
     { id: 'music', label: '音乐', detail: '上传歌单和管理播放', icon: Music, count: `${musicTracks.length} 首` },
+    { id: 'toolbox', label: '工具箱', detail: '自定义网址和友链', icon: Wrench, count: 'Links' },
     { id: 'releases', label: '版本', detail: '更新记录和路线', icon: Code2, count: releaseRoadmap[0].version },
     { id: 'visual', label: '视觉巡检', detail: '白底、控件、夜间模式', icon: Eye, count: 'QA' },
     { id: 'ops', label: '运维', detail: '服务、部署、脚本', icon: ShieldCheck, count: '控制台' },
@@ -8139,6 +8600,7 @@ function AdminWorkspace({
       (articleManagerCategory === 'all' || (article.category || '未分类') === articleManagerCategory)
     );
   });
+  const articleExplorerGroups = buildArticleExplorerGroups(filteredManagerArticles);
   const selectedManagerArticles = filteredManagerArticles.filter((article) => selectedManagerArticleIds.includes(article.id));
   const isAllManagerArticlesSelected = filteredManagerArticles.length > 0
     && filteredManagerArticles.every((article) => selectedManagerArticleIds.includes(article.id));
@@ -9542,45 +10004,53 @@ function AdminWorkspace({
           <div className="manager-list">
             {filteredManagerArticles.length === 0 ? (
               <p className="empty-state">没有符合条件的文章</p>
-            ) : filteredManagerArticles.map((article) => (
-              <article className="manager-row article-manager-row" key={article.id}>
-                <label className="manager-select-box" aria-label={`选择 ${article.title}`}>
-                  <input
-                    type="checkbox"
-                    checked={selectedManagerArticleIds.includes(article.id)}
-                    onChange={() => toggleManagerArticleSelection(article.id)}
-                  />
-                </label>
-                <div>
-                  <div className="manager-title-line">
-                    <h3>{article.title}</h3>
-                    <span className={article.status === 'draft' ? 'status-badge draft' : 'status-badge'}>{article.status === 'draft' ? '草稿' : '已发布'}</span>
-                  </div>
-                  <p>{article.summary}</p>
-                  <span className="manager-meta-line">创建 {formatArticleTimestamp(article.createdAt, article.date || '未知')} · 修改 {formatArticleTimestamp(article.updatedAt, article.createdAt || article.date || '未知')}</span>
-                  {(article.noteCollection || article.notePath) && (
-                    <span className="manager-meta-line note-location">
-                      收纳 {article.noteCollection || article.category || '技术笔记'}{article.notePath ? ` / ${article.notePath}` : ''}
-                    </span>
-                  )}
-                  <div className="tag-row">
-                    {article.tags.map((tag) => (
-                      <span key={tag}>{tag}</span>
-                    ))}
-                  </div>
-                </div>
-                <div className="manager-actions">
-                  <button type="button" onClick={() => handleStartEditingArticle(article)}>
-                    <PencilLine size={17} />
-                    <span>编辑</span>
-                  </button>
-                  <button className="danger-button" type="button" onClick={() => deleteArticle(article)}>
-                    <Trash2 size={17} />
-                    <span>删除</span>
-                  </button>
-                </div>
-              </article>
-            ))}
+            ) : (
+              <div className="article-explorer">
+                {articleExplorerGroups.map((group) => (
+                  <section className="article-explorer-group" key={group.key}>
+                    <div className="article-explorer-folder">
+                      <BookOpen size={17} />
+                      <strong>{group.section}</strong>
+                      <span>{group.folder}</span>
+                      <em>{group.articles.length} 篇</em>
+                    </div>
+                    <div className="article-explorer-files">
+                      {group.articles.map((article) => (
+                        <article className="article-explorer-file" key={article.id}>
+                          <label className="manager-select-box" aria-label={`选择 ${article.title}`}>
+                            <input
+                              type="checkbox"
+                              checked={selectedManagerArticleIds.includes(article.id)}
+                              onChange={() => toggleManagerArticleSelection(article.id)}
+                            />
+                          </label>
+                          <span className="article-file-order">{String(article.displayOrder).padStart(2, '0')}</span>
+                          <div>
+                            <div className="manager-title-line">
+                              <h3>{article.title}</h3>
+                              <span className={article.status === 'draft' ? 'status-badge draft' : 'status-badge'}>{article.status === 'draft' ? '草稿' : '已发布'}</span>
+                              {article.pinned && <span className="status-badge">置顶</span>}
+                            </div>
+                            <p>{article.summary || '暂无摘要'}</p>
+                            <span className="manager-meta-line">创建 {formatArticleTimestamp(article.createdAt, article.date || '未知')} · 修改 {formatArticleTimestamp(article.updatedAt, article.createdAt || article.date || '未知')}</span>
+                          </div>
+                          <div className="manager-actions">
+                            <button type="button" onClick={() => handleStartEditingArticle(article)}>
+                              <PencilLine size={17} />
+                              <span>编辑</span>
+                            </button>
+                            <button className="danger-button" type="button" onClick={() => deleteArticle(article)}>
+                              <Trash2 size={17} />
+                              <span>删除</span>
+                            </button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
           </div>
         </section>
         )}
@@ -9612,6 +10082,10 @@ function AdminWorkspace({
             )}
           </section>
         </aside>
+        )}
+
+        {activeAdminPage === 'toolbox' && (
+          <ToolboxWorkspace currentUser={currentUser} authToken={authToken} manageOnly />
         )}
 
         {activeAdminPage === 'music' && (
