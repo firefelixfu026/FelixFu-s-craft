@@ -164,6 +164,7 @@ const ACTIVE_VIEW_KEY = 'felix_blog_active_view';
 const ADMIN_PAGE_KEY = 'felix_blog_admin_page';
 const MUSIC_PLAYLISTS_KEY = 'felix_blog_music_playlists';
 const MUSIC_RECENT_KEY = 'felix_blog_music_recent';
+const TOOLBOX_DEFAULT_OVERRIDES_KEY = 'felix_blog_toolbox_default_overrides';
 const THEME_KEY = 'felix_blog_theme';
 const SIDEBAR_COLLAPSED_KEY = 'felix_blog_sidebar_collapsed';
 const AUTH_FAIL_STATE_KEY = 'felix_blog_auth_fail_state';
@@ -435,6 +436,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.0.1',
+    title: '工具箱编辑、笔记收纳与悬浮吉祥物手感修复',
+    date: '2026-08-10',
+    status: '已上线',
+    points: ['工具箱管理页支持编辑和删除内置网站、友链与自定义网站', '内容库新增批量收纳笔记，可填写合集和目录路径', '迷你播放器左下角优先显示当前歌曲封面', '文章互动数字取消跳动动画，点击反馈更稳', '黍泡泡提升到最顶层，只在本体区域响应点击、拖动和右键菜单']
+  },
   {
     version: 'v6.0',
     title: '内容管理、音乐资源与阅读交互修复',
@@ -1309,6 +1317,8 @@ function formatArticleTimestamp(value, fallback = '保存后生成') {
 function isTechnicalArticle(article = {}) {
   const haystack = [
     article.category || '',
+    article.noteCollection || '',
+    article.notePath || '',
     article.title || '',
     article.summary || '',
     ...(article.tags || [])
@@ -3199,6 +3209,50 @@ function App() {
     }
   }
 
+  async function collectArticlesBulk(selectedArticles, placement) {
+    const targets = Array.isArray(selectedArticles) ? selectedArticles.filter(Boolean) : [];
+    if (!targets.length) {
+      setAdminMessage('请先选择要收纳的文章或笔记');
+      return;
+    }
+    if (!authToken) {
+      setAdminMessage('请先登录管理员账号');
+      setActiveView('login');
+      return;
+    }
+    const noteCollection = (placement?.noteCollection || '').trim();
+    const notePath = (placement?.notePath || '').trim();
+    if (!noteCollection && !notePath) {
+      setAdminMessage('至少填写一个合集名或目录路径');
+      return;
+    }
+
+    setIsSavingArticle(true);
+    setAdminMessage(`正在收纳 ${targets.length} 篇内容...`);
+    let successCount = 0;
+    try {
+      for (const article of targets) {
+        const response = await fetch(`/api/admin/articles/${article.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify(buildArticlePayload(article, {
+            category: article.category || '学习笔记',
+            noteCollection,
+            notePath
+          }))
+        });
+        if (response.ok) successCount += 1;
+      }
+      await refreshArticles();
+      await refreshAdminAuditLogs();
+      setAdminMessage(`已收纳：${successCount} / ${targets.length} 篇`);
+    } catch {
+      setAdminMessage('收纳保存失败，请稍后再试');
+    } finally {
+      setIsSavingArticle(false);
+    }
+  }
+
   async function refreshUploadedImages({ resetMessage = true } = {}) {
     if (!authToken) return;
 
@@ -3861,6 +3915,7 @@ function App() {
             deleteArticle={deleteArticle}
             reorderArticles={reorderArticles}
             manageArticlesBulk={manageArticlesBulk}
+            collectArticlesBulk={collectArticlesBulk}
             adminComments={adminComments}
             adminCommentPage={adminCommentPage}
             setAdminCommentPage={setAdminCommentPage}
@@ -6775,10 +6830,21 @@ function createEmptyToolboxForm() {
 function normalizeToolboxLink(link, index = 0) {
   return {
     ...link,
-    id: link.id ?? `default-${index}`,
+    id: link.id ?? (typeof index === 'string' ? index : `default-${index}`),
     tags: Array.isArray(link.tags) ? link.tags : [],
     custom: Boolean(link.custom)
   };
+}
+
+function readToolboxDefaultOverrides() {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const parsed = JSON.parse(localStorage.getItem(TOOLBOX_DEFAULT_OVERRIDES_KEY) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    localStorage.removeItem(TOOLBOX_DEFAULT_OVERRIDES_KEY);
+    return {};
+  }
 }
 
 const defaultFriendLinks = [
@@ -6832,22 +6898,43 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
   const [customLinks, setCustomLinks] = useState([]);
   const [toolboxForm, setToolboxForm] = useState(createEmptyToolboxForm);
   const [editingToolboxLinkId, setEditingToolboxLinkId] = useState(null);
+  const [editingToolboxSource, setEditingToolboxSource] = useState(null);
+  const [toolboxDefaultOverrides, setToolboxDefaultOverrides] = useState(readToolboxDefaultOverrides);
   const [toolboxMessage, setToolboxMessage] = useState('');
   const [toolboxAdminQuery, setToolboxAdminQuery] = useState('');
   const [isLoadingToolboxLinks, setIsLoadingToolboxLinks] = useState(false);
   const [isSavingToolboxLink, setIsSavingToolboxLink] = useState(false);
   const canManageToolbox = currentUser?.role === 'admin';
+  function persistToolboxDefaultOverrides(nextOverrides) {
+    setToolboxDefaultOverrides(nextOverrides);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(TOOLBOX_DEFAULT_OVERRIDES_KEY, JSON.stringify(nextOverrides));
+    }
+  }
+
+  function applyToolboxOverride(link) {
+    const override = toolboxDefaultOverrides[link.id];
+    if (override?.hidden) return null;
+    return normalizeToolboxLink({
+      ...link,
+      ...override,
+      tags: Array.isArray(override?.tags) ? override.tags : link.tags
+    }, link.id);
+  }
+
   const friendToolboxLinks = defaultFriendLinks.map((link, index) => normalizeToolboxLink({
     title: link.title,
     category: '友链',
     url: link.url,
     description: link.description,
     tags: ['友链', '博客', index === 2 ? '同学' : '参考']
-  }, `friend-${index}`));
+  }, `friend-${index}`)).map((link) => ({ ...link, sourceType: 'friend' }));
+  const defaultManagedToolboxLinks = defaultToolboxLinks.map((link, index) => normalizeToolboxLink(link, `default-${index}`))
+    .map((link) => ({ ...link, sourceType: 'default' }));
   const allToolboxLinks = [
-    ...customLinks.map((link) => ({ ...normalizeToolboxLink(link), custom: true })),
-    ...friendToolboxLinks,
-    ...defaultToolboxLinks.map((link, index) => normalizeToolboxLink(link, index))
+    ...customLinks.map((link) => ({ ...normalizeToolboxLink(link), custom: true, sourceType: 'custom' })),
+    ...friendToolboxLinks.map(applyToolboxOverride).filter(Boolean),
+    ...defaultManagedToolboxLinks.map(applyToolboxOverride).filter(Boolean)
   ];
   const dynamicCategories = ['全部', ...Array.from(new Set([
     ...toolboxCategories.filter((category) => category !== '全部'),
@@ -6902,11 +6989,13 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
   function resetToolboxForm(message = '') {
     setToolboxForm(createEmptyToolboxForm());
     setEditingToolboxLinkId(null);
+    setEditingToolboxSource(null);
     setToolboxMessage(message);
   }
 
   function startEditingToolboxLink(link) {
     setEditingToolboxLinkId(link.id);
+    setEditingToolboxSource(link.sourceType || (link.custom ? 'custom' : 'default'));
     setToolboxForm({
       title: link.title || '',
       category: link.category || '自定义',
@@ -6942,6 +7031,19 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
 
     setIsSavingToolboxLink(true);
     try {
+      if (editingToolboxLinkId && editingToolboxSource !== 'custom') {
+        const nextOverrides = {
+          ...toolboxDefaultOverrides,
+          [editingToolboxLinkId]: {
+            ...(toolboxDefaultOverrides[editingToolboxLinkId] || {}),
+            ...payload,
+            hidden: false
+          }
+        };
+        persistToolboxDefaultOverrides(nextOverrides);
+        resetToolboxForm('预置链接已更新');
+        return;
+      }
       const endpoint = editingToolboxLinkId
         ? `/api/admin/toolbox-links/${editingToolboxLinkId}`
         : '/api/admin/toolbox-links';
@@ -6968,8 +7070,21 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
   }
 
   async function deleteToolboxLink(link) {
-    if (!canManageToolbox || !authToken || !link.custom) return;
+    if (!canManageToolbox || !authToken) return;
     if (!window.confirm(`确定删除工具箱链接：${link.title}？`)) return;
+    if (!link.custom) {
+      const nextOverrides = {
+        ...toolboxDefaultOverrides,
+        [link.id]: {
+          ...(toolboxDefaultOverrides[link.id] || {}),
+          hidden: true
+        }
+      };
+      persistToolboxDefaultOverrides(nextOverrides);
+      if (editingToolboxLinkId === link.id) resetToolboxForm('');
+      setToolboxMessage('预置链接已删除');
+      return;
+    }
     try {
       const response = await fetch(`/api/admin/toolbox-links/${link.id}`, {
         method: 'DELETE',
@@ -6991,8 +7106,8 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
     <form className="toolbox-editor" onSubmit={submitToolboxLink}>
       <div className="admin-panel-heading compact-heading">
         <div>
-          <h3>{editingToolboxLinkId ? '编辑自定义网址' : '添加自定义网址'}</h3>
-          <span>{isLoadingToolboxLinks ? '正在同步链接' : `${customLinks.length} 个自定义链接`}</span>
+          <h3>{editingToolboxLinkId ? '编辑网址' : '添加网址'}</h3>
+          <span>{isLoadingToolboxLinks ? '正在同步链接' : `${allToolboxLinks.length} 个可管理链接`}</span>
         </div>
         {editingToolboxLinkId && (
           <button className="ghost-button" type="button" onClick={() => resetToolboxForm('已取消编辑')}>
@@ -7040,6 +7155,18 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
           <RefreshCw size={17} />
           <span>刷新</span>
         </button>
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={() => {
+            if (!window.confirm('确定恢复内置和友链预设吗？之前对预置链接的编辑和删除会被清空。')) return;
+            persistToolboxDefaultOverrides({});
+            resetToolboxForm('已恢复内置和友链预设');
+          }}
+        >
+          <RefreshCw size={17} />
+          <span>恢复预置</span>
+        </button>
       </div>
       {toolboxMessage && <p className="admin-message">{toolboxMessage}</p>}
     </form>
@@ -7086,20 +7213,16 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
                   <ExternalLink size={16} />
                   <span>打开</span>
                 </a>
-                {link.custom ? (
                 <>
                 <button type="button" onClick={() => startEditingToolboxLink(link)}>
                   <PencilLine size={16} />
                   <span>编辑</span>
                 </button>
-                <button className="danger-button" type="button" onClick={() => deleteToolboxLink({ ...link, custom: true })}>
+                <button className="danger-button" type="button" onClick={() => deleteToolboxLink(link)}>
                   <Trash2 size={16} />
                   <span>删除</span>
                 </button>
                 </>
-                ) : (
-                  <span className="status-badge">{source}</span>
-                )}
               </div>
             </article>
           );})}
@@ -7440,6 +7563,42 @@ function Live2DMascot() {
     setMenuPosition(null);
   }
 
+  function openMascotMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    setMenuPosition({ open: true });
+  }
+
+  function startMascotDrag(event) {
+    if (event.button !== 0) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: position.x,
+      originY: position.y,
+      moved: false
+    };
+  }
+
+  function moveMascotDrag(event) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    if (Math.abs(dx) + Math.abs(dy) > 5) drag.moved = true;
+    savePosition(clampPosition({ x: drag.originX + dx, y: drag.originY + dy }));
+  }
+
+  function endMascotDrag(event) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (!drag.moved) speak();
+  }
+
   if (isHidden) {
     return (
       closedNotice && (
@@ -7456,37 +7615,6 @@ function Live2DMascot() {
       className={`live2d-mascot ${mode === 'window' ? 'windowed' : 'pet'}`}
       style={{ left: `${position.x}px`, top: `${position.y}px` }}
       aria-label="本站吉祥物黍泡泡"
-      onContextMenu={(event) => {
-        event.preventDefault();
-        setMenuPosition({ x: event.clientX, y: event.clientY });
-      }}
-      onPointerDown={(event) => {
-        if (event.button !== 0) return;
-        event.currentTarget.setPointerCapture?.(event.pointerId);
-        dragRef.current = {
-          pointerId: event.pointerId,
-          startX: event.clientX,
-          startY: event.clientY,
-          originX: position.x,
-          originY: position.y,
-          moved: false
-        };
-      }}
-      onPointerMove={(event) => {
-        const drag = dragRef.current;
-        if (!drag || drag.pointerId !== event.pointerId) return;
-        const dx = event.clientX - drag.startX;
-        const dy = event.clientY - drag.startY;
-        if (Math.abs(dx) + Math.abs(dy) > 5) drag.moved = true;
-        savePosition(clampPosition({ x: drag.originX + dx, y: drag.originY + dy }));
-      }}
-      onPointerUp={(event) => {
-        const drag = dragRef.current;
-        if (!drag || drag.pointerId !== event.pointerId) return;
-        dragRef.current = null;
-        event.currentTarget.releasePointerCapture?.(event.pointerId);
-        if (!drag.moved) speak();
-      }}
     >
       {speechVisible && (
         <div className="live2d-speech">
@@ -7495,7 +7623,17 @@ function Live2DMascot() {
           <span>模型来源：切丁鱼片</span>
         </div>
       )}
-      <div className="live2d-stage" title="拖动我，点击我说话，右键打开菜单">
+      <div
+        className="live2d-stage"
+        title="拖动我，点击我说话，右键打开菜单"
+        onContextMenu={openMascotMenu}
+        onPointerDown={startMascotDrag}
+        onPointerMove={moveMascotDrag}
+        onPointerUp={endMascotDrag}
+        onPointerCancel={() => {
+          dragRef.current = null;
+        }}
+      >
         <canvas ref={canvasRef} width="260" height="340" />
         {status === 'loading' && <span className="live2d-loading">加载中</span>}
         {status === 'error' && (
@@ -7507,7 +7645,6 @@ function Live2DMascot() {
       {menuPosition && (
         <div
           className="live2d-context-menu"
-          style={{ left: `${menuPosition.x - position.x}px`, top: `${menuPosition.y - position.y}px` }}
           onClick={(event) => event.stopPropagation()}
         >
           <button type="button" onClick={() => speak()}>说句话</button>
@@ -7527,7 +7664,11 @@ function SidebarMusicPlayer({ track, isPlaying, progress, duration, togglePlayba
     <div className={isPlaying ? 'sidebar-music-player playing' : 'sidebar-music-player'}>
       <button className="sidebar-music-main" type="button" onClick={openMusic} title="打开音乐">
         <span className="sidebar-music-disc">
-          <Music size={18} />
+          {track?.coverUrl ? (
+            <img src={track.coverUrl} alt="" loading="lazy" />
+          ) : (
+            <Music size={18} />
+          )}
         </span>
         <span className="sidebar-music-info">
           <strong className="sidebar-music-title" title={track?.title || 'Felix Music'}>
@@ -8564,6 +8705,7 @@ function AdminWorkspace({
   deleteArticle,
   reorderArticles,
   manageArticlesBulk,
+  collectArticlesBulk,
   adminComments,
   adminCommentPage,
   setAdminCommentPage,
@@ -8666,6 +8808,8 @@ function AdminWorkspace({
   const [articleManagerStatus, setArticleManagerStatus] = useState('all');
   const [articleManagerCategory, setArticleManagerCategory] = useState('all');
   const [selectedManagerArticleIds, setSelectedManagerArticleIds] = useState([]);
+  const [managerCollectionDraft, setManagerCollectionDraft] = useState('');
+  const [managerPathDraft, setManagerPathDraft] = useState('');
   const [draggingArticleId, setDraggingArticleId] = useState(null);
   const [dragOverArticleId, setDragOverArticleId] = useState(null);
   const [imageManagerQuery, setImageManagerQuery] = useState('');
@@ -8721,6 +8865,14 @@ function AdminWorkspace({
 
   async function runManagerBulkAction(action) {
     await manageArticlesBulk(selectedManagerArticles, action);
+    setSelectedManagerArticleIds([]);
+  }
+
+  async function runManagerCollectAction() {
+    await collectArticlesBulk(selectedManagerArticles, {
+      noteCollection: managerCollectionDraft,
+      notePath: managerPathDraft
+    });
     setSelectedManagerArticleIds([]);
   }
 
@@ -10110,6 +10262,29 @@ function AdminWorkspace({
             </div>
           </div>
 
+          <div className="manager-collect-bar">
+            <div>
+              <strong>收纳笔记</strong>
+              <span>把选中的内容放进对应合集和目录路径。</span>
+            </div>
+            <input
+              value={managerCollectionDraft}
+              onChange={(event) => setManagerCollectionDraft(event.target.value)}
+              placeholder="合集，比如 X-lab 软件团队学习笔记"
+              aria-label="笔记合集"
+            />
+            <input
+              value={managerPathDraft}
+              onChange={(event) => setManagerPathDraft(event.target.value)}
+              placeholder="目录路径，比如 React / Hooks"
+              aria-label="笔记目录路径"
+            />
+            <button type="button" onClick={runManagerCollectAction} disabled={!selectedManagerArticles.length || isSavingArticle}>
+              <BookOpen size={16} />
+              <span>收纳所选</span>
+            </button>
+          </div>
+
           <div className="manager-list">
             {filteredManagerArticles.length === 0 ? (
               <p className="empty-state">没有符合条件的文章</p>
@@ -10468,7 +10643,7 @@ function IconToggle({ active, label, count, icon: Icon, onClick, tone = 'default
   return (
     <button className={active ? 'icon-toggle active' : 'icon-toggle'} type="button" onClick={onClick} title={label} data-tone={tone}>
       <Icon size={17} />
-      <span>{label} <strong className="icon-toggle-count" key={count}>{count}</strong></span>
+      <span>{label} <strong>{count}</strong></span>
     </button>
   );
 }

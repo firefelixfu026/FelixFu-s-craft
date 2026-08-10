@@ -440,18 +440,17 @@ textarea {
 
 .live2d-mascot {
   position: fixed;
-  z-index: 120;
+  z-index: 9999;
   display: grid;
   width: 208px;
   min-height: 210px;
   user-select: none;
   touch-action: none;
-  cursor: grab;
   will-change: transform;
   pointer-events: auto;
 }
 
-.live2d-mascot:active {
+.live2d-stage:active {
   cursor: grabbing;
 }
 
@@ -522,20 +521,30 @@ textarea {
   position: relative;
   justify-self: center;
   width: 200px;
-  height: 212px;
+  height: 148px;
+  margin-top: 64px;
+  cursor: grab;
   filter: drop-shadow(0 18px 26px rgba(47, 143, 131, 0.18));
 }
 
 .live2d-mascot.windowed .live2d-stage {
   width: 212px;
-  height: 232px;
+  height: 166px;
+  margin-top: 58px;
 }
 
 .live2d-stage canvas {
+  position: absolute;
+  left: 0;
+  bottom: -10px;
   display: block;
   width: 100%;
-  height: 100%;
+  height: 212px;
   pointer-events: none;
+}
+
+.live2d-mascot.windowed .live2d-stage canvas {
+  height: 232px;
 }
 
 .live2d-loading,
@@ -574,6 +583,8 @@ textarea {
 
 .live2d-context-menu {
   position: absolute;
+  left: 12px;
+  bottom: 12px;
   z-index: 4;
   display: grid;
   min-width: 136px;
@@ -614,7 +625,7 @@ textarea {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  z-index: 35;
+  z-index: 9998;
   max-width: 280px;
   padding: 12px 14px;
   border: 1px solid rgba(47, 143, 131, 0.22);
@@ -825,10 +836,17 @@ textarea {
   place-items: center;
   width: 42px;
   height: 42px;
+  overflow: hidden;
   border-radius: 50%;
   color: #102033;
   background: #f8fafc;
   box-shadow: 0 0 16px rgba(248, 250, 252, 0.38);
+}
+
+.sidebar-music-disc img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .sidebar-music-player.playing .sidebar-music-disc {
@@ -3402,12 +3420,6 @@ h3 {
   transform: translateY(1px) scale(0.98);
 }
 
-.icon-toggle-count {
-  display: inline-block;
-  min-width: 1.4ch;
-  animation: reactionCountPop 220ms ease both;
-}
-
 .icon-toggle[data-tone='favorite'].active {
   border-color: #c68b15;
   background: #c68b15;
@@ -3424,17 +3436,6 @@ h3 {
   border-color: #1f7a6d;
   background: #1f7a6d;
   box-shadow: 0 10px 22px rgba(31, 122, 109, 0.2);
-}
-
-@keyframes reactionCountPop {
-  0% {
-    transform: translateY(4px) scale(0.86);
-    opacity: 0.45;
-  }
-  100% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
 }
 
 .comment-box {
@@ -6875,6 +6876,32 @@ h3 {
   white-space: nowrap;
 }
 
+.manager-collect-bar {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.8fr) minmax(220px, 1fr) minmax(220px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.manager-collect-bar > div {
+  display: grid;
+  gap: 2px;
+}
+
+.manager-collect-bar strong {
+  color: #102033;
+  font-size: 14px;
+}
+
+.manager-collect-bar span {
+  color: #5b6878;
+  font-size: 12px;
+}
+
 .manager-row > div {
   min-width: 0;
   max-width: 100%;
@@ -7740,6 +7767,7 @@ h3 {
 :root[data-theme='dark'] .visual-component-row select,
 :root[data-theme='dark'] .manager-row,
 :root[data-theme='dark'] .manager-bulk-bar,
+:root[data-theme='dark'] .manager-collect-bar,
 :root[data-theme='dark'] .article-explorer-group,
 :root[data-theme='dark'] .article-explorer-file,
 :root[data-theme='dark'] .content-library-tree,
@@ -8260,6 +8288,7 @@ h3 {
 :root[data-theme='dark'] .ops-list-row strong,
 :root[data-theme='dark'] .release-metric strong,
 :root[data-theme='dark'] .manager-bulk-bar > strong,
+:root[data-theme='dark'] .manager-collect-bar strong,
 :root[data-theme='dark'] .release-story-hero h3,
 :root[data-theme='dark'] .release-major-head h3,
 :root[data-theme='dark'] .release-version-card h3,
@@ -8394,7 +8423,8 @@ h3 {
 
 :root[data-theme='dark'] .content-library-title small,
 :root[data-theme='dark'] .content-library-row > span:not(.status-badge),
-:root[data-theme='dark'] .content-library-tree-group > span {
+:root[data-theme='dark'] .content-library-tree-group > span,
+:root[data-theme='dark'] .manager-collect-bar span {
   color: #b7c6da;
 }
 
@@ -8698,6 +8728,7 @@ h3 {
   .note-import-grid,
   .editor-compose-grid,
   .manager-bulk-bar,
+  .manager-collect-bar,
   .manager-row {
     grid-template-columns: 1fr;
   }
