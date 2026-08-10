@@ -1,12 +1,12 @@
 {
 	"Version": 3,
 	"FileReferences": {
-		"Moc": "黍泡泡.moc3",
+		"Moc": "model.moc3",
 		"Textures": [
-			"黍泡泡.2048/texture_00.png"
+			"textures/texture_00.png"
 		],
-		"Physics": "黍泡泡.physics3.json",
-		"DisplayInfo": "黍泡泡.cdi3.json"
+		"Physics": "model.physics3.json",
+		"DisplayInfo": "model.cdi3.json"
 	},
 	"Groups": [
 		{

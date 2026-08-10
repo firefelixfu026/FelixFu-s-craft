@@ -110,12 +110,12 @@ const ARTICLE_SECTION_PATHS = {
   notes: '/notes'
 };
 const ROUTED_VIEW_IDS = new Set(Object.keys(VIEW_PATHS));
-const LIVE2D_MODEL_URL = '/live2d/黍泡泡/黍泡泡.model3.json';
+const LIVE2D_MODEL_URL = '/live2d/shu-bubble/model.model3.json';
 const LIVE2D_HIDDEN_KEY = 'felix_blog_live2d_hidden';
 const LIVE2D_SCRIPT_SOURCES = [
   'https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js',
   'https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js',
-  'https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/index.min.js'
+  'https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js'
 ];
 const mascotLines = [
   '欢迎回来，今天也要稳稳推进。',
@@ -420,6 +420,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v5.7.1',
+    title: 'Live2D 加载修复',
+    date: '2026-08-10',
+    status: '已上线',
+    points: ['Live2D 改用 Cubism4 专用运行包', '模型资源路径改为英文别名，减少静态资源编码问题', '加载失败时支持重试，并在控制台输出具体错误']
+  },
   {
     version: 'v5.7',
     title: 'Live2D 吉祥物',
@@ -1388,7 +1395,12 @@ function loadExternalScript(src) {
       script.dataset.loading = 'false';
       resolve();
     }, { once: true });
-    script.addEventListener('error', reject, { once: true });
+    script.addEventListener('error', () => {
+      script.dataset.loading = 'false';
+      script.dataset.failed = 'true';
+      script.remove();
+      reject(new Error(`Failed to load script: ${src}`));
+    }, { once: true });
     document.head.appendChild(script);
   });
 }
@@ -6988,6 +7000,7 @@ function Live2DMascot() {
   const appRef = useRef(null);
   const [status, setStatus] = useState('idle');
   const [lineIndex, setLineIndex] = useState(0);
+  const [reloadKey, setReloadKey] = useState(0);
   const [isHidden, setIsHidden] = useState(() => (
     typeof localStorage !== 'undefined' && localStorage.getItem(LIVE2D_HIDDEN_KEY) === 'true'
   ));
@@ -7013,7 +7026,7 @@ function Live2DMascot() {
         });
         appRef.current = app;
 
-        const model = await Live2DModel.from(encodeURI(LIVE2D_MODEL_URL), { autoInteract: true });
+        const model = await Live2DModel.from(LIVE2D_MODEL_URL, { autoInteract: true });
         if (cancelled) {
           app.destroy(true);
           return;
@@ -7028,7 +7041,8 @@ function Live2DMascot() {
         });
         app.stage.addChild(model);
         setStatus('ready');
-      } catch {
+      } catch (error) {
+        console.warn('[Live2D mascot] failed to load', error);
         setStatus('error');
       }
     }
@@ -7041,7 +7055,7 @@ function Live2DMascot() {
         appRef.current = null;
       }
     };
-  }, [isHidden]);
+  }, [isHidden, reloadKey]);
 
   function hideMascot() {
     if (typeof localStorage !== 'undefined') {
@@ -7082,6 +7096,11 @@ function Live2DMascot() {
         )}
       </div>
       <div className="live2d-actions">
+        {status === 'error' && (
+          <button type="button" onClick={() => setReloadKey((current) => current + 1)}>
+            重试
+          </button>
+        )}
         <button type="button" onClick={() => setLineIndex((current) => (current + 1) % mascotLines.length)}>
           换句话
         </button>
