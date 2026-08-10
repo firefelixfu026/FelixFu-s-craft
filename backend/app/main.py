@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import (
@@ -368,6 +368,7 @@ class ArticleIn(BaseModel):
     notePath: str = ""
     category: str = "学习笔记"
     pinned: bool = False
+    sortOrder: int | None = None
 
 
 class SummerPlanIn(BaseModel):
@@ -385,6 +386,10 @@ class ToolboxLinkIn(BaseModel):
     description: str = ""
     tags: list[str] = []
     pinned: bool = False
+
+
+class ArticleOrderIn(BaseModel):
+    articleIds: list[str]
 
 
 class RegisterIn(BaseModel):
@@ -848,6 +853,7 @@ def create_admin_article(
         note_collection=(_optional_text(payload.noteCollection) or "")[:120],
         note_path=_optional_text(payload.notePath) or "",
         pinned=payload.pinned,
+        sort_order=payload.sortOrder if payload.sortOrder is not None else _next_article_sort_order(db),
         created_at=now,
         updated_at=now,
     )
@@ -881,11 +887,36 @@ def update_admin_article(
     article.note_collection = (_optional_text(payload.noteCollection) or "")[:120]
     article.note_path = _optional_text(payload.notePath) or ""
     article.pinned = payload.pinned
+    if payload.sortOrder is not None:
+        article.sort_order = payload.sortOrder
     article.updated_at = datetime.utcnow()
     article.tags = [_get_or_create_tag(db, tag_name) for tag_name in _clean_tags(payload.tags)]
     db.commit()
     _record_admin_event(db, current_user, "更新文章", "article", article.title, f"状态：{article.status}")
     return _article_to_dict(_get_article_or_404(db, article.id), current_user)
+
+
+@app.put("/api/admin/article-order")
+def update_admin_article_order(
+    payload: ArticleOrderIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict[str, int]:
+    ordered_ids = [article_id for article_id in payload.articleIds if article_id]
+    if not ordered_ids:
+        raise HTTPException(status_code=400, detail="Article order is required")
+
+    articles = db.scalars(select(Article).where(Article.id.in_(ordered_ids))).all()
+    article_by_id = {article.id: article for article in articles}
+    for index, article_id in enumerate(ordered_ids):
+        article = article_by_id.get(article_id)
+        if article:
+            article.sort_order = index
+            article.updated_at = datetime.utcnow()
+
+    db.commit()
+    _record_admin_event(db, current_user, "更新文章顺序", "article", "内容库", f"{len(article_by_id)} 篇")
+    return {"updated": len(article_by_id)}
 
 
 @app.delete("/api/admin/articles/{article_id}")
@@ -2140,9 +2171,14 @@ def _load_articles(db: Session) -> list[Article]:
             selectinload(Article.reactions),
             selectinload(Article.user_reactions),
         )
-        .order_by(Article.pinned.desc(), Article.created_at.desc())
+        .order_by(Article.pinned.desc(), Article.sort_order.asc(), Article.created_at.desc())
     )
     return list(db.scalars(statement).all())
+
+
+def _next_article_sort_order(db: Session) -> int:
+    current_max = db.scalar(select(func.max(Article.sort_order)))
+    return int(current_max or 0) + 1
 
 
 def _get_site_profile(db: Session) -> dict:
@@ -2248,6 +2284,7 @@ def _article_to_dict(article: Article, current_user: User | None = None) -> dict
         "noteCollection": article.note_collection or "",
         "notePath": article.note_path or "",
         "pinned": bool(article.pinned),
+        "sortOrder": article.sort_order or 0,
         "viewCount": article.view_count or 0,
         "comments": [_comment_to_dict(comment) for comment in _visible_comments(article, current_user)],
         "reactions": _reaction_counts(article),

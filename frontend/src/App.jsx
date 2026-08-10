@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowDown,
@@ -54,7 +54,7 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import changelogText from '../../CHANGELOG.md?raw';
 import { aiNews as fallbackNews, articles as fallbackArticles, gameModule, profile as fallbackProfile } from './data.js';
-import ProjectOpsPanel from './ProjectOpsPanel.jsx';
+const ProjectOpsPanel = React.lazy(() => import('./ProjectOpsPanel.jsx'));
 
 const createEmptyArticleForm = () => ({
   title: '',
@@ -79,7 +79,6 @@ const visitorNavItems = [
   { id: 'plan', label: '计划', icon: List },
   { id: 'music', label: '音乐', icon: Music },
   { id: 'toolbox', label: '工具箱', icon: Wrench },
-  { id: 'links', label: '友链', icon: Heart },
   { id: 'game', label: '游戏', icon: Gamepad2 },
   { id: 'login', label: '登录', icon: LogIn }
 ];
@@ -90,7 +89,6 @@ const readerNavItems = [
   { id: 'plan', label: '计划', icon: List },
   { id: 'music', label: '音乐', icon: Music },
   { id: 'toolbox', label: '工具箱', icon: Wrench },
-  { id: 'links', label: '友链', icon: Heart },
   { id: 'game', label: '游戏', icon: Gamepad2 }
 ];
 
@@ -102,7 +100,6 @@ const VIEW_PATHS = {
   plan: '/plan',
   music: '/music',
   toolbox: '/toolbox',
-  links: '/links',
   game: '/game',
   login: '/login',
   account: '/account',
@@ -124,6 +121,7 @@ const PLAN_SECTION_PATHS = {
 };
 const ROUTED_VIEW_IDS = new Set(Object.keys(VIEW_PATHS));
 const LIVE2D_MODEL_URL = '/live2d/shu-bubble/model.model3.json';
+const LIVE2D_TEXTURE_FALLBACK_URL = '/live2d/shu-bubble/textures/texture_00.png';
 const LIVE2D_HIDDEN_KEY = 'felix_blog_live2d_hidden';
 const LIVE2D_POSITION_KEY = 'felix_blog_live2d_position';
 const LIVE2D_MODE_KEY = 'felix_blog_live2d_mode';
@@ -437,11 +435,18 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v5.9',
+    title: '工具箱归类、排序与性能整理',
+    date: '2026-08-10',
+    status: '已上线',
+    points: ['首页顶部留白收紧，内容区改为更克制的横向留白', '友链从首页和导航移入工具箱友链分类', '后台工具箱管理页接入管理布局', '黍泡泡延迟加载并增加贴图兜底', '内容库支持文章和笔记拖拽排序并保存到后端', 'README 和 CHANGELOG 清理历史乱码']
+  },
+  {
     version: 'v5.8',
     title: '站点结构与阅读体验整理',
     date: '2026-08-10',
     status: '已上线',
-    points: ['黍泡泡改为可拖动悬浮窗，支持点击说话、右键菜单和账号页唤回', '技术笔记索引改为不遮挡正文的左侧栏，右侧阅读进度和目录保持跟随', '计划页拆成时间安排、完成度、课程、应用、记账、饮食、身体和睡眠等独立路径', '工具箱公共页只展示资源，自定义网址移动到后台管理', '新增独立友链页、游戏库选择入口和后台文件资源管理器式内容库', '整体卡片和标题尺寸收紧，页面留白更稳']
+    points: ['黍泡泡改为可拖动悬浮窗，支持点击说话、右键菜单和账号页唤回', '技术笔记索引改为不遮挡正文的左侧栏，右侧阅读进度和目录保持跟随', '计划页拆成时间安排、完成度、课程、应用、记账、饮食、身体和睡眠等独立路径', '工具箱公共页只展示资源，自定义网址移动到后台管理', '新增工具箱友链分类、游戏库选择入口和后台文件资源管理器式内容库', '整体卡片和标题尺寸收紧，页面留白更稳']
   },
   {
     version: 'v5.7.1',
@@ -3083,8 +3088,43 @@ function App() {
       noteCollection: article.noteCollection || '',
       notePath: article.notePath || '',
       pinned: Boolean(article.pinned),
+      sortOrder: Number(article.sortOrder || 0),
       ...overrides
     };
+  }
+
+  async function reorderArticles(sourceArticleId, targetArticleId) {
+    if (!authToken || !sourceArticleId || !targetArticleId || sourceArticleId === targetArticleId) return;
+    const currentArticles = [...articles];
+    const sourceIndex = currentArticles.findIndex((article) => article.id === sourceArticleId);
+    const targetIndex = currentArticles.findIndex((article) => article.id === targetArticleId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+
+    const [movedArticle] = currentArticles.splice(sourceIndex, 1);
+    currentArticles.splice(targetIndex, 0, movedArticle);
+    const optimisticArticles = currentArticles.map((article, index) => ({ ...article, sortOrder: index }));
+    setArticles(optimisticArticles);
+    setAdminMessage('正在保存文章顺序...');
+
+    try {
+      const response = await fetch('/api/admin/article-order', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ articleIds: optimisticArticles.map((article) => article.id) })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setAdminMessage(result.detail || '文章顺序保存失败');
+        await refreshArticles();
+        return;
+      }
+      await refreshArticles();
+      await refreshAdminAuditLogs();
+      setAdminMessage('文章顺序已保存');
+    } catch {
+      await refreshArticles();
+      setAdminMessage('后端服务不可用，文章顺序保存失败');
+    }
   }
 
   async function manageArticlesBulk(selectedArticles, action) {
@@ -3661,8 +3701,6 @@ function App() {
 
         {activeView === 'toolbox' && <ToolboxWorkspace currentUser={currentUser} authToken={authToken} />}
 
-        {activeView === 'links' && <FriendLinksWorkspace />}
-
         {activeView === 'account' && currentUser && (
           <AccountWorkspace
             currentUser={currentUser}
@@ -3749,6 +3787,7 @@ function App() {
             resetArticleForm={resetArticleForm}
             startEditingArticle={startEditingArticle}
             deleteArticle={deleteArticle}
+            reorderArticles={reorderArticles}
             manageArticlesBulk={manageArticlesBulk}
             adminComments={adminComments}
             adminCommentPage={adminCommentPage}
@@ -3814,7 +3853,6 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
     return () => window.clearTimeout(timer);
   }, [identityPhrases, isDeletingIdentity, typedIdentity, typingIndex]);
 
-  const [customFriendLinks, setCustomFriendLinks] = useState([]);
   const publishedArticles = articles.filter((article) => article.status !== 'draft');
   const recentArticle = publishedArticles[0];
   const totalViews = publishedArticles.reduce((sum, article) => sum + Number(article.viewCount || 0), 0);
@@ -3836,7 +3874,7 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
     { title: '技术笔记', detail: '课程笔记、项目文档和代码学习记录。', view: 'articles', section: 'notes', icon: Code2, meta: '/notes' },
     { title: '暑期计划', detail: '时间段计划、完成度、睡眠、体重和应用使用。', view: 'plan', icon: List, meta: '8/4 - 8/15' },
     { title: '音乐', detail: '私人歌单、最近播放和站内迷你播放器。', view: 'music', icon: Music, meta: 'Felix Music' },
-    { title: '工具箱', detail: '常用网站、友链和学习资源入口。', view: 'toolbox', icon: Wrench, meta: 'Links' },
+    { title: '工具箱', detail: '常用网站、学习资源和维护入口。', view: 'toolbox', icon: Wrench, meta: 'Links' },
     { title: '小游戏', detail: '休息时打开的小项目和试玩入口。', view: 'game', icon: Gamepad2, meta: 'Break' }
   ];
   const terminalLines = [
@@ -3845,80 +3883,6 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
     ['latest', recentArticles[0]?.title || '等待第一篇新文章'],
     ['mode', currentUser?.role === 'admin' ? 'admin workspace unlocked' : 'reader mode']
   ];
-  const friendLinks = [
-    {
-      title: "BruceJin's Notebook",
-      description: '学长的课程笔记与个人站点，适合参考内容组织方式。',
-      url: 'https://brucejqs.github.io/MyNotebook/',
-      avatar: 'BJ',
-      tone: 'blue'
-    },
-    {
-      title: "Wcowin's Web",
-      description: 'MkDocs 主题与教程，站点审美和文档结构都很值得看。',
-      url: 'https://wcowin.work/',
-      avatar: 'W',
-      tone: 'cyan'
-    },
-    {
-      title: 'Chenji Learning Hub',
-      description: '同学的全栈学习工作台，和这台服务器一起成长中。',
-      url: 'https://chenji.felixfu.xyz/',
-      avatar: 'CJ',
-      tone: 'green'
-    },
-    {
-      title: 'ZJU CS-All Sum In One',
-      description: '浙大 CS 课程资料集合，查课设和复习资料很方便。',
-      url: 'https://qsctech.github.io/zju-icicles/',
-      avatar: 'CS',
-      tone: 'purple'
-    },
-    {
-      title: 'MkDocs Material',
-      description: '技术笔记站的经典参考，后面整理课程笔记可以借鉴。',
-      url: 'https://squidfunk.github.io/mkdocs-material/',
-      avatar: 'MD',
-      tone: 'teal'
-    },
-    {
-      title: 'GitHub',
-      description: '项目、笔记和小工具的公开仓库入口。',
-      url: 'https://github.com/firefelixfu026',
-      avatar: 'GH',
-      tone: 'gray'
-    }
-  ];
-  const displayedFriendLinks = [
-    ...customFriendLinks,
-    ...friendLinks
-  ].slice(0, 8);
-
-  useEffect(() => {
-    async function loadFriendLinks() {
-      try {
-        const response = await fetch('/api/toolbox-links');
-        if (!response.ok) return;
-        const links = await response.json();
-        setCustomFriendLinks(
-          links
-            .filter((link) => ['友链', '推荐链接', '朋友', '博客'].includes(link.category))
-            .map((link, index) => ({
-              title: link.title,
-              description: link.description || '站点推荐',
-              url: link.url,
-              avatar: (link.title || 'Link').slice(0, 2).toUpperCase(),
-              tone: ['cyan', 'green', 'purple', 'teal', 'gray'][index % 5]
-            }))
-        );
-      } catch {
-        setCustomFriendLinks([]);
-      }
-    }
-
-    loadFriendLinks();
-  }, []);
-
   return (
     <section className="workspace homepage-workspace">
       <section className="geek-hero" aria-labelledby="home-title">
@@ -4062,25 +4026,6 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
               </button>
             );
           })}
-        </div>
-      </section>
-
-      <section className="content-band friend-links-band">
-        <div className="section-heading">
-          <p className="eyebrow">友链</p>
-          <h2>我愿意挂出来的站点</h2>
-        </div>
-        <div className="friend-link-grid">
-          {displayedFriendLinks.map((link) => (
-            <a className={`friend-link-card ${link.tone}`} href={link.url} target="_blank" rel="noreferrer" key={link.title}>
-              <span className="friend-link-avatar" aria-hidden="true">{link.avatar}</span>
-              <div>
-                <strong>{link.title}</strong>
-                <p>{link.description}</p>
-              </div>
-              <ExternalLink size={17} />
-            </a>
-          ))}
         </div>
       </section>
 
@@ -6792,63 +6737,6 @@ const defaultFriendLinks = [
   }
 ];
 
-function FriendLinksWorkspace() {
-  const [customFriendLinks, setCustomFriendLinks] = useState([]);
-
-  useEffect(() => {
-    async function loadFriendLinks() {
-      try {
-        const response = await fetch('/api/toolbox-links');
-        if (!response.ok) return;
-        const links = await response.json();
-        setCustomFriendLinks(
-          links
-            .filter((link) => ['友链', '推荐链接', '朋友', '博客'].includes(link.category))
-            .map((link, index) => ({
-              title: link.title,
-              description: link.description || '站点推荐',
-              url: link.url,
-              avatar: (link.title || 'Link').slice(0, 2).toUpperCase(),
-              tone: ['cyan', 'green', 'purple', 'teal', 'gray', 'blue'][index % 6]
-            }))
-        );
-      } catch {
-        setCustomFriendLinks([]);
-      }
-    }
-
-    loadFriendLinks();
-  }, []);
-
-  const links = [...customFriendLinks, ...defaultFriendLinks];
-
-  return (
-    <section className="workspace friend-page-workspace">
-      <div className="section-heading">
-        <p className="eyebrow">友情链接</p>
-        <h1>友链</h1>
-      </div>
-      <section className="friend-page-panel">
-        <div className="friend-page-side">
-          <strong>Links</strong>
-          <span>朋友、前辈、资料站和我常去的地方。</span>
-        </div>
-        <div className="friend-page-list">
-          {links.map((link) => (
-            <a className={`friend-page-row ${link.tone || 'blue'}`} href={link.url} target="_blank" rel="noreferrer" key={`${link.title}-${link.url}`}>
-              <span className="friend-page-avatar">{link.avatar}</span>
-              <span>
-                <strong>{link.title}</strong>
-                <em>{link.description}</em>
-              </span>
-            </a>
-          ))}
-        </div>
-      </section>
-    </section>
-  );
-}
-
 function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
   const [selectedCategory, setSelectedCategory] = useState('全部');
   const [toolboxQuery, setToolboxQuery] = useState('');
@@ -6859,8 +6747,16 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
   const [isLoadingToolboxLinks, setIsLoadingToolboxLinks] = useState(false);
   const [isSavingToolboxLink, setIsSavingToolboxLink] = useState(false);
   const canManageToolbox = currentUser?.role === 'admin';
+  const friendToolboxLinks = defaultFriendLinks.map((link, index) => normalizeToolboxLink({
+    title: link.title,
+    category: '友链',
+    url: link.url,
+    description: link.description,
+    tags: ['友链', '博客', index === 2 ? '同学' : '参考']
+  }, `friend-${index}`));
   const allToolboxLinks = [
     ...customLinks.map((link) => ({ ...normalizeToolboxLink(link), custom: true })),
+    ...friendToolboxLinks,
     ...defaultToolboxLinks.map((link, index) => normalizeToolboxLink(link, index))
   ];
   const dynamicCategories = ['全部', ...Array.from(new Set([
@@ -6873,6 +6769,15 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
     const haystack = [link.title, link.category, link.description, ...link.tags].join(' ').toLowerCase();
     return matchesCategory && (!normalizedQuery || haystack.includes(normalizedQuery));
   });
+  const toolboxSections = (selectedCategory === '全部'
+    ? dynamicCategories.filter((category) => category !== '全部')
+    : [selectedCategory]
+  )
+    .map((category) => ({
+      category,
+      links: filteredLinks.filter((link) => link.category === category)
+    }))
+    .filter((section) => section.links.length > 0);
   const featuredLinks = allToolboxLinks
     .filter((link) => link.pinned || ['OI Wiki', 'MDN Web Docs', 'ChatGPT', 'Excalidraw'].includes(link.title))
     .slice(0, 6);
@@ -7052,7 +6957,7 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
         <div className="admin-panel-heading">
           <div>
             <h2>工具箱网址管理</h2>
-            <span>分类填“友链”会同步到友链页。</span>
+          <span>分类填“友链”会出现在工具箱的友链分组里。</span>
           </div>
           <button className="ghost-button" type="button" onClick={refreshToolboxLinks}>
             <RefreshCw size={17} />
@@ -7091,13 +6996,13 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
     <section className="workspace toolbox-workspace">
       <div className="section-heading">
         <p className="eyebrow">工具箱</p>
-        <h1>常用网站、学习资源和摸鱼入口</h1>
+        <h1>工具箱</h1>
       </div>
 
       <div className="content-band toolbox-hero">
         <div>
           <span>Felix Links</span>
-          <h2>今天要去哪里？</h2>
+          <h2>常用资源入口</h2>
         </div>
         <div className="toolbox-featured-grid" aria-label="高频工具">
           {featuredLinks.map((link) => (
@@ -7133,24 +7038,34 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
         </div>
       </div>
 
-      <div className="toolbox-grid">
-        {filteredLinks.map((link) => (
-          <article className="toolbox-card" key={`${link.custom ? 'custom' : 'default'}-${link.id || link.url}`}>
-            <span className="toolbox-card-category">{link.category}</span>
-            <div>
-              <h2>{link.title}</h2>
-              <a href={link.url} target="_blank" rel="noreferrer" aria-label={`打开 ${link.title}`}>
-                <ExternalLink size={17} />
-              </a>
+      <div className="toolbox-sections">
+        {toolboxSections.map((section) => (
+          <section className="toolbox-section" key={section.category}>
+            <div className="toolbox-section-heading">
+              <h2>{section.category}</h2>
+              <span>{section.links.length} 个入口</span>
             </div>
-            <p>{link.description}</p>
-            <span className="toolbox-url">{new URL(link.url).hostname.replace(/^www\./, '')}</span>
-            <div className="toolbox-tags">
-              {link.tags.map((tag) => (
-                <span key={tag}>{tag}</span>
+            <div className="toolbox-grid">
+              {section.links.map((link) => (
+                <article className="toolbox-card" key={`${link.custom ? 'custom' : 'default'}-${link.id || link.url}`}>
+                  <span className="toolbox-card-category">{link.category}</span>
+                  <div>
+                    <h2>{link.title}</h2>
+                    <a href={link.url} target="_blank" rel="noreferrer" aria-label={`打开 ${link.title}`}>
+                      <ExternalLink size={17} />
+                    </a>
+                  </div>
+                  <p>{link.description}</p>
+                  <span className="toolbox-url">{new URL(link.url).hostname.replace(/^www\./, '')}</span>
+                  <div className="toolbox-tags">
+                    {link.tags.map((tag) => (
+                      <span key={tag}>{tag}</span>
+                    ))}
+                  </div>
+                </article>
               ))}
             </div>
-          </article>
+          </section>
         ))}
       </div>
 
@@ -7189,11 +7104,6 @@ const stickerSets = {
     { variant: 'terminal', label: 'PORTAL', icon: '◇' },
     { variant: 'memo', label: 'LINKS', icon: '✦' },
     { variant: 'guitar', label: 'TOOLS', icon: '♪' }
-  ],
-  links: [
-    { variant: 'memo', label: 'FRIENDS', icon: '✦' },
-    { variant: 'terminal', label: 'BLOGROLL', icon: '◇' },
-    { variant: 'guitar', label: 'VISIT', icon: '♪' }
   ],
   game: [
     { variant: 'terminal', label: 'STAGE READY', icon: '◇' },
@@ -7284,6 +7194,8 @@ function Live2DMascot() {
   useEffect(() => {
     if (isHidden || !canvasRef.current) return undefined;
     let cancelled = false;
+    let idleHandle = null;
+    let timeoutHandle = null;
 
     async function mountMascot() {
       setStatus('loading');
@@ -7304,7 +7216,7 @@ function Live2DMascot() {
 
         const model = await Live2DModel.from(LIVE2D_MODEL_URL, { autoInteract: true });
         if (cancelled) {
-          app.destroy(true);
+          app.destroy(false, { children: true, texture: true, baseTexture: true });
           return;
         }
 
@@ -7323,15 +7235,25 @@ function Live2DMascot() {
       }
     }
 
-    mountMascot();
+    if ('requestIdleCallback' in window) {
+      idleHandle = window.requestIdleCallback(mountMascot, { timeout: 1200 });
+    } else {
+      timeoutHandle = window.setTimeout(mountMascot, 360);
+    }
     return () => {
       cancelled = true;
+      if (idleHandle !== null && 'cancelIdleCallback' in window) {
+        window.cancelIdleCallback(idleHandle);
+      }
+      if (timeoutHandle !== null) {
+        window.clearTimeout(timeoutHandle);
+      }
       if (speechTimerRef.current) {
         window.clearTimeout(speechTimerRef.current);
         speechTimerRef.current = null;
       }
       if (appRef.current) {
-        appRef.current.destroy(true);
+        appRef.current.destroy(false, { children: true, texture: true, baseTexture: true });
         appRef.current = null;
       }
     };
@@ -7449,7 +7371,7 @@ function Live2DMascot() {
         {status === 'loading' && <span className="live2d-loading">加载中</span>}
         {status === 'error' && (
           <span className="live2d-fallback">
-            <Bot size={42} />
+            <img src={LIVE2D_TEXTURE_FALLBACK_URL} alt="" loading="lazy" />
           </span>
         )}
       </div>
@@ -8467,6 +8389,7 @@ function AdminWorkspace({
   resetArticleForm,
   startEditingArticle,
   deleteArticle,
+  reorderArticles,
   manageArticlesBulk,
   adminComments,
   adminCommentPage,
@@ -8570,6 +8493,8 @@ function AdminWorkspace({
   const [articleManagerStatus, setArticleManagerStatus] = useState('all');
   const [articleManagerCategory, setArticleManagerCategory] = useState('all');
   const [selectedManagerArticleIds, setSelectedManagerArticleIds] = useState([]);
+  const [draggingArticleId, setDraggingArticleId] = useState(null);
+  const [dragOverArticleId, setDragOverArticleId] = useState(null);
   const [imageManagerQuery, setImageManagerQuery] = useState('');
   const [imageManagerSort, setImageManagerSort] = useState('newest');
   const [draftHistory, setDraftHistory] = useState(readDraftHistory);
@@ -8580,7 +8505,7 @@ function AdminWorkspace({
   const [corpusInput, setCorpusInput] = useState('');
   const [studyState, setStudyState] = useState(readStudyState);
   const [studyInput, setStudyInput] = useState('');
-  const shouldShowAdminLayout = ['editor', 'notes', 'articles', 'music', 'comments'].includes(activeAdminPage);
+  const shouldShowAdminLayout = ['editor', 'notes', 'articles', 'music', 'comments', 'toolbox'].includes(activeAdminPage);
 
   useEffect(() => {
     localStorage.setItem(ADMIN_PAGE_KEY, activeAdminPage);
@@ -8625,6 +8550,15 @@ function AdminWorkspace({
     await manageArticlesBulk(selectedManagerArticles, action);
     setSelectedManagerArticleIds([]);
   }
+
+  async function dropArticleOnTarget(targetArticleId) {
+    const sourceArticleId = draggingArticleId;
+    setDraggingArticleId(null);
+    setDragOverArticleId(null);
+    if (!sourceArticleId || !targetArticleId || sourceArticleId === targetArticleId) return;
+    await reorderArticles(sourceArticleId, targetArticleId);
+  }
+
   const filteredUploadedImages = uploadedImages
     .filter((image) => {
       const query = imageManagerQuery.trim().toLowerCase();
@@ -8963,7 +8897,9 @@ function AdminWorkspace({
           title="运维页暂时打不开"
           onReset={() => openAdminPage('overview')}
         >
-          <ProjectOpsPanel authToken={authToken} />
+          <Suspense fallback={<p className="empty-state">运维面板加载中...</p>}>
+            <ProjectOpsPanel authToken={authToken} />
+          </Suspense>
         </AdminPanelErrorBoundary>
       )}
 
@@ -10016,7 +9952,36 @@ function AdminWorkspace({
                     </div>
                     <div className="article-explorer-files">
                       {group.articles.map((article) => (
-                        <article className="article-explorer-file" key={article.id}>
+                        <article
+                          className={[
+                            'article-explorer-file',
+                            draggingArticleId === article.id ? 'dragging' : '',
+                            dragOverArticleId === article.id && draggingArticleId !== article.id ? 'drag-over' : ''
+                          ].filter(Boolean).join(' ')}
+                          key={article.id}
+                          draggable
+                          onDragStart={(event) => {
+                            setDraggingArticleId(article.id);
+                            event.dataTransfer.effectAllowed = 'move';
+                            event.dataTransfer.setData('text/plain', article.id);
+                          }}
+                          onDragOver={(event) => {
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = 'move';
+                            setDragOverArticleId(article.id);
+                          }}
+                          onDragLeave={() => {
+                            setDragOverArticleId((current) => (current === article.id ? null : current));
+                          }}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            dropArticleOnTarget(article.id);
+                          }}
+                          onDragEnd={() => {
+                            setDraggingArticleId(null);
+                            setDragOverArticleId(null);
+                          }}
+                        >
                           <label className="manager-select-box" aria-label={`选择 ${article.title}`}>
                             <input
                               type="checkbox"
@@ -10024,7 +9989,7 @@ function AdminWorkspace({
                               onChange={() => toggleManagerArticleSelection(article.id)}
                             />
                           </label>
-                          <span className="article-file-order">{String(article.displayOrder).padStart(2, '0')}</span>
+                          <span className="article-file-order" title="拖动排序">{String(article.displayOrder).padStart(2, '0')}</span>
                           <div>
                             <div className="manager-title-line">
                               <h3>{article.title}</h3>

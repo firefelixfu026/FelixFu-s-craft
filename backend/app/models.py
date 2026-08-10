@@ -47,6 +47,7 @@ class Article(Base):
     note_path: Mapped[str] = mapped_column(Text, default="")
     category: Mapped[str] = mapped_column(String(80), default="学习笔记")
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
     view_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
