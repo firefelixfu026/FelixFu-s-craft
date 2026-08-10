@@ -83,6 +83,8 @@ MAX_AUDIO_UPLOAD_BYTES = 50 * 1024 * 1024
 MAX_AUDIO_CHUNK_BYTES = 1024 * 1024
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
 AUDIO_SUFFIXES = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac"}
+MUSIC_COVER_SUFFIXES = [".jpg", ".jpeg", ".png", ".webp"]
+MUSIC_LYRIC_SUFFIXES = [".lrc", ".txt"]
 LOGIN_FAILURES: dict[str, dict[str, Any]] = {}
 
 
@@ -969,11 +971,15 @@ def list_music_tracks() -> list[dict[str, str | int]]:
         if not path.is_file() or path.suffix.lower() not in AUDIO_SUFFIXES:
             continue
         stat = path.stat()
+        sidecar = _music_sidecar_metadata(path)
         tracks.append({
             "filename": path.name,
             "title": _music_title_from_filename(path.name),
             "artist": "Felix 的歌单",
             "url": f"/uploads/music/{path.name}",
+            "coverUrl": sidecar["coverUrl"],
+            "lyrics": sidecar["lyrics"],
+            "lyricsUrl": sidecar["lyricsUrl"],
             "size": stat.st_size,
             "createdAt": datetime.fromtimestamp(stat.st_mtime).isoformat(),
         })
@@ -2169,6 +2175,29 @@ def _music_title_from_filename(filename: str) -> str:
     stem = Path(filename).stem
     title = re.sub(r"^\d{14}-[0-9a-f]{8}-", "", stem)
     return title.replace("-", " ").strip() or "未命名音乐"
+
+
+def _music_sidecar_metadata(path: Path) -> dict[str, str]:
+    cover_url = ""
+    lyrics_url = ""
+    lyrics = ""
+    for suffix in MUSIC_COVER_SUFFIXES:
+        cover_path = path.with_suffix(suffix)
+        if cover_path.exists() and cover_path.is_file():
+            cover_url = f"/uploads/music/{cover_path.name}"
+            break
+
+    for suffix in MUSIC_LYRIC_SUFFIXES:
+        lyric_path = path.with_suffix(suffix)
+        if lyric_path.exists() and lyric_path.is_file():
+            lyrics_url = f"/uploads/music/{lyric_path.name}"
+            try:
+                lyrics = lyric_path.read_text(encoding="utf-8")[:6000]
+            except UnicodeDecodeError:
+                lyrics = lyric_path.read_text(encoding="gb18030", errors="ignore")[:6000]
+            break
+
+    return {"coverUrl": cover_url, "lyrics": lyrics, "lyricsUrl": lyrics_url}
 
 
 def _clean_toolbox_payload(payload: ToolboxLinkIn) -> dict[str, Any]:

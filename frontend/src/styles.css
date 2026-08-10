@@ -1076,7 +1076,26 @@ mark {
   gap: 10px;
 }
 
+.home-update-timeline {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  padding-left: 18px;
+}
+
+.home-update-timeline::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #1f7a6d, rgba(96, 165, 250, 0.26));
+}
+
 .home-update-item {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(150px, 0.72fr) minmax(0, 1fr);
   gap: 14px;
@@ -1084,6 +1103,19 @@ mark {
   border: 1px solid #d8e0e9;
   border-radius: 8px;
   background: #f8fafc;
+}
+
+.home-update-timeline .home-update-item::before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 22px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: #1f7a6d;
+  box-shadow: 0 0 0 3px rgba(31, 122, 109, 0.16);
 }
 
 .home-update-item > div {
@@ -1123,6 +1155,87 @@ mark {
   color: #5b6878;
   font-size: 13px;
   line-height: 1.45;
+}
+
+.home-entry-band {
+  position: relative;
+}
+
+.home-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.home-entry-card {
+  display: grid;
+  gap: 9px;
+  min-height: 148px;
+  padding: 18px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  color: #102033;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(244, 248, 252, 0.96)),
+    #ffffff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.home-entry-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(31, 122, 109, 0.34);
+  box-shadow: 0 18px 34px rgba(16, 32, 51, 0.1);
+}
+
+.home-entry-card > span {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #1f7a6d, #60a5fa);
+}
+
+.home-entry-card strong {
+  color: #102033;
+  font-size: 19px;
+  font-weight: 950;
+}
+
+.home-entry-card p {
+  margin: 0;
+  color: #5b6878;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.home-entry-card em {
+  align-self: end;
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 8px;
+  color: #1f7a6d;
+  background: #effbf5;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.live-status-grid.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.live-status-grid.compact .live-status-card {
+  padding: 12px;
+}
+
+.live-status-grid.compact .live-status-card strong {
+  font-size: 20px;
 }
 
 .friend-links-band {
@@ -2357,6 +2470,54 @@ h3 {
   min-height: 120px;
 }
 
+.article-neighbor-nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.article-neighbor-nav button,
+.article-neighbor-nav > span {
+  min-height: 92px;
+  padding: 16px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.article-neighbor-nav button {
+  display: grid;
+  gap: 8px;
+  color: #102033;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.article-neighbor-nav button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(31, 122, 109, 0.38);
+  background: #eefaf6;
+}
+
+.article-neighbor-nav button:last-child {
+  text-align: right;
+}
+
+.article-neighbor-nav span {
+  color: #1f7a6d;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.article-neighbor-nav strong {
+  overflow: hidden;
+  color: #102033;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .article-summary {
   margin-bottom: 0;
@@ -3684,6 +3845,63 @@ h3 {
   background:
     linear-gradient(135deg, rgba(31, 122, 109, 0.95), rgba(45, 141, 240, 0.88)),
     #1f7a6d;
+}
+
+.music-cover img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+.music-extra-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.36fr);
+  gap: 12px;
+}
+
+.music-lyric-panel,
+.music-sidecar-tip {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.music-lyric-panel h3 {
+  margin-bottom: 0;
+}
+
+.music-lyric-lines {
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+  color: #334155;
+  line-height: 1.7;
+}
+
+.music-lyric-lines p,
+.music-sidecar-tip p {
+  margin: 0;
+}
+
+.music-sidecar-tip {
+  align-content: center;
+}
+
+.music-sidecar-tip strong {
+  color: #102033;
+  font-size: 16px;
+}
+
+.music-sidecar-tip p {
+  color: #6a7685;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .music-now span,
@@ -6686,10 +6904,13 @@ h3 {
 :root[data-theme='dark'] .archive-filter,
 :root[data-theme='dark'] .archive-button,
 :root[data-theme='dark'] .article-section-card,
+:root[data-theme='dark'] .article-neighbor-nav button,
+:root[data-theme='dark'] .article-neighbor-nav > span,
 :root[data-theme='dark'] .popular-panel,
 :root[data-theme='dark'] .popular-list button,
 :root[data-theme='dark'] .live-status-card,
 :root[data-theme='dark'] .home-update-item,
+:root[data-theme='dark'] .home-entry-card,
 :root[data-theme='dark'] .friend-link-card,
 :root[data-theme='dark'] .latest-article-strip,
 :root[data-theme='dark'] .metric,
@@ -6703,6 +6924,8 @@ h3 {
 :root[data-theme='dark'] .tool-panel,
 :root[data-theme='dark'] .game-details,
 :root[data-theme='dark'] .music-player-panel,
+:root[data-theme='dark'] .music-lyric-panel,
+:root[data-theme='dark'] .music-sidecar-tip,
 :root[data-theme='dark'] .music-library-panel,
 :root[data-theme='dark'] .music-recent-panel,
 :root[data-theme='dark'] .toolbox-card,
@@ -7135,6 +7358,7 @@ h3 {
 :root[data-theme='dark'] .home-clock-meta,
 :root[data-theme='dark'] .home-update-item em,
 :root[data-theme='dark'] .home-update-item ul,
+:root[data-theme='dark'] .home-entry-card p,
 :root[data-theme='dark'] .friend-link-card p,
 :root[data-theme='dark'] .latest-article-strip span,
 :root[data-theme='dark'] .latest-article-strip em,
@@ -7170,6 +7394,7 @@ h3 {
 :root[data-theme='dark'] .release-version-card li,
 :root[data-theme='dark'] .release-version-card small,
 :root[data-theme='dark'] .music-recent-card em,
+:root[data-theme='dark'] .music-sidecar-tip p,
 :root[data-theme='dark'] .admin-insight-grid p,
 :root[data-theme='dark'] .account-profile p,
 :root[data-theme='dark'] .account-list span,
@@ -7210,6 +7435,7 @@ h3 {
 :root[data-theme='dark'] .project-showcase-card strong,
 :root[data-theme='dark'] .admin-page-card strong,
 :root[data-theme='dark'] .article-section-card span,
+:root[data-theme='dark'] .article-neighbor-nav strong,
 :root[data-theme='dark'] .note-tree-group strong,
 :root[data-theme='dark'] .note-import-card strong,
 :root[data-theme='dark'] .admin-pulse-card strong,
@@ -7229,6 +7455,7 @@ h3 {
 :root[data-theme='dark'] .release-major-head h3,
 :root[data-theme='dark'] .release-version-card h3,
 :root[data-theme='dark'] .music-recent-card strong,
+:root[data-theme='dark'] .music-sidecar-tip strong,
 :root[data-theme='dark'] .admin-insight-grid h3,
 :root[data-theme='dark'] .account-site-avatar-editor strong,
 :root[data-theme='dark'] .completion-summary-grid strong,
@@ -7238,7 +7465,36 @@ h3 {
 
 :root[data-theme='dark'] .home-clock-time,
 :root[data-theme='dark'] .home-update-item strong,
+:root[data-theme='dark'] .home-entry-card strong,
 :root[data-theme='dark'] .friend-link-card strong {
+  color: var(--text-main);
+}
+
+:root[data-theme='dark'] .home-entry-card em {
+  color: var(--accent);
+  background: rgba(52, 211, 153, 0.12);
+}
+
+:root[data-theme='dark'] .home-update-timeline::before {
+  background: linear-gradient(180deg, var(--accent), rgba(96, 165, 250, 0.2));
+}
+
+:root[data-theme='dark'] .home-update-timeline .home-update-item::before {
+  border-color: var(--panel);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.14);
+}
+
+:root[data-theme='dark'] .article-neighbor-nav span {
+  color: var(--accent);
+}
+
+:root[data-theme='dark'] .article-neighbor-nav button:hover {
+  border-color: rgba(52, 211, 153, 0.4);
+  background: rgba(52, 211, 153, 0.1);
+}
+
+:root[data-theme='dark'] .music-lyric-lines {
   color: var(--text-main);
 }
 
@@ -7629,6 +7885,7 @@ h3 {
   .ai-config-form,
   .template-grid,
   .home-pulse-grid,
+  .home-entry-grid,
   .friend-link-grid,
   .summer-plan-hero,
   .summer-goal-grid,
@@ -7801,6 +8058,11 @@ h3 {
   }
 
   .home-update-item {
+    grid-template-columns: 1fr;
+  }
+
+  .music-extra-grid,
+  .article-neighbor-nav {
     grid-template-columns: 1fr;
   }
 

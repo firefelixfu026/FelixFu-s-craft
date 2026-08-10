@@ -31,6 +31,7 @@ https://www.felixfu.xyz
 - 技术笔记：`/notes`
 - 普通文章详情：`/articles/:id`
 - 技术笔记详情：`/notes/:id`
+- 新文章详情链接会尽量使用 `标题--id`，旧的纯 `id` 链接仍然兼容。
 - 暑期计划：`/plan`
 - 音乐：`/music`
 - 工具箱：`/toolbox`

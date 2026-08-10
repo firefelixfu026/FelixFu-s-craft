@@ -407,6 +407,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v5.6',
+    title: '首页门户化与内容体验升级',
+    date: '2026-08-10',
+    status: '已上线',
+    points: ['首页瘦身为个人门户，详细模块改为独立入口', '最近更新改成时间线展示，更像维护日志', '文章详情 URL 支持 标题--id 形式并保留旧链接兼容', '技术笔记和文章详情增加上一篇 / 下一篇', '友链可复用工具箱自定义链接管理，分类填友链会自动出现在首页', '音乐支持同名封面和歌词文件展示']
+  },
+  {
     version: 'v5.5',
     title: '真实 URL 路由',
     date: '2026-08-10',
@@ -716,7 +723,7 @@ const releaseRoadmap = [
   }
 ];
 
-const toolboxCategories = ['全部', '学习', '开发', 'AI', '设计素材', '效率', '娱乐生活'];
+const toolboxCategories = ['全部', '学习', '开发', 'AI', '设计素材', '效率', '娱乐生活', '友链'];
 
 const defaultToolboxLinks = [
   {
@@ -1249,6 +1256,37 @@ function getArticleSection(article) {
   return isTechnicalArticle(article) ? 'notes' : 'essays';
 }
 
+function slugifyArticleTitle(title = '') {
+  return String(title)
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+}
+
+function getArticleRouteKey(article = {}) {
+  const id = String(article.id || '').trim();
+  if (!id) return '';
+  const titleSlug = slugifyArticleTitle(article.title || '');
+  if (!titleSlug || titleSlug === id) return id;
+  return `${titleSlug}--${id}`;
+}
+
+function resolveArticleRouteKey(articles = [], routeKey = '') {
+  const key = String(routeKey || '').trim();
+  if (!key) return '';
+  const directMatch = articles.find((article) => String(article.id) === key);
+  if (directMatch) return directMatch.id;
+  const routeMatch = articles.find((article) => getArticleRouteKey(article) === key);
+  if (routeMatch) return routeMatch.id;
+  const [, possibleId] = key.match(/--(.+)$/) || [];
+  if (possibleId && articles.some((article) => String(article.id) === possibleId)) {
+    return possibleId;
+  }
+  return key;
+}
+
 function normalizeRoutePath(pathname = '/') {
   const rawPath = pathname || '/';
   const withoutTrailingSlash = rawPath.length > 1 ? rawPath.replace(/\/+$/, '') : rawPath;
@@ -1302,7 +1340,7 @@ function getViewPath(view, articleSection = 'essays') {
 
 function getArticlePath(articleOrId, fallbackSection = 'essays') {
   const article = typeof articleOrId === 'object' ? articleOrId : null;
-  const articleId = article?.id || articleOrId;
+  const articleId = article ? getArticleRouteKey(article) : articleOrId;
   const section = article ? getArticleSection(article) : fallbackSection;
   const basePath = ARTICLE_SECTION_PATHS[section] || ARTICLE_SECTION_PATHS.essays;
   return `${basePath}/${encodeURIComponent(articleId)}`;
@@ -1642,12 +1680,13 @@ function App() {
   }
 
   function navigateToArticle(articleId, { replace = false } = {}) {
-    const article = articles.find((item) => String(item.id) === String(articleId));
+    const resolvedArticleId = resolveArticleRouteKey(articles, articleId);
+    const article = articles.find((item) => String(item.id) === String(resolvedArticleId));
     const nextSection = article ? getArticleSection(article) : articleSection;
-    writeBrowserRoute(getArticlePath(article || articleId, nextSection), { replace });
+    writeBrowserRoute(getArticlePath(article || resolvedArticleId, nextSection), { replace });
     setActiveView('articles');
     setArticleSection(nextSection);
-    setSelectedArticleId(articleId);
+    setSelectedArticleId(resolvedArticleId);
   }
 
   function createMusicPlaylist(name) {
@@ -1845,8 +1884,13 @@ function App() {
 
   useEffect(() => {
     if (activeView !== 'articles' || !selectedArticleId) return;
-    loadArticleDetail(selectedArticleId);
-  }, [activeView, selectedArticleId, authToken]);
+    const resolvedArticleId = resolveArticleRouteKey(articles, selectedArticleId);
+    if (resolvedArticleId && resolvedArticleId !== selectedArticleId) {
+      setSelectedArticleId(resolvedArticleId);
+      return;
+    }
+    loadArticleDetail(resolvedArticleId);
+  }, [activeView, selectedArticleId, authToken, articles]);
 
   useEffect(() => {
     if (currentUser?.role !== 'admin') return;
@@ -3653,52 +3697,7 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
     return () => window.clearTimeout(timer);
   }, [identityPhrases, isDeletingIdentity, typedIdentity, typingIndex]);
 
-  const skillPillars = [
-    {
-      title: 'Web 全栈',
-      detail: 'React、FastAPI、PostgreSQL、Docker，把想法快速接成可访问的网站。',
-      level: '70%',
-      icon: Code2
-    },
-    {
-      title: 'AI 工作流',
-      detail: '把模型能力接到写作、学习助手、群聊语料和自动化工具里。',
-      level: '62%',
-      icon: Bot
-    },
-    {
-      title: '部署运维',
-      detail: '服务器续费、快照备份、日志排查、域名绑定和线上发布都纳入后台。',
-      level: '58%',
-      icon: ShieldCheck
-    }
-  ];
-
-  const roadmapItems = [
-    { stage: 'Now', title: '把个人博客打磨成稳定工作台', detail: '内容、评论、后台、备份和 AI 配置已经形成基本闭环。' },
-    { stage: 'Next', title: '沉淀学习助手和微信群 bot 语料', detail: '把暑期学习、课程笔记和群聊文本变成可检索、可总结的数据。' },
-    { stage: 'Later', title: '做更多可展示的小项目', detail: '管理工具、游戏、科研辅助和安全练习都可以接到同一个主页。' }
-  ];
-  const storyTimeline = [
-    {
-      stage: '01',
-      title: '从课程和笔记开始',
-      detail: '把 React、后端、网络基础和旧笔记整理成可检索的文章库，让学习过程留下痕迹。',
-      signal: '内容沉淀'
-    },
-    {
-      stage: '02',
-      title: '把站点做成自己的工具箱',
-      detail: '后台、图片管理、评论审核、备份中心、运维状态和版本清单都接进同一套界面。',
-      signal: '工程闭环'
-    },
-    {
-      stage: '03',
-      title: '继续接入 AI 和自动化',
-      detail: '让写作辅助、学习助手和群聊语料逐步变成能复盘、能问答、能帮忙推进项目的系统。',
-      signal: 'AI 工作流'
-    }
-  ];
+  const [customFriendLinks, setCustomFriendLinks] = useState([]);
   const publishedArticles = articles.filter((article) => article.status !== 'draft');
   const recentArticle = publishedArticles[0];
   const totalViews = publishedArticles.reduce((sum, article) => sum + Number(article.viewCount || 0), 0);
@@ -3707,67 +3706,22 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
   const clockTime = homeNow.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const clockDate = homeNow.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
   const clockZone = Intl.DateTimeFormat().resolvedOptions().timeZone || '本地时间';
-  const latestUpdates = releaseArchive.slice(0, 3);
+  const latestUpdates = releaseArchive.slice(0, 5);
   const liveStats = [
     { label: '上线时间', value: formatLaunchDuration(homeNow), detail: '精准到秒' },
     { label: '公开文章', value: `${publishedArticles.length} 篇`, detail: currentMonthCount ? `本月 ${currentMonthCount} 篇` : '等待新内容' },
     { label: '阅读记录', value: `${totalViews} 次`, detail: '来自文章详情页' },
     { label: '评论互动', value: `${totalComments} 条`, detail: currentUser ? '已登录可参与' : 'GitHub 登录后可评论' }
   ];
-
-  const capabilityCards = [
-    {
-      title: '文章系统',
-      summary: '支持 Markdown、LaTeX、图片上传、封面图、标签筛选、评论审核和阅读统计。',
-      action: '浏览文章',
-      view: 'articles',
-      icon: BookOpen
-    },
-    {
-      title: '小游戏',
-      summary: '已嵌入 Card War 在线试玩，后续可接排行榜和统一登录后的分数记录。',
-      action: '试玩游戏',
-      view: 'game',
-      icon: Gamepad2
-    },
-    {
-      title: '写作后台',
-      summary: '管理员可发布文章、管理图片、恢复本地草稿、审核评论和维护内容。',
-      action: '进入后台',
-      view: 'admin',
-      icon: FilePenLine,
-      adminOnly: true
-    }
-  ];
-  const projectHighlights = [
-    {
-      title: '个人博客工作台',
-      detail: '从内容发布到评论审核、版本记录、备份和线上部署，已经跑通一个完整的小型全栈产品。',
-      meta: `${publishedArticles.length} 篇公开文章`,
-      view: 'articles',
-      icon: BookOpen
-    },
-    {
-      title: '暑期计划控制台',
-      detail: '时间段计划、完成记录、应用使用、睡眠饮食和记账都集中在同一个页面里。',
-      meta: '8月4日 - 8月15日',
-      view: 'plan',
-      icon: List
-    },
-    {
-      title: '运维和备份面板',
-      detail: '把健康检查、容器状态、备份记录和版本路线放进后台，让网站不是一次性作品。',
-      meta: `v${releaseRoadmap[0].version.replace(/^v/, '')}`,
-      view: currentUser?.role === 'admin' ? 'admin' : 'overview',
-      icon: ShieldCheck
-    }
-  ];
-  const explorationCards = [
-    { label: '正在学', value: 'Web 全栈、网络基础、AI 工具链' },
-    { label: '正在做', value: '把博客升级成个人作品集和学习控制台' },
-    { label: '接下来', value: '评论体验、站内副驾驶、更多可展示项目' }
-  ];
   const recentArticles = [...articles].slice(0, 3);
+  const homeEntryCards = [
+    { title: '随笔和文章', detail: '生活、游戏、番剧、读书和普通文章。', view: 'articles', icon: BookOpen, meta: `${publishedArticles.length} 篇` },
+    { title: '技术笔记', detail: '课程笔记、项目文档和代码学习记录。', view: 'articles', section: 'notes', icon: Code2, meta: '/notes' },
+    { title: '暑期计划', detail: '时间段计划、完成度、睡眠、体重和应用使用。', view: 'plan', icon: List, meta: '8/4 - 8/15' },
+    { title: '音乐', detail: '私人歌单、最近播放和站内迷你播放器。', view: 'music', icon: Music, meta: 'Felix Music' },
+    { title: '工具箱', detail: '常用网站、友链和学习资源入口。', view: 'toolbox', icon: Wrench, meta: 'Links' },
+    { title: '小游戏', detail: '休息时打开的小项目和试玩入口。', view: 'game', icon: Gamepad2, meta: 'Break' }
+  ];
   const terminalLines = [
     ['boot', 'personal site online'],
     ['stack', 'React + FastAPI + PostgreSQL + Docker'],
@@ -3818,6 +3772,35 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
       tone: 'gray'
     }
   ];
+  const displayedFriendLinks = [
+    ...customFriendLinks,
+    ...friendLinks
+  ].slice(0, 8);
+
+  useEffect(() => {
+    async function loadFriendLinks() {
+      try {
+        const response = await fetch('/api/toolbox-links');
+        if (!response.ok) return;
+        const links = await response.json();
+        setCustomFriendLinks(
+          links
+            .filter((link) => ['友链', '推荐链接', '朋友', '博客'].includes(link.category))
+            .map((link, index) => ({
+              title: link.title,
+              description: link.description || '站点推荐',
+              url: link.url,
+              avatar: (link.title || 'Link').slice(0, 2).toUpperCase(),
+              tone: ['cyan', 'green', 'purple', 'teal', 'gray'][index % 5]
+            }))
+        );
+      } catch {
+        setCustomFriendLinks([]);
+      }
+    }
+
+    loadFriendLinks();
+  }, []);
 
   return (
     <section className="workspace homepage-workspace">
@@ -3900,6 +3883,15 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
             <span>{clockDate}</span>
             <em>{clockZone}</em>
           </div>
+          <div className="live-status-grid compact">
+            {liveStats.map((item) => (
+              <article className="live-status-card" key={item.label}>
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+                <p>{item.detail}</p>
+              </article>
+            ))}
+          </div>
         </article>
 
         <article className="content-band home-updates-card">
@@ -3912,7 +3904,7 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
               <h2>刚改了什么</h2>
             </div>
           </div>
-          <div className="home-update-list">
+          <div className="home-update-timeline">
             {latestUpdates.map((release) => (
               <div className="home-update-item" key={release.version}>
                 <div>
@@ -3931,13 +3923,38 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
         </article>
       </section>
 
+      <section className="content-band home-entry-band">
+        <div className="section-heading">
+          <p className="eyebrow">入口</p>
+          <h2>想看什么，直接进去</h2>
+        </div>
+        <div className="home-entry-grid">
+          {homeEntryCards.map((entry) => {
+            const Icon = entry.icon;
+            return (
+              <button
+                className="home-entry-card"
+                type="button"
+                key={entry.title}
+                onClick={() => setActiveView(entry.view, entry.section ? { section: entry.section } : undefined)}
+              >
+                <span><Icon size={19} /></span>
+                <strong>{entry.title}</strong>
+                <p>{entry.detail}</p>
+                <em>{entry.meta}</em>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       <section className="content-band friend-links-band">
         <div className="section-heading">
           <p className="eyebrow">友链</p>
           <h2>我愿意挂出来的站点</h2>
         </div>
         <div className="friend-link-grid">
-          {friendLinks.map((link) => (
+          {displayedFriendLinks.map((link) => (
             <a className={`friend-link-card ${link.tone}`} href={link.url} target="_blank" rel="noreferrer" key={link.title}>
               <span className="friend-link-avatar" aria-hidden="true">{link.avatar}</span>
               <div>
@@ -3946,149 +3963,6 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
               </div>
               <ExternalLink size={17} />
             </a>
-          ))}
-        </div>
-      </section>
-
-      <section className="content-band live-status-band">
-        <div className="section-heading">
-          <p className="eyebrow">现在</p>
-          <h2>这个站点正在发生什么</h2>
-        </div>
-        <div className="live-status-grid">
-          {liveStats.map((item) => (
-            <article className="live-status-card" key={item.label}>
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-              <p>{item.detail}</p>
-            </article>
-          ))}
-        </div>
-        {recentArticle && (
-          <button className="latest-article-strip" type="button" onClick={() => setActiveView('articles')}>
-            <span>最近更新</span>
-            <strong>{recentArticle.title}</strong>
-            <em>{recentArticle.date}</em>
-          </button>
-        )}
-      </section>
-
-      <section className="content-band personal-story-band">
-        <div className="section-heading">
-          <p className="eyebrow">故事线</p>
-          <h2>这个主页不只是入口，也是学习路线图</h2>
-        </div>
-        <div className="story-layout">
-          <div className="story-timeline">
-            {storyTimeline.map((item) => (
-              <article className="story-step" key={item.stage}>
-                <span>{item.stage}</span>
-                <div>
-                  <strong>{item.signal}</strong>
-                  <h3>{item.title}</h3>
-                  <p>{item.detail}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-          <div className="exploration-panel">
-            <p className="eyebrow">当前探索</p>
-            {explorationCards.map((item) => (
-              <div key={item.label}>
-                <span>{item.label}</span>
-                <strong>{item.value}</strong>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="content-band">
-        <div className="section-heading">
-          <p className="eyebrow">技能树</p>
-          <h2>正在点亮的方向</h2>
-        </div>
-        <div className="skill-pillar-grid">
-          {skillPillars.map((skill) => {
-            const Icon = skill.icon;
-            return (
-              <article className="skill-pillar-card" key={skill.title}>
-                <div className="skill-pillar-heading">
-                  <Icon size={20} />
-                  <div>
-                    <h3>{skill.title}</h3>
-                    <span>{skill.level}</span>
-                  </div>
-                </div>
-                <p>{skill.detail}</p>
-                <div className="skill-meter" aria-label={`${skill.title} 当前进度 ${skill.level}`}>
-                  <span style={{ width: skill.level }} />
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="content-band project-showcase-band">
-        <div className="section-heading">
-          <p className="eyebrow">作品墙</p>
-          <h2>已经能拿出来讲的东西</h2>
-        </div>
-        <div className="project-showcase-grid">
-          {projectHighlights.map((project) => {
-            const Icon = project.icon;
-            return (
-              <button className="project-showcase-card" type="button" key={project.title} onClick={() => setActiveView(project.view)}>
-                <Icon size={20} />
-                <span>{project.meta}</span>
-                <strong>{project.title}</strong>
-                <p>{project.detail}</p>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="content-band">
-        <div className="section-heading">
-          <p className="eyebrow">项目入口</p>
-          <h2>主页连接到正在生长的作品</h2>
-        </div>
-        <div className="capability-grid">
-          {capabilityCards.filter((card) => !card.adminOnly || currentUser?.role === 'admin').map((card) => {
-            const Icon = card.icon;
-            return (
-              <article className="capability-card" key={card.title}>
-                <div>
-                  <Icon size={20} />
-                  <h3>{card.title}</h3>
-                </div>
-                <p>{card.summary}</p>
-                <button type="button" onClick={() => setActiveView(card.view)}>
-                  <span>{card.action}</span>
-                  <ExternalLink size={16} />
-                </button>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="content-band">
-        <div className="section-heading">
-          <p className="eyebrow">路线</p>
-          <h2>下一段迭代怎么走</h2>
-        </div>
-        <div className="roadmap-list">
-          {roadmapItems.map((item) => (
-            <article className="roadmap-item" key={item.stage}>
-              <span>{item.stage}</span>
-              <div>
-                <h3>{item.title}</h3>
-                <p>{item.detail}</p>
-              </div>
-            </article>
           ))}
         </div>
       </section>
@@ -4387,6 +4261,14 @@ function ArticleDetail({
   const headings = useMemo(() => getMarkdownHeadings(article.content || ''), [article.content]);
   const isNoteArticle = isTechnicalArticle(article);
   const noteArticles = siblingArticles.filter((item) => isTechnicalArticle(item));
+  const navigationArticles = (isNoteArticle ? noteArticles : siblingArticles)
+    .filter((item) => item.status !== 'draft')
+    .sort((first, second) => String(second.date || '').localeCompare(String(first.date || '')));
+  const currentArticleIndex = navigationArticles.findIndex((item) => String(item.id) === String(article.id));
+  const previousArticle = currentArticleIndex > 0 ? navigationArticles[currentArticleIndex - 1] : null;
+  const nextArticle = currentArticleIndex >= 0 && currentArticleIndex < navigationArticles.length - 1
+    ? navigationArticles[currentArticleIndex + 1]
+    : null;
 
   useEffect(() => {
     function updateReadingProgress() {
@@ -4460,6 +4342,23 @@ function ArticleDetail({
 
         {article.content && (
           <MarkdownContent content={article.content} title={article.title} />
+        )}
+
+        {(previousArticle || nextArticle) && (
+          <nav className="article-neighbor-nav" aria-label="上一篇和下一篇">
+            {previousArticle ? (
+              <button type="button" onClick={() => openArticle(previousArticle.id)}>
+                <span>上一篇</span>
+                <strong>{previousArticle.title}</strong>
+              </button>
+            ) : <span />}
+            {nextArticle ? (
+              <button type="button" onClick={() => openArticle(nextArticle.id)}>
+                <span>下一篇</span>
+                <strong>{nextArticle.title}</strong>
+              </button>
+            ) : <span />}
+          </nav>
         )}
 
         <div className="reaction-row">
@@ -6833,7 +6732,7 @@ function ToolboxWorkspace({ currentUser, authToken }) {
         <div>
           <span>Felix Links</span>
           <h2>今天要去哪里？</h2>
-          <p>先从高频入口开始，登录管理员后可以继续把课程、项目、娱乐和生活服务都整理进来。</p>
+          <p>先从高频入口开始，登录管理员后可以继续把课程、项目、娱乐和生活服务都整理进来。分类填“友链”时，首页会自动展示。</p>
         </div>
         <div className="toolbox-featured-grid" aria-label="高频工具">
           {featuredLinks.map((link) => (
@@ -7095,6 +6994,13 @@ function MusicWorkspace({
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const selectedTrackNames = new Set(selectedPlaylist?.trackFilenames || []);
   const displayTracks = selectedPlaylist ? queue : tracks;
+  const currentLyrics = useMemo(() => (
+    (currentTrack?.lyrics || '')
+      .split(/\r?\n/)
+      .map((line) => line.replace(/^\[[^\]]+\]\s*/, '').trim())
+      .filter(Boolean)
+      .slice(0, 12)
+  ), [currentTrack?.lyrics]);
 
   return (
     <section className="workspace music-workspace">
@@ -7107,13 +7013,39 @@ function MusicWorkspace({
       <section className="music-player-panel">
         <div className="music-now">
           <div className="music-cover" aria-hidden="true">
-            <Music size={42} />
+            {currentTrack?.coverUrl ? (
+              <img src={currentTrack.coverUrl} alt="" />
+            ) : (
+              <Music size={42} />
+            )}
           </div>
           <div>
             <span>正在播放</span>
             <h2>{currentTrack?.title || '等待加入第一首歌'}</h2>
             <p>{currentTrack?.artist || '后台上传音乐后，这里会变成你的私人歌单。'}</p>
           </div>
+        </div>
+
+        <div className="music-extra-grid">
+          <article className="music-lyric-panel">
+            <div className="admin-panel-heading compact-heading">
+              <h3>歌词</h3>
+              <span>{currentTrack?.lyricsUrl ? '同名歌词文件' : '可放同名 .lrc / .txt'}</span>
+            </div>
+            {currentLyrics.length ? (
+              <div className="music-lyric-lines">
+                {currentLyrics.map((line, index) => (
+                  <p key={`${line}-${index}`}>{line}</p>
+                ))}
+              </div>
+            ) : (
+              <p className="empty-state compact">还没有歌词文件。把同名 .lrc 或 .txt 放到音乐目录后，这里会自动显示。</p>
+            )}
+          </article>
+          <article className="music-sidecar-tip">
+            <strong>封面 / 歌词</strong>
+            <p>音乐文件旁边放同名图片会显示封面；放同名歌词文件会显示歌词。</p>
+          </article>
         </div>
 
         <div className="music-progress">
