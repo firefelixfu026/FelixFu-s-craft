@@ -83,7 +83,7 @@ MAX_AUDIO_UPLOAD_BYTES = 50 * 1024 * 1024
 MAX_AUDIO_CHUNK_BYTES = 1024 * 1024
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
 AUDIO_SUFFIXES = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac"}
-MUSIC_COVER_SUFFIXES = [".jpg", ".jpeg", ".png", ".webp"]
+MUSIC_COVER_SUFFIXES = [".jpg", ".jpeg", ".png", ".webp", ".gif"]
 MUSIC_LYRIC_SUFFIXES = [".lrc", ".txt"]
 LOGIN_FAILURES: dict[str, dict[str, Any]] = {}
 
@@ -1129,8 +1129,61 @@ def delete_admin_music(
         raise HTTPException(status_code=404, detail="Audio not found")
 
     target.unlink()
+    _delete_music_sidecars(target)
     _record_admin_event(db, current_user, "删除音乐", "upload", filename, "")
     return {"status": "deleted", "filename": filename}
+
+
+@app.post("/api/admin/uploads/music/{filename}/cover")
+async def upload_admin_music_cover(
+    filename: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, str | int]:
+    target = _resolve_music_audio_path(filename)
+    original_suffix = Path(file.filename or "").suffix.lower()
+    content_type = (file.content_type or "").lower()
+    suffix = original_suffix if original_suffix in MUSIC_COVER_SUFFIXES else ALLOWED_IMAGE_TYPES.get(content_type)
+    if suffix not in MUSIC_COVER_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Only JPG, PNG, WEBP, or GIF covers are supported")
+
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="Cover image must be 5 MB or smaller")
+    if not content:
+        raise HTTPException(status_code=400, detail="Cover image is empty")
+
+    _delete_music_sidecars(target, MUSIC_COVER_SUFFIXES)
+    cover_path = target.with_suffix(suffix)
+    cover_path.write_bytes(content)
+    _record_admin_event(db, current_user, "上传音乐封面", "upload", cover_path.name, f"{len(content)} bytes")
+    return _music_track_to_dict(target)
+
+
+@app.post("/api/admin/uploads/music/{filename}/lyrics")
+async def upload_admin_music_lyrics(
+    filename: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, str | int]:
+    target = _resolve_music_audio_path(filename)
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in MUSIC_LYRIC_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Only LRC or TXT lyrics are supported")
+
+    content = await file.read(512 * 1024 + 1)
+    if len(content) > 512 * 1024:
+        raise HTTPException(status_code=400, detail="Lyrics file must be 512 KB or smaller")
+    if not content:
+        raise HTTPException(status_code=400, detail="Lyrics file is empty")
+
+    _delete_music_sidecars(target, MUSIC_LYRIC_SUFFIXES)
+    lyric_path = target.with_suffix(suffix)
+    lyric_path.write_bytes(content)
+    _record_admin_event(db, current_user, "上传音乐歌词", "upload", lyric_path.name, f"{len(content)} bytes")
+    return _music_track_to_dict(target)
 
 
 @app.get("/api/admin/comments")
@@ -2213,6 +2266,22 @@ def _music_title_from_filename(filename: str) -> str:
     return title.replace("-", " ").strip() or "未命名音乐"
 
 
+def _resolve_music_audio_path(filename: str) -> Path:
+    if Path(filename).name != filename or Path(filename).suffix.lower() not in AUDIO_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Invalid audio filename")
+    target = MUSIC_DIR / filename
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="Audio not found")
+    return target
+
+
+def _delete_music_sidecars(path: Path, suffixes: list[str] | None = None) -> None:
+    for suffix in suffixes or [*MUSIC_COVER_SUFFIXES, *MUSIC_LYRIC_SUFFIXES]:
+        sidecar_path = path.with_suffix(suffix)
+        if sidecar_path.exists() and sidecar_path.is_file():
+            sidecar_path.unlink(missing_ok=True)
+
+
 def _music_sidecar_metadata(path: Path) -> dict[str, str]:
     cover_url = ""
     lyrics_url = ""
@@ -2234,6 +2303,22 @@ def _music_sidecar_metadata(path: Path) -> dict[str, str]:
             break
 
     return {"coverUrl": cover_url, "lyrics": lyrics, "lyricsUrl": lyrics_url}
+
+
+def _music_track_to_dict(path: Path) -> dict[str, str | int]:
+    stat = path.stat()
+    sidecar = _music_sidecar_metadata(path)
+    return {
+        "filename": path.name,
+        "title": _music_title_from_filename(path.name),
+        "artist": "Felix 的歌单",
+        "url": f"/uploads/music/{path.name}",
+        "coverUrl": sidecar["coverUrl"],
+        "lyrics": sidecar["lyrics"],
+        "lyricsUrl": sidecar["lyricsUrl"],
+        "size": stat.st_size,
+        "createdAt": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+    }
 
 
 def _clean_toolbox_payload(payload: ToolboxLinkIn) -> dict[str, Any]:

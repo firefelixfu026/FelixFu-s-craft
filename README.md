@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/firefelixfu026/the-piggy-home-of-felixfu/actions/workflows/ci.yml/badge.svg)](https://github.com/firefelixfu026/the-piggy-home-of-felixfu/actions/workflows/ci.yml)
 
-这是付江樊的个人网站，用来放个人介绍、随笔、技术笔记、暑期计划、音乐、小游戏和常用工具入口。项目已经从一个普通博客逐步长成“个人主页 + 内容库 + 小型后台”的站点。
+这是付江樊的个人网站，用来放个人介绍、随笔、技术笔记、暑期计划、音乐、小游戏和常用工具入口。项目已经从一个普通博客，逐步长成“个人主页 + 内容库 + 生活记录 + 小型后台”的站点。
 
 线上地址：
 
@@ -13,14 +13,13 @@ https://www.felixfu.xyz
 ## 当前状态
 
 - 前台页面：主页、文章、计划、音乐、工具箱、游戏、账号中心。
-- 文章分成“随笔 / 娱乐文章”和“技术笔记”两个入口。
-- 技术笔记支持类似知识库的阅读体验：左侧笔记树、中间正文、右侧阅读进度和目录。
-- 计划页拆成时间安排、完成度、课程、应用、记账、饮食、身体和睡眠等子路由。
-- 工具箱按分类展示常用网站，友链也归在工具箱分类中；自定义网站在后台管理。
-- 音乐模块支持上传本地歌曲、自建歌单、调整播放列表顺序和全站迷你播放器。
-- 首页保留时钟、最近更新、主要入口和最近文章，避免把所有模块堆在首屏。
+- 文章中心分为“随笔 / 娱乐文章”和“技术笔记”两个入口。
+- 技术笔记采用知识库式阅读：左侧笔记树、中间正文、右侧阅读进度和文章目录。
+- 计划页拆成时间安排、完成度、课程、应用、记账、饮食、身体、睡眠等子页面。
+- 工具箱按分类展示常用网站，友链归入工具箱分类；自定义网站在后台管理。
+- 音乐模块支持上传本地歌曲、自建歌单、拖拽调整歌单顺序、上传封面和歌词、全站迷你播放器。
 - 黍泡泡作为站点吉祥物，以可拖动悬浮窗形式出现；模型来源：Bilibili UP 主切丁鱼片。
-- 管理后台支持写文章、导入笔记、内容库拖拽排序、评论删除、音乐上传、工具箱管理、版本记录、视觉巡检、运维和安全日志。
+- 管理后台支持写文章、导入笔记、文件管理器式内容库、拖拽排序、评论删除、音乐管理、工具箱管理、版本记录、视觉巡检、运维和安全日志。
 
 ## 页面路径
 
@@ -37,7 +36,7 @@ https://www.felixfu.xyz
 - 账号中心：`/account`
 - 管理后台：`/admin`
 
-前端容器的 Nginx 配置了 SPA fallback，直接刷新这些路径时会回到前端应用处理。
+前端容器的 Nginx 已配置 SPA fallback，直接刷新这些路径时会回到前端应用处理。
 
 ## 技术栈
 
@@ -92,17 +91,17 @@ http://127.0.0.1:8080/api/health
 
 ## 关键环境变量
 
-- `DATABASE_URL`：PostgreSQL 数据库连接地址
-- `AUTH_SECRET`：后端登录 Token 加密密钥
-- `ADMIN_SETUP_TOKEN`：初始化管理员所需密钥
-- `GITHUB_CLIENT_ID`：GitHub OAuth 应用 ID
-- `GITHUB_CLIENT_SECRET`：GitHub OAuth 应用密钥
-- `GITHUB_OAUTH_CALLBACK_URL`：GitHub 登录回调地址
-- `GITHUB_ADMIN_LOGINS`：允许成为管理员的 GitHub 用户名
-- `GITHUB_ADMIN_EMAILS`：允许成为管理员的 GitHub 邮箱
-- `ALLOW_PUBLIC_EMAIL_REGISTRATION`：是否允许公开邮箱注册
-- `ALLOW_READER_EMAIL_LOGIN`：是否允许普通读者邮箱登录
-- `ADMIN_COMMENTS_REQUIRE_APPROVAL`：是否开启评论审核
+- `DATABASE_URL`：数据库连接地址。
+- `AUTH_SECRET`：后端登录 Token 加密密钥。
+- `ADMIN_SETUP_TOKEN`：初始化管理员所需密钥。
+- `GITHUB_CLIENT_ID`：GitHub OAuth 应用 ID。
+- `GITHUB_CLIENT_SECRET`：GitHub OAuth 应用密钥。
+- `GITHUB_OAUTH_CALLBACK_URL`：GitHub 登录回调地址。
+- `GITHUB_ADMIN_LOGINS`：允许成为管理员的 GitHub 用户名。
+- `GITHUB_ADMIN_EMAILS`：允许成为管理员的 GitHub 邮箱。
+- `ALLOW_PUBLIC_EMAIL_REGISTRATION`：是否允许公开邮箱注册。
+- `ALLOW_READER_EMAIL_LOGIN`：是否允许普通读者邮箱登录。
+- `ADMIN_COMMENTS_REQUIRE_APPROVAL`：是否开启评论审核。
 
 不要把 `.env`、真实 API Key、OAuth Secret 或生产数据库密码提交到 GitHub。
 

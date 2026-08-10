@@ -17,6 +17,7 @@ import {
   FilePenLine,
   Gamepad2,
   Github,
+  GripVertical,
   Heading2,
   Heart,
   ImageIcon,
@@ -123,7 +124,7 @@ const ROUTED_VIEW_IDS = new Set(Object.keys(VIEW_PATHS));
 const LIVE2D_MODEL_URL = '/live2d/shu-bubble/model.model3.json';
 const LIVE2D_TEXTURE_FALLBACK_URL = '/live2d/shu-bubble/textures/texture_00.png';
 const LIVE2D_HIDDEN_KEY = 'felix_blog_live2d_hidden';
-const LIVE2D_POSITION_KEY = 'felix_blog_live2d_position';
+const LIVE2D_POSITION_KEY = 'felix_blog_live2d_position_v2';
 const LIVE2D_MODE_KEY = 'felix_blog_live2d_mode';
 const LIVE2D_SHOW_EVENT = 'felix-live2d-show';
 const LIVE2D_SCRIPT_SOURCES = [
@@ -434,6 +435,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.0',
+    title: '内容管理、音乐资源与阅读交互修复',
+    date: '2026-08-10',
+    status: '已上线',
+    points: ['黍泡泡悬浮层级和坐标缓存重置，默认回到右下角并避免卡住', '前台页面顶部留白收紧，接近后台管理页的起始高度', '文章互动按钮增强暗色激活态和数字变化动画', '文章目录点击改为主动平滑跳转到正文标题', '技术笔记导引保留后台排序，不再按标题强制重排', '音乐管理支持为歌曲上传封面和歌词，歌单歌曲支持拖拽排序', '后台工具箱管理统一展示内置网站、自定义网站和友链并支持搜索', '内容库改为文件资源管理器式列表，便于查看目录和拖拽调整顺序']
+  },
   {
     version: 'v5.9',
     title: '工具箱归类、排序与性能整理',
@@ -1491,7 +1499,7 @@ function buildNoteTree(articles = []) {
     });
     currentNode.articles.push(article);
   });
-  return Array.from(root.values()).sort((first, second) => first.name.localeCompare(second.name, 'zh-CN'));
+  return Array.from(root.values());
 }
 
 function noteNodeHasActiveArticle(node, activeArticleId) {
@@ -1840,6 +1848,19 @@ function App() {
       if (index < 0 || nextIndex < 0 || nextIndex >= filenames.length) return filenames;
       const next = [...filenames];
       [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  }
+
+  function reorderTrackInPlaylist(playlistId, sourceFilename, targetFilename) {
+    if (!playlistId || playlistId === 'all' || sourceFilename === targetFilename) return;
+    updateMusicPlaylistTracks(playlistId, (filenames) => {
+      const sourceIndex = filenames.indexOf(sourceFilename);
+      const targetIndex = filenames.indexOf(targetFilename);
+      if (sourceIndex < 0 || targetIndex < 0) return filenames;
+      const next = [...filenames];
+      const [moved] = next.splice(sourceIndex, 1);
+      next.splice(targetIndex, 0, moved);
       return next;
     });
   }
@@ -3337,6 +3358,54 @@ function App() {
     }
   }
 
+  async function uploadMusicSidecar(track, file, kind) {
+    if (!track?.filename || !file) return;
+    if (!authToken) {
+      setAdminMessage('请先登录管理员账号');
+      setActiveView('login');
+      return;
+    }
+    const isCover = kind === 'cover';
+    const suffix = file.name?.split('.').pop()?.toLowerCase();
+    const valid = isCover
+      ? (file.type?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(suffix))
+      : ['lrc', 'txt'].includes(suffix) || file.type?.startsWith('text/');
+    if (!valid) {
+      setAdminMessage(isCover ? '封面只支持 jpg、png、webp 或 gif' : '歌词只支持 .lrc 或 .txt');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    setAdminMessage(isCover ? '正在上传封面...' : '正在上传歌词...');
+    try {
+      const response = await fetch(`/api/admin/uploads/music/${encodeURIComponent(track.filename)}/${kind}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: formData
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setAdminMessage(result.detail || (isCover ? '封面上传失败' : '歌词上传失败'));
+        if (response.status === 401 || response.status === 403) setActiveView('login');
+        return;
+      }
+      await refreshMusicTracks();
+      await refreshAdminAuditLogs();
+      setAdminMessage(isCover ? `封面已更新：${result.title || track.title}` : `歌词已更新：${result.title || track.title}`);
+    } catch {
+      setAdminMessage('后端服务不可用，音乐附加文件上传失败');
+    }
+  }
+
+  function uploadMusicCover(track, file) {
+    return uploadMusicSidecar(track, file, 'cover');
+  }
+
+  function uploadMusicLyrics(track, file) {
+    return uploadMusicSidecar(track, file, 'lyrics');
+  }
+
   async function deleteMusicTrack(track) {
     if (!window.confirm(`确定删除音乐 ${track.title || track.filename} 吗？`)) return;
     try {
@@ -3683,6 +3752,7 @@ function App() {
             deletePlaylist={deleteMusicPlaylist}
             toggleTrackInPlaylist={toggleTrackInPlaylist}
             moveTrackInPlaylist={moveTrackInPlaylist}
+            reorderTrackInPlaylist={reorderTrackInPlaylist}
             playTrack={playMusicTrack}
             togglePlayback={toggleMusicPlayback}
             stepTrack={stepMusicTrack}
@@ -3779,6 +3849,8 @@ function App() {
             deleteUploadedImage={deleteUploadedImage}
             refreshMusicTracks={refreshMusicTracks}
             uploadMusicTrack={uploadMusicTrack}
+            uploadMusicCover={uploadMusicCover}
+            uploadMusicLyrics={uploadMusicLyrics}
             deleteMusicTrack={deleteMusicTrack}
             runArticleAiTask={runArticleAiTask}
             undoLatestArticleAiResult={undoLatestArticleAiResult}
@@ -4429,6 +4501,7 @@ function ArticleDetail({
             label="点赞"
             count={reactionCounts[article.id]?.like || 0}
             icon={Heart}
+            tone="like"
             onClick={() => toggleReaction(article.id, 'like')}
           />
           <IconToggle
@@ -4436,6 +4509,7 @@ function ArticleDetail({
             label="收藏"
             count={reactionCounts[article.id]?.favorite || 0}
             icon={Star}
+            tone="favorite"
             onClick={() => toggleReaction(article.id, 'favorite')}
           />
           <IconToggle
@@ -4443,6 +4517,7 @@ function ArticleDetail({
             label="点踩"
             count={reactionCounts[article.id]?.downvote || 0}
             icon={ThumbsDown}
+            tone="downvote"
             onClick={() => toggleReaction(article.id, 'downvote')}
           />
           <IconToggle
@@ -4450,6 +4525,7 @@ function ArticleDetail({
             label="?"
             count={reactionCounts[article.id]?.question || 0}
             icon={CircleHelp}
+            tone="question"
             onClick={() => toggleReaction(article.id, 'question')}
           />
         </div>
@@ -4686,12 +4762,25 @@ function getMarkdownHeadings(content) {
 }
 
 function ArticleToc({ headings }) {
+  function jumpToHeading(event, headingId) {
+    event.preventDefault();
+    const target = document.getElementById(headingId);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.history.replaceState(null, '', `#${headingId}`);
+  }
+
   return (
     <nav className="article-toc" aria-label="文章目录">
       <div className="article-toc-heading">文章目录</div>
       <div className="article-toc-list">
         {headings.map((heading) => (
-          <a className={`toc-level-${heading.level}`} href={`#${heading.id}`} key={heading.id}>
+          <a
+            className={`toc-level-${heading.level}`}
+            href={`#${heading.id}`}
+            key={heading.id}
+            onClick={(event) => jumpToHeading(event, heading.id)}
+          >
             {renderInlineMarkdown(heading.text)}
           </a>
         ))}
@@ -6744,6 +6833,7 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
   const [toolboxForm, setToolboxForm] = useState(createEmptyToolboxForm);
   const [editingToolboxLinkId, setEditingToolboxLinkId] = useState(null);
   const [toolboxMessage, setToolboxMessage] = useState('');
+  const [toolboxAdminQuery, setToolboxAdminQuery] = useState('');
   const [isLoadingToolboxLinks, setIsLoadingToolboxLinks] = useState(false);
   const [isSavingToolboxLink, setIsSavingToolboxLink] = useState(false);
   const canManageToolbox = currentUser?.role === 'admin';
@@ -6781,6 +6871,12 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
   const featuredLinks = allToolboxLinks
     .filter((link) => link.pinned || ['OI Wiki', 'MDN Web Docs', 'ChatGPT', 'Excalidraw'].includes(link.title))
     .slice(0, 6);
+  const toolboxAdminLinks = allToolboxLinks.filter((link) => {
+    const query = toolboxAdminQuery.trim().toLowerCase();
+    const source = link.custom ? '自定义' : link.category === '友链' ? '友链' : '内置';
+    const haystack = [link.title, link.category, link.url, link.description, source, ...(link.tags || [])].join(' ').toLowerCase();
+    return !query || haystack.includes(query);
+  });
 
   useEffect(() => {
     refreshToolboxLinks();
@@ -6957,7 +7053,7 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
         <div className="admin-panel-heading">
           <div>
             <h2>工具箱网址管理</h2>
-          <span>分类填“友链”会出现在工具箱的友链分组里。</span>
+            <span>内置、自定义和友链都在这里统一查看。</span>
           </div>
           <button className="ghost-button" type="button" onClick={refreshToolboxLinks}>
             <RefreshCw size={17} />
@@ -6965,17 +7061,33 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
           </button>
         </div>
         {toolboxEditor}
+        <div className="admin-filter-bar">
+          <input
+            value={toolboxAdminQuery}
+            onChange={(event) => setToolboxAdminQuery(event.target.value)}
+            placeholder="搜索网站、分类、标签或来源"
+            aria-label="搜索工具箱管理列表"
+          />
+        </div>
         <div className="toolbox-admin-list">
-          {customLinks.length === 0 ? (
-            <p className="empty-state">还没有自定义网址。</p>
-          ) : customLinks.map((link) => (
-            <article className="toolbox-admin-row" key={link.id}>
+          {toolboxAdminLinks.length === 0 ? (
+            <p className="empty-state">没有找到对应网址。</p>
+          ) : toolboxAdminLinks.map((link) => {
+            const source = link.custom ? '自定义' : link.category === '友链' ? '友链' : '内置';
+            return (
+            <article className="toolbox-admin-row" key={`${source}-${link.id || link.url}`}>
               <div>
                 <strong>{link.title}</strong>
-                <span>{link.category || '自定义'} · {link.url}</span>
+                <span>{source} · {link.category || '自定义'} · {link.url}</span>
                 {link.description && <p>{link.description}</p>}
               </div>
               <div className="manager-actions">
+                <a className="ghost-button" href={link.url} target="_blank" rel="noreferrer">
+                  <ExternalLink size={16} />
+                  <span>打开</span>
+                </a>
+                {link.custom ? (
+                <>
                 <button type="button" onClick={() => startEditingToolboxLink(link)}>
                   <PencilLine size={16} />
                   <span>编辑</span>
@@ -6984,9 +7096,13 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
                   <Trash2 size={16} />
                   <span>删除</span>
                 </button>
+                </>
+                ) : (
+                  <span className="status-badge">{source}</span>
+                )}
               </div>
             </article>
-          ))}
+          );})}
         </div>
       </section>
     );
@@ -7167,6 +7283,14 @@ function Live2DMascot() {
     typeof localStorage !== 'undefined' && localStorage.getItem(LIVE2D_HIDDEN_KEY) === 'true'
   ));
 
+  function getDefaultPosition(nextMode = mode) {
+    if (typeof window === 'undefined') return { x: 0, y: 0 };
+    return {
+      x: Math.max(24, window.innerWidth - (nextMode === 'window' ? 282 : 246)),
+      y: Math.max(88, window.innerHeight - (nextMode === 'window' ? 320 : 278))
+    };
+  }
+
   function savePosition(nextPosition) {
     setPosition(nextPosition);
     if (typeof localStorage !== 'undefined') {
@@ -7285,6 +7409,10 @@ function Live2DMascot() {
   }, []);
 
   useEffect(() => {
+    savePosition(clampPosition(position.x || position.y ? position : getDefaultPosition()));
+  }, []);
+
+  useEffect(() => {
     function handleResize() {
       savePosition(clampPosition(position));
     }
@@ -7308,6 +7436,7 @@ function Live2DMascot() {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(LIVE2D_MODE_KEY, nextMode);
     }
+    savePosition(clampPosition(getDefaultPosition(nextMode)));
     setMenuPosition(null);
   }
 
@@ -7454,12 +7583,15 @@ function MusicWorkspace({
   deletePlaylist,
   toggleTrackInPlaylist,
   moveTrackInPlaylist,
+  reorderTrackInPlaylist,
   playTrack,
   togglePlayback,
   stepTrack,
   seekTrack
 }) {
   const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [draggingTrackFilename, setDraggingTrackFilename] = useState(null);
+  const [dragOverTrackFilename, setDragOverTrackFilename] = useState(null);
   const selectedTrackNames = new Set(selectedPlaylist?.trackFilenames || []);
   const displayTracks = selectedPlaylist ? queue : tracks;
   const currentLyrics = useMemo(() => (
@@ -7497,7 +7629,7 @@ function MusicWorkspace({
           <article className="music-lyric-panel">
             <div className="admin-panel-heading compact-heading">
               <h3>歌词</h3>
-              <span>{currentTrack?.lyricsUrl ? '同名歌词文件' : '可放同名 .lrc / .txt'}</span>
+              <span>{currentTrack?.lyricsUrl ? '已上传歌词' : '后台可上传 .lrc / .txt'}</span>
             </div>
             {currentLyrics.length ? (
               <div className="music-lyric-lines">
@@ -7506,12 +7638,12 @@ function MusicWorkspace({
                 ))}
               </div>
             ) : (
-              <p className="empty-state compact">还没有歌词文件。把同名 .lrc 或 .txt 放到音乐目录后，这里会自动显示。</p>
+              <p className="empty-state compact">还没有歌词。去后台音乐管理给这首歌上传 .lrc 或 .txt。</p>
             )}
           </article>
           <article className="music-sidecar-tip">
             <strong>封面 / 歌词</strong>
-            <p>音乐文件旁边放同名图片会显示封面；放同名歌词文件会显示歌词。</p>
+            <p>封面和歌词都在后台上传，前台只负责安静播放。</p>
           </article>
         </div>
 
@@ -7664,8 +7796,49 @@ function MusicWorkspace({
         ) : (
           <div className="music-track-list">
             {displayTracks.map((track, index) => (
-              <div className={track.filename === currentTrack?.filename ? 'music-track active' : 'music-track'} key={track.filename}>
+              <div
+                className={[
+                  'music-track',
+                  track.filename === currentTrack?.filename ? 'active' : '',
+                  dragOverTrackFilename === track.filename && draggingTrackFilename !== track.filename ? 'drag-over' : ''
+                ].filter(Boolean).join(' ')}
+                key={track.filename}
+                onDragOver={(event) => {
+                  if (!selectedPlaylist) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'move';
+                  setDragOverTrackFilename(track.filename);
+                }}
+                onDragLeave={() => setDragOverTrackFilename((current) => (current === track.filename ? null : current))}
+                onDrop={(event) => {
+                  if (!selectedPlaylist) return;
+                  event.preventDefault();
+                  const source = event.dataTransfer.getData('text/plain') || draggingTrackFilename;
+                  reorderTrackInPlaylist(selectedPlaylist.id, source, track.filename);
+                  setDraggingTrackFilename(null);
+                  setDragOverTrackFilename(null);
+                }}
+              >
                 <button type="button" onClick={() => playTrack(track, selectedPlaylistId)}>
+                  {selectedPlaylist && (
+                    <span
+                      className="music-track-drag-handle"
+                      draggable
+                      onDragStart={(event) => {
+                        setDraggingTrackFilename(track.filename);
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', track.filename);
+                      }}
+                      onDragEnd={() => {
+                        setDraggingTrackFilename(null);
+                        setDragOverTrackFilename(null);
+                      }}
+                      onClick={(event) => event.stopPropagation()}
+                      title="拖动调整歌曲顺序"
+                    >
+                      <GripVertical size={15} />
+                    </span>
+                  )}
                   <span>{String(index + 1).padStart(2, '0')}</span>
                   <strong>{track.title}</strong>
                   <em>{formatFileSize(track.size)}</em>
@@ -8330,9 +8503,7 @@ function buildArticleExplorerGroups(articles) {
     }
     groups.get(key).articles.push({ ...article, displayOrder: index + 1 });
   });
-  return Array.from(groups.values()).sort((first, second) => (
-    `${first.section}/${first.folder}`.localeCompare(`${second.section}/${second.folder}`, 'zh-CN')
-  ));
+  return Array.from(groups.values());
 }
 
 function AdminWorkspace({
@@ -8381,6 +8552,8 @@ function AdminWorkspace({
   deleteUploadedImage,
   refreshMusicTracks,
   uploadMusicTrack,
+  uploadMusicCover,
+  uploadMusicLyrics,
   deleteMusicTrack,
   runArticleAiTask,
   undoLatestArticleAiResult,
@@ -9941,79 +10114,98 @@ function AdminWorkspace({
             {filteredManagerArticles.length === 0 ? (
               <p className="empty-state">没有符合条件的文章</p>
             ) : (
-              <div className="article-explorer">
-                {articleExplorerGroups.map((group) => (
-                  <section className="article-explorer-group" key={group.key}>
-                    <div className="article-explorer-folder">
-                      <BookOpen size={17} />
-                      <strong>{group.section}</strong>
-                      <span>{group.folder}</span>
-                      <em>{group.articles.length} 篇</em>
+              <div className="content-library-shell">
+                <aside className="content-library-tree" aria-label="内容目录">
+                  <div className="content-library-tree-head">
+                    <BookOpen size={17} />
+                    <strong>内容目录</strong>
+                  </div>
+                  {articleExplorerGroups.map((group) => (
+                    <div className="content-library-tree-group" key={group.key}>
+                      <span>{group.section}</span>
+                      <button type="button" onClick={() => setArticleManagerQuery(group.folder)}>
+                        <ChevronRight size={14} />
+                        <strong>{group.folder}</strong>
+                        <em>{group.articles.length}</em>
+                      </button>
                     </div>
-                    <div className="article-explorer-files">
-                      {group.articles.map((article) => (
-                        <article
-                          className={[
-                            'article-explorer-file',
-                            draggingArticleId === article.id ? 'dragging' : '',
-                            dragOverArticleId === article.id && draggingArticleId !== article.id ? 'drag-over' : ''
-                          ].filter(Boolean).join(' ')}
-                          key={article.id}
-                          draggable
-                          onDragStart={(event) => {
-                            setDraggingArticleId(article.id);
-                            event.dataTransfer.effectAllowed = 'move';
-                            event.dataTransfer.setData('text/plain', article.id);
-                          }}
-                          onDragOver={(event) => {
-                            event.preventDefault();
-                            event.dataTransfer.dropEffect = 'move';
-                            setDragOverArticleId(article.id);
-                          }}
-                          onDragLeave={() => {
-                            setDragOverArticleId((current) => (current === article.id ? null : current));
-                          }}
-                          onDrop={(event) => {
-                            event.preventDefault();
-                            dropArticleOnTarget(article.id);
-                          }}
-                          onDragEnd={() => {
-                            setDraggingArticleId(null);
-                            setDragOverArticleId(null);
-                          }}
-                        >
-                          <label className="manager-select-box" aria-label={`选择 ${article.title}`}>
-                            <input
-                              type="checkbox"
-                              checked={selectedManagerArticleIds.includes(article.id)}
-                              onChange={() => toggleManagerArticleSelection(article.id)}
-                            />
-                          </label>
-                          <span className="article-file-order" title="拖动排序">{String(article.displayOrder).padStart(2, '0')}</span>
-                          <div>
-                            <div className="manager-title-line">
-                              <h3>{article.title}</h3>
-                              <span className={article.status === 'draft' ? 'status-badge draft' : 'status-badge'}>{article.status === 'draft' ? '草稿' : '已发布'}</span>
-                              {article.pinned && <span className="status-badge">置顶</span>}
-                            </div>
-                            <p>{article.summary || '暂无摘要'}</p>
-                            <span className="manager-meta-line">创建 {formatArticleTimestamp(article.createdAt, article.date || '未知')} · 修改 {formatArticleTimestamp(article.updatedAt, article.createdAt || article.date || '未知')}</span>
-                          </div>
-                          <div className="manager-actions">
-                            <button type="button" onClick={() => handleStartEditingArticle(article)}>
-                              <PencilLine size={17} />
-                              <span>编辑</span>
-                            </button>
-                            <button className="danger-button" type="button" onClick={() => deleteArticle(article)}>
-                              <Trash2 size={17} />
-                              <span>删除</span>
-                            </button>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-                ))}
+                  ))}
+                </aside>
+
+                <div className="content-library-table" role="table" aria-label="文章和笔记列表">
+                  <div className="content-library-header" role="row">
+                    <span>排序</span>
+                    <span>标题</span>
+                    <span>目录</span>
+                    <span>状态</span>
+                    <span>最后修改</span>
+                    <span>操作</span>
+                  </div>
+                  {filteredManagerArticles.map((article, index) => (
+                    <article
+                      className={[
+                        'content-library-row',
+                        draggingArticleId === article.id ? 'dragging' : '',
+                        dragOverArticleId === article.id && draggingArticleId !== article.id ? 'drag-over' : ''
+                      ].filter(Boolean).join(' ')}
+                      key={article.id}
+                      draggable
+                      onDragStart={(event) => {
+                        setDraggingArticleId(article.id);
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', article.id);
+                      }}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = 'move';
+                        setDragOverArticleId(article.id);
+                      }}
+                      onDragLeave={() => {
+                        setDragOverArticleId((current) => (current === article.id ? null : current));
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        dropArticleOnTarget(article.id);
+                      }}
+                      onDragEnd={() => {
+                        setDraggingArticleId(null);
+                        setDragOverArticleId(null);
+                      }}
+                      role="row"
+                    >
+                      <div className="content-library-order" role="cell" title="拖动这一行调整顺序">
+                        <GripVertical size={16} />
+                        <span>{String(index + 1).padStart(2, '0')}</span>
+                      </div>
+                      <div className="content-library-title" role="cell">
+                        <label className="manager-select-box" aria-label={`选择 ${article.title}`}>
+                          <input
+                            type="checkbox"
+                            checked={selectedManagerArticleIds.includes(article.id)}
+                            onChange={() => toggleManagerArticleSelection(article.id)}
+                          />
+                        </label>
+                        <div>
+                          <strong>{article.title}</strong>
+                          <small>{article.summary || '暂无摘要'}</small>
+                        </div>
+                      </div>
+                      <span role="cell">{isTechnicalArticle(article) ? [article.noteCollection, article.notePath].filter(Boolean).join(' / ') || '未收纳笔记' : article.category || '未分类'}</span>
+                      <span role="cell" className={article.status === 'draft' ? 'status-badge draft' : 'status-badge'}>{article.status === 'draft' ? '草稿' : '已发布'}</span>
+                      <span role="cell">{formatArticleTimestamp(article.updatedAt, article.createdAt || article.date || '未知')}</span>
+                      <div className="manager-actions" role="cell">
+                        <button type="button" onClick={() => handleStartEditingArticle(article)}>
+                          <PencilLine size={17} />
+                          <span>编辑</span>
+                        </button>
+                        <button className="danger-button" type="button" onClick={() => deleteArticle(article)}>
+                          <Trash2 size={17} />
+                          <span>删除</span>
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -10089,10 +10281,37 @@ function AdminWorkspace({
                   <div>
                     <strong>{track.title}</strong>
                     <span>{track.filename} · {formatFileSize(track.size)} · {formatArticleTimestamp(track.createdAt, '未知时间')}</span>
+                    <span>{track.coverUrl ? '已上传封面' : '未上传封面'} · {track.lyricsUrl ? '已上传歌词' : '未上传歌词'}</span>
                   </div>
                   <audio controls preload="none" src={track.url}>
                     当前浏览器不支持音频播放。
                   </audio>
+                  <div className="music-admin-sidecar-actions">
+                    <label className="file-upload-control compact-upload">
+                      <ImageIcon size={15} />
+                      <span>封面</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        onChange={(event) => {
+                          uploadMusicCover(track, event.target.files?.[0]);
+                          event.target.value = '';
+                        }}
+                      />
+                    </label>
+                    <label className="file-upload-control compact-upload">
+                      <FilePenLine size={15} />
+                      <span>歌词</span>
+                      <input
+                        type="file"
+                        accept=".lrc,.txt,text/plain"
+                        onChange={(event) => {
+                          uploadMusicLyrics(track, event.target.files?.[0]);
+                          event.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
                   <button className="danger-button" type="button" onClick={() => deleteMusicTrack(track)}>
                     <Trash2 size={16} />
                     <span>删除</span>
@@ -10245,11 +10464,11 @@ function AdminWorkspace({
   );
 }
 
-function IconToggle({ active, label, count, icon: Icon, onClick }) {
+function IconToggle({ active, label, count, icon: Icon, onClick, tone = 'default' }) {
   return (
-    <button className={active ? 'icon-toggle active' : 'icon-toggle'} type="button" onClick={onClick} title={label}>
+    <button className={active ? 'icon-toggle active' : 'icon-toggle'} type="button" onClick={onClick} title={label} data-tone={tone}>
       <Icon size={17} />
-      <span>{label} {count}</span>
+      <span>{label} <strong className="icon-toggle-count" key={count}>{count}</strong></span>
     </button>
   );
 }
