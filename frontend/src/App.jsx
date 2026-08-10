@@ -441,7 +441,7 @@ const releaseRoadmap = [
     title: '工具箱编辑、笔记收纳与悬浮吉祥物手感修复',
     date: '2026-08-10',
     status: '已上线',
-    points: ['工具箱管理页支持编辑和删除内置网站、友链与自定义网站', '内容库新增批量收纳笔记，可填写合集和目录路径', '迷你播放器左下角优先显示当前歌曲封面', '文章互动数字取消跳动动画，点击反馈更稳', '黍泡泡提升到最顶层，只在本体区域响应点击、拖动和右键菜单']
+    points: ['工具箱管理页支持编辑和删除内置网站、友链与自定义网站，并把预置覆盖保存到后端', '内容库新增批量收纳笔记，可填写合集和目录路径', '迷你播放器左下角优先显示当前歌曲封面', '文章互动数字取消跳动动画，点击反馈更稳', '黍泡泡提升到最顶层，只在本体区域响应点击、拖动和右键菜单']
   },
   {
     version: 'v6.0',
@@ -4286,7 +4286,7 @@ function ArticleWorkspace({
         <button
           className={articleSection === 'essays' ? 'article-section-card active' : 'article-section-card'}
           type="button"
-          onClick={() => {
+          onClick={async () => {
             setArticleSection('essays');
             setSelectedArticleId(null);
           }}
@@ -4298,7 +4298,7 @@ function ArticleWorkspace({
         <button
           className={articleSection === 'notes' ? 'article-section-card active' : 'article-section-card'}
           type="button"
-          onClick={() => {
+          onClick={async () => {
             setArticleSection('notes');
             setSelectedArticleId(null);
           }}
@@ -6905,10 +6905,24 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
   const [isLoadingToolboxLinks, setIsLoadingToolboxLinks] = useState(false);
   const [isSavingToolboxLink, setIsSavingToolboxLink] = useState(false);
   const canManageToolbox = currentUser?.role === 'admin';
-  function persistToolboxDefaultOverrides(nextOverrides) {
+  async function persistToolboxDefaultOverrides(nextOverrides) {
     setToolboxDefaultOverrides(nextOverrides);
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(TOOLBOX_DEFAULT_OVERRIDES_KEY, JSON.stringify(nextOverrides));
+    }
+    if (canManageToolbox && authToken) {
+      const response = await fetch('/api/admin/toolbox-overrides', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ payload: nextOverrides })
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.detail || '预置链接保存失败');
+      }
     }
   }
 
@@ -6967,6 +6981,7 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
 
   useEffect(() => {
     refreshToolboxLinks();
+    refreshToolboxOverrides();
   }, []);
 
   async function refreshToolboxLinks() {
@@ -6979,6 +6994,22 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
       setToolboxMessage('自定义链接暂时加载失败，先显示预置工具。');
     } finally {
       setIsLoadingToolboxLinks(false);
+    }
+  }
+
+  async function refreshToolboxOverrides() {
+    try {
+      const response = await fetch('/api/toolbox-overrides');
+      if (!response.ok) return;
+      const nextOverrides = await response.json();
+      if (nextOverrides && typeof nextOverrides === 'object') {
+        setToolboxDefaultOverrides(nextOverrides);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(TOOLBOX_DEFAULT_OVERRIDES_KEY, JSON.stringify(nextOverrides));
+        }
+      }
+    } catch {
+      // Keep local fallback if the setting endpoint is temporarily unavailable.
     }
   }
 
@@ -7040,7 +7071,7 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
             hidden: false
           }
         };
-        persistToolboxDefaultOverrides(nextOverrides);
+        await persistToolboxDefaultOverrides(nextOverrides);
         resetToolboxForm('预置链接已更新');
         return;
       }
@@ -7080,7 +7111,7 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
           hidden: true
         }
       };
-      persistToolboxDefaultOverrides(nextOverrides);
+      await persistToolboxDefaultOverrides(nextOverrides);
       if (editingToolboxLinkId === link.id) resetToolboxForm('');
       setToolboxMessage('预置链接已删除');
       return;
@@ -7158,10 +7189,14 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
         <button
           className="ghost-button"
           type="button"
-          onClick={() => {
+          onClick={async () => {
             if (!window.confirm('确定恢复内置和友链预设吗？之前对预置链接的编辑和删除会被清空。')) return;
-            persistToolboxDefaultOverrides({});
-            resetToolboxForm('已恢复内置和友链预设');
+            try {
+              await persistToolboxDefaultOverrides({});
+              resetToolboxForm('已恢复内置和友链预设');
+            } catch (error) {
+              setToolboxMessage(error.message || '恢复预置失败');
+            }
           }}
         >
           <RefreshCw size={17} />

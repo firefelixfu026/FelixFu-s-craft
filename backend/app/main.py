@@ -388,6 +388,10 @@ class ToolboxLinkIn(BaseModel):
     pinned: bool = False
 
 
+class ToolboxDefaultOverridesIn(BaseModel):
+    payload: dict[str, Any]
+
+
 class ArticleOrderIn(BaseModel):
     articleIds: list[str]
 
@@ -514,6 +518,30 @@ def update_summer_plan(
 def list_toolbox_links(db: Session = Depends(get_db)) -> list[dict]:
     links = db.scalars(select(ToolboxLink).order_by(ToolboxLink.pinned.desc(), ToolboxLink.created_at.desc())).all()
     return [_toolbox_link_to_dict(link) for link in links]
+
+
+@app.get("/api/toolbox-overrides")
+def get_toolbox_overrides(db: Session = Depends(get_db)) -> dict[str, Any]:
+    setting = db.get(SiteSetting, "toolbox-overrides")
+    return setting.payload if setting and isinstance(setting.payload, dict) else {}
+
+
+@app.put("/api/admin/toolbox-overrides")
+def update_toolbox_overrides(
+    payload: ToolboxDefaultOverridesIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict[str, Any]:
+    cleaned = _clean_toolbox_overrides(payload.payload)
+    setting = db.get(SiteSetting, "toolbox-overrides")
+    if setting:
+        setting.payload = cleaned
+    else:
+        setting = SiteSetting(key="toolbox-overrides", payload=cleaned)
+        db.add(setting)
+    db.commit()
+    _record_admin_event(db, current_user, "更新工具箱预置链接", "toolbox", "overrides", f"{len(cleaned)} entries")
+    return cleaned
 
 
 @app.post("/api/admin/toolbox-links")
@@ -2335,6 +2363,36 @@ def _clean_toolbox_payload(payload: ToolboxLinkIn) -> dict[str, Any]:
         "tags": _clean_tags(payload.tags)[:8],
         "pinned": bool(payload.pinned),
     }
+
+
+def _clean_toolbox_overrides(payload: dict[str, Any]) -> dict[str, Any]:
+    cleaned: dict[str, Any] = {}
+    if not isinstance(payload, dict):
+        return cleaned
+    for raw_key, raw_value in payload.items():
+        key = str(raw_key).strip()[:80]
+        if not key or not isinstance(raw_value, dict):
+            continue
+        item: dict[str, Any] = {}
+        if raw_value.get("hidden") is True:
+            item["hidden"] = True
+        for field, limit in {
+            "title": 120,
+            "category": 60,
+            "url": 1000,
+            "description": 500,
+        }.items():
+            value = str(raw_value.get(field) or "").strip()
+            if value:
+                item[field] = value[:limit]
+        tags = raw_value.get("tags")
+        if isinstance(tags, list):
+            item["tags"] = _clean_tags([str(tag) for tag in tags])[:8]
+        if "pinned" in raw_value:
+            item["pinned"] = bool(raw_value.get("pinned"))
+        if item:
+            cleaned[key] = item
+    return cleaned
 
 
 def _toolbox_link_to_dict(link: ToolboxLink) -> dict[str, Any]:
