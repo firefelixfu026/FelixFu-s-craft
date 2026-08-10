@@ -94,6 +94,22 @@ const readerNavItems = [
 
 const adminNavItem = { id: 'admin', label: '管理', icon: FilePenLine };
 const accountNavItem = { id: 'account', label: '账号', icon: ShieldCheck };
+const VIEW_PATHS = {
+  overview: '/',
+  articles: '/articles',
+  plan: '/plan',
+  music: '/music',
+  toolbox: '/toolbox',
+  game: '/game',
+  login: '/login',
+  account: '/account',
+  admin: '/admin'
+};
+const ARTICLE_SECTION_PATHS = {
+  essays: '/articles',
+  notes: '/notes'
+};
+const ROUTED_VIEW_IDS = new Set(Object.keys(VIEW_PATHS));
 
 const COMMENT_MAX_LENGTH = 300;
 const COMMENT_PAGE_UNITS = 5;
@@ -214,7 +230,7 @@ function readStoredUser() {
 function readStoredActiveView() {
   if (typeof localStorage === 'undefined') return 'overview';
   const storedView = localStorage.getItem(ACTIVE_VIEW_KEY) || 'overview';
-  const publicViews = new Set(['overview', 'articles', 'plan', 'music', 'game', 'login', 'account', 'admin']);
+  const publicViews = new Set(['overview', 'articles', 'plan', 'music', 'toolbox', 'game', 'login', 'account', 'admin']);
   return publicViews.has(storedView) ? storedView : 'overview';
 }
 
@@ -390,6 +406,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v5.5',
+    title: '真实 URL 路由',
+    date: '2026-08-10',
+    status: '已上线',
+    points: ['首页、文章、计划、音乐、工具箱、游戏、账号和后台都有独立路径', '技术笔记支持 /notes 和 /notes/文章id 直接访问', '浏览器前进后退、刷新和分享链接能保持当前页面']
+  },
   {
     version: 'v5.4.6',
     title: '身体睡眠图表与友链',
@@ -1226,6 +1249,65 @@ function getArticleSection(article) {
   return isTechnicalArticle(article) ? 'notes' : 'essays';
 }
 
+function normalizeRoutePath(pathname = '/') {
+  const rawPath = pathname || '/';
+  const withoutTrailingSlash = rawPath.length > 1 ? rawPath.replace(/\/+$/, '') : rawPath;
+  return withoutTrailingSlash || '/';
+}
+
+function decodeRoutePart(value = '') {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function parseRoutePath(pathname = '/') {
+  const path = normalizeRoutePath(pathname);
+  if (path === '/') return { view: 'overview', articleSection: 'essays', articleId: null };
+
+  const parts = path.split('/').filter(Boolean).map(decodeRoutePart);
+  const [area, id] = parts;
+  if (area === 'articles') return { view: 'articles', articleSection: 'essays', articleId: id || null };
+  if (area === 'notes') return { view: 'articles', articleSection: 'notes', articleId: id || null };
+
+  const matchedView = Object.entries(VIEW_PATHS).find(([, viewPath]) => normalizeRoutePath(viewPath).slice(1) === area);
+  if (matchedView) return { view: matchedView[0], articleSection: 'essays', articleId: null };
+
+  return null;
+}
+
+function readCurrentRoute() {
+  if (typeof window === 'undefined') return null;
+  return parseRoutePath(window.location.pathname);
+}
+
+function readInitialActiveView() {
+  return readCurrentRoute()?.view || readStoredActiveView();
+}
+
+function readInitialArticleSection() {
+  return readCurrentRoute()?.articleSection || 'essays';
+}
+
+function readInitialArticleId() {
+  return readCurrentRoute()?.articleId || null;
+}
+
+function getViewPath(view, articleSection = 'essays') {
+  if (view === 'articles') return ARTICLE_SECTION_PATHS[articleSection] || ARTICLE_SECTION_PATHS.essays;
+  return VIEW_PATHS[view] || VIEW_PATHS.overview;
+}
+
+function getArticlePath(articleOrId, fallbackSection = 'essays') {
+  const article = typeof articleOrId === 'object' ? articleOrId : null;
+  const articleId = article?.id || articleOrId;
+  const section = article ? getArticleSection(article) : fallbackSection;
+  const basePath = ARTICLE_SECTION_PATHS[section] || ARTICLE_SECTION_PATHS.essays;
+  return `${basePath}/${encodeURIComponent(articleId)}`;
+}
+
 function splitNotePath(value = '') {
   return String(value)
     .split(/[\/>｜|]+/)
@@ -1349,7 +1431,8 @@ function aiTaskLabel(task) {
 
 
 function App() {
-  const [activeView, setActiveView] = useState(readStoredActiveView);
+  const [activeView, setActiveView] = useState(readInitialActiveView);
+  const [articleSection, setArticleSection] = useState(readInitialArticleSection);
   const [theme, setTheme] = useState(readStoredTheme);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(readStoredSidebarCollapsed);
   const [query, setQuery] = useState('');
@@ -1365,7 +1448,7 @@ function App() {
   const [commentReplyTargets, setCommentReplyTargets] = useState({});
   const [comments, setComments] = useState({});
   const [commentPages, setCommentPages] = useState({});
-  const [selectedArticleId, setSelectedArticleId] = useState(null);
+  const [selectedArticleId, setSelectedArticleId] = useState(readInitialArticleId);
   const [articleForm, setArticleForm] = useState(createEmptyArticleForm);
   const [editingArticleId, setEditingArticleId] = useState(null);
   const [adminMessage, setAdminMessage] = useState('');
@@ -1532,6 +1615,41 @@ function App() {
     setMusicIsPlaying(false);
   }
 
+  function writeBrowserRoute(path, { replace = false } = {}) {
+    if (typeof window === 'undefined') return;
+    const normalizedPath = normalizeRoutePath(path);
+    const nextUrl = `${normalizedPath}${window.location.search}${window.location.hash}`;
+    const currentUrl = `${normalizeRoutePath(window.location.pathname)}${window.location.search}${window.location.hash}`;
+    if (nextUrl === currentUrl) return;
+    window.history[replace ? 'replaceState' : 'pushState'](null, '', nextUrl);
+  }
+
+  function navigateToView(view, { replace = false, section = articleSection } = {}) {
+    const nextView = ROUTED_VIEW_IDS.has(view) ? view : 'overview';
+    const nextSection = nextView === 'articles' ? section : 'essays';
+    writeBrowserRoute(getViewPath(nextView, nextSection), { replace });
+    setActiveView(nextView);
+    setArticleSection(nextSection);
+    setSelectedArticleId(null);
+  }
+
+  function navigateToArticleSection(section, { replace = false } = {}) {
+    const nextSection = section === 'notes' ? 'notes' : 'essays';
+    writeBrowserRoute(getViewPath('articles', nextSection), { replace });
+    setActiveView('articles');
+    setArticleSection(nextSection);
+    setSelectedArticleId(null);
+  }
+
+  function navigateToArticle(articleId, { replace = false } = {}) {
+    const article = articles.find((item) => String(item.id) === String(articleId));
+    const nextSection = article ? getArticleSection(article) : articleSection;
+    writeBrowserRoute(getArticlePath(article || articleId, nextSection), { replace });
+    setActiveView('articles');
+    setArticleSection(nextSection);
+    setSelectedArticleId(articleId);
+  }
+
   function createMusicPlaylist(name) {
     const playlistName = name.trim();
     if (!playlistName) return;
@@ -1582,6 +1700,32 @@ function App() {
   useEffect(() => {
     localStorage.setItem(ACTIVE_VIEW_KEY, activeView);
   }, [activeView]);
+
+  useEffect(() => {
+    function handleRouteChange() {
+      const route = readCurrentRoute();
+      if (!route) {
+        navigateToView('overview', { replace: true });
+        return;
+      }
+      setActiveView(route.view);
+      setArticleSection(route.articleSection || 'essays');
+      setSelectedArticleId(route.articleId || null);
+    }
+
+    window.addEventListener('popstate', handleRouteChange);
+    return () => window.removeEventListener('popstate', handleRouteChange);
+  }, []);
+
+  useEffect(() => {
+    const routePath = activeView === 'articles' && selectedArticleId
+      ? getArticlePath(
+        articles.find((article) => String(article.id) === String(selectedArticleId)) || selectedArticleId,
+        articleSection
+      )
+      : getViewPath(activeView, articleSection);
+    writeBrowserRoute(routePath, { replace: true });
+  }, [activeView, articleSection, selectedArticleId, articles]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -1645,12 +1789,12 @@ function App() {
       setCurrentUser(null);
       setAuthToken(token);
       setAuthMessage('GitHub 登录成功');
-      setActiveView('admin');
+      navigateToView('admin', { replace: true });
       return;
     }
 
     setAuthMessage(error ? `GitHub 登录失败：${error}` : 'GitHub 登录失败');
-    setActiveView('login');
+    navigateToView('login', { replace: true });
   }, []);
 
   useEffect(() => {
@@ -1700,6 +1844,11 @@ function App() {
   }, [activeView, currentUser?.id, authToken]);
 
   useEffect(() => {
+    if (activeView !== 'articles' || !selectedArticleId) return;
+    loadArticleDetail(selectedArticleId);
+  }, [activeView, selectedArticleId, authToken]);
+
+  useEffect(() => {
     if (currentUser?.role !== 'admin') return;
     const rawDraft = localStorage.getItem(ARTICLE_DRAFT_KEY);
     if (rawDraft) {
@@ -1724,19 +1873,19 @@ function App() {
   useEffect(() => {
     if (!currentUser) {
       if (authToken) return;
-      if (!['overview', 'articles', 'plan', 'music', 'game', 'login'].includes(activeView)) {
-        setActiveView('overview');
+      if (!['overview', 'articles', 'plan', 'music', 'toolbox', 'game', 'login'].includes(activeView)) {
+        navigateToView('overview', { replace: true });
       }
       return;
     }
 
     if (activeView === 'admin' && currentUser.role !== 'admin') {
-      setActiveView('overview');
+      navigateToView('overview', { replace: true });
       return;
     }
 
     if (activeView === 'ai') {
-      setActiveView('overview');
+      navigateToView('overview', { replace: true });
     }
   }, [activeView, authToken, currentUser?.role]);
 
@@ -2059,8 +2208,8 @@ function App() {
     }));
   }
 
-  async function openArticle(articleId) {
-    setSelectedArticleId(articleId);
+  async function loadArticleDetail(articleId) {
+    if (!articleId) return;
     try {
       const response = await fetch(`/api/articles/${articleId}`, {
         headers: getAuthHeaders()
@@ -2070,6 +2219,10 @@ function App() {
     } catch {
       setInteractionMessage('后端服务不可用，阅读次数暂时无法更新');
     }
+  }
+
+  async function openArticle(articleId) {
+    navigateToArticle(articleId);
   }
 
   function updateAuthForm(field, value) {
@@ -2118,7 +2271,7 @@ function App() {
       setInteractionMessage('');
       await refreshArticles(result.token);
       setAuthMessage('已登录');
-      setActiveView(result.user?.role === 'admin' ? 'admin' : 'articles');
+      navigateToView(result.user?.role === 'admin' ? 'admin' : 'articles');
     } catch {
       setAuthMessage('后端服务不可用，登录失败');
     } finally {
@@ -2133,7 +2286,7 @@ function App() {
     setAuthMessage('');
     setInteractionMessage('');
     if (redirect) {
-      setActiveView('overview');
+      navigateToView('overview');
     }
   }
 
@@ -3171,7 +3324,7 @@ function App() {
                 key={item.id}
                 className={activeView === item.id ? 'nav-button active' : 'nav-button'}
                 type="button"
-                onClick={() => setActiveView(item.id)}
+                onClick={() => navigateToView(item.id)}
                 title={item.label}
                 aria-label={item.label}
               >
@@ -3191,7 +3344,7 @@ function App() {
           ) : (
             <>
               <span>后台账号</span>
-              <button className="icon-text-button" type="button" onClick={() => setActiveView('login')} title="登录" aria-label="登录">
+              <button className="icon-text-button" type="button" onClick={() => navigateToView('login')} title="登录" aria-label="登录">
                 <LogIn size={17} />
                 <span>登录</span>
               </button>
@@ -3208,7 +3361,7 @@ function App() {
             togglePlayback={toggleMusicPlayback}
             stepTrack={stepMusicTrack}
             seekTrack={seekMusicTrack}
-            openMusic={() => setActiveView('music')}
+            openMusic={() => navigateToView('music')}
           />
         )}
       </aside>
@@ -3270,7 +3423,7 @@ function App() {
           </section>
         )}
 
-        {activeView === 'overview' && <Overview profile={profile} articles={articles} setActiveView={setActiveView} currentUser={currentUser} />}
+        {activeView === 'overview' && <Overview profile={profile} articles={articles} setActiveView={navigateToView} currentUser={currentUser} />}
 
         {activeView === 'articles' && (
           <ArticleWorkspace
@@ -3302,6 +3455,8 @@ function App() {
             setCommentPages={setCommentPages}
             query={query}
             searchMeta={searchMeta}
+            articleSection={articleSection}
+            setArticleSection={navigateToArticleSection}
           />
         )}
 
@@ -3353,13 +3508,12 @@ function App() {
             profile={profile}
             accountActivity={accountActivity}
             refreshAccountActivity={refreshAccountActivity}
-            setActiveView={setActiveView}
+            setActiveView={navigateToView}
             updateSidebarAvatar={updateSidebarAvatar}
             profileAvatarMessage={profileAvatarMessage}
             isSavingProfileAvatar={isSavingProfileAvatar || isUploadingImage}
             logout={logout}
             openArticle={(articleId) => {
-              setActiveView('articles');
               openArticle(articleId);
             }}
           />
@@ -3374,7 +3528,7 @@ function App() {
             isAuthLoading={isAuthLoading}
             currentUser={currentUser}
             logout={logout}
-            goToAdmin={() => setActiveView('admin')}
+            goToAdmin={() => navigateToView('admin')}
           />
         )}
 
@@ -4000,10 +4154,11 @@ function ArticleWorkspace({
   commentPages,
   setCommentPages,
   query = '',
-  searchMeta = parseSearchQuery('')
+  searchMeta = parseSearchQuery(''),
+  articleSection = 'essays',
+  setArticleSection = () => {}
 }) {
-  const selectedArticle = articles.find((article) => article.id === selectedArticleId) || null;
-  const [articleSection, setArticleSection] = useState('essays');
+  const selectedArticle = articles.find((article) => String(article.id) === String(selectedArticleId)) || null;
   const essayArticles = articles.filter((article) => getArticleSection(article) === 'essays');
   const noteArticles = articles.filter((article) => getArticleSection(article) === 'notes');
   const activeArticles = articleSection === 'notes' ? noteArticles : essayArticles;
@@ -4045,7 +4200,7 @@ function ArticleWorkspace({
         currentUser={currentUser}
         commentPages={commentPages}
         setCommentPages={setCommentPages}
-        onBack={() => setSelectedArticleId(null)}
+        onBack={() => setArticleSection(articleSection)}
         siblingArticles={articles}
         openArticle={openArticle}
       />
