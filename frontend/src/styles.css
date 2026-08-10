@@ -1125,6 +1125,107 @@ mark {
   line-height: 1.45;
 }
 
+.friend-links-band {
+  position: relative;
+  overflow: hidden;
+}
+
+.friend-links-band::before {
+  content: '';
+  position: absolute;
+  inset: 18px;
+  pointer-events: none;
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(31, 122, 109, 0.08) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(96, 165, 250, 0.08) 1px, transparent 1px);
+  background-size: 38px 38px;
+  mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent);
+}
+
+.friend-link-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 28px;
+}
+
+.friend-link-card {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  min-height: 112px;
+  padding: 18px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  color: #102033;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(248, 250, 252, 0.96)),
+    #ffffff;
+  text-decoration: none;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.friend-link-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(31, 122, 109, 0.36);
+  box-shadow: 0 18px 36px rgba(16, 32, 51, 0.1);
+}
+
+.friend-link-card strong {
+  display: block;
+  overflow: hidden;
+  color: #2f6fae;
+  font-size: 20px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-link-card p {
+  margin: 6px 0 0;
+  color: #6a7685;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.friend-link-card > svg {
+  color: #8aa0b8;
+}
+
+.friend-link-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #1f7a6d, #60a5fa);
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.friend-link-card.cyan .friend-link-avatar {
+  background: linear-gradient(135deg, #0891b2, #67e8f9);
+}
+
+.friend-link-card.green .friend-link-avatar {
+  background: linear-gradient(135deg, #16a34a, #86efac);
+}
+
+.friend-link-card.purple .friend-link-avatar {
+  background: linear-gradient(135deg, #7c3aed, #c4b5fd);
+}
+
+.friend-link-card.teal .friend-link-avatar {
+  background: linear-gradient(135deg, #0f766e, #5eead4);
+}
+
+.friend-link-card.gray .friend-link-avatar {
+  background: linear-gradient(135deg, #334155, #94a3b8);
+}
+
 .workspace {
   display: grid;
   gap: 28px;
@@ -6181,9 +6282,27 @@ h3 {
   fill: #2563eb;
 }
 
+.metric-line {
+  stroke: #f472b6;
+}
+
+.metric-point {
+  stroke: #f472b6;
+}
+
+.metric-bar {
+  fill: #f472b6;
+}
+
 .chart-label {
   fill: #6a7685;
   font-size: 12px;
+}
+
+.chart-value-label {
+  fill: #334155;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .compact-plan-date-picker {
@@ -6571,6 +6690,7 @@ h3 {
 :root[data-theme='dark'] .popular-list button,
 :root[data-theme='dark'] .live-status-card,
 :root[data-theme='dark'] .home-update-item,
+:root[data-theme='dark'] .friend-link-card,
 :root[data-theme='dark'] .latest-article-strip,
 :root[data-theme='dark'] .metric,
 :root[data-theme='dark'] .skill-pillar-card,
@@ -6742,6 +6862,12 @@ h3 {
 :root[data-theme='dark'] .home-update-item span {
   color: #06151b;
   background: var(--accent);
+}
+
+:root[data-theme='dark'] .friend-links-band::before {
+  background:
+    linear-gradient(90deg, rgba(52, 211, 153, 0.08) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(96, 165, 250, 0.08) 1px, transparent 1px);
 }
 
 :root[data-theme='dark'] .reading-toolbar {
@@ -7009,6 +7135,7 @@ h3 {
 :root[data-theme='dark'] .home-clock-meta,
 :root[data-theme='dark'] .home-update-item em,
 :root[data-theme='dark'] .home-update-item ul,
+:root[data-theme='dark'] .friend-link-card p,
 :root[data-theme='dark'] .latest-article-strip span,
 :root[data-theme='dark'] .latest-article-strip em,
 :root[data-theme='dark'] .article-card p,
@@ -7110,7 +7237,8 @@ h3 {
 }
 
 :root[data-theme='dark'] .home-clock-time,
-:root[data-theme='dark'] .home-update-item strong {
+:root[data-theme='dark'] .home-update-item strong,
+:root[data-theme='dark'] .friend-link-card strong {
   color: var(--text-main);
 }
 
@@ -7196,8 +7324,10 @@ h3 {
 
 :root[data-theme='dark'] .date,
 :root[data-theme='dark'] .article-meta,
-:root[data-theme='dark'] .chart-label {
+:root[data-theme='dark'] .chart-label,
+:root[data-theme='dark'] .chart-value-label {
   color: var(--text-muted);
+  fill: var(--text-muted);
 }
 
 :root[data-theme='dark'] .markdown-math,
@@ -7499,6 +7629,7 @@ h3 {
   .ai-config-form,
   .template-grid,
   .home-pulse-grid,
+  .friend-link-grid,
   .summer-plan-hero,
   .summer-goal-grid,
   .summer-module-grid,

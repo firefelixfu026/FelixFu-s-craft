@@ -391,6 +391,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v5.4.6',
+    title: '身体睡眠图表与友链',
+    date: '2026-08-10',
+    status: '已上线',
+    points: ['体重与状态模块新增趋势折线图和记录完整度柱状图', '睡眠记录模块新增睡眠时长折线图和柱状图', '首页新增友链/推荐链接区，保留个人博客互访入口']
+  },
+  {
     version: 'v5.4.5',
     title: '后台视觉巡检',
     date: '2026-08-09',
@@ -3613,6 +3620,50 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
     ['latest', recentArticles[0]?.title || '等待第一篇新文章'],
     ['mode', currentUser?.role === 'admin' ? 'admin workspace unlocked' : 'reader mode']
   ];
+  const friendLinks = [
+    {
+      title: "BruceJin's Notebook",
+      description: '学长的课程笔记与个人站点，适合参考内容组织方式。',
+      url: 'https://brucejqs.github.io/MyNotebook/',
+      avatar: 'BJ',
+      tone: 'blue'
+    },
+    {
+      title: "Wcowin's Web",
+      description: 'MkDocs 主题与教程，站点审美和文档结构都很值得看。',
+      url: 'https://wcowin.work/',
+      avatar: 'W',
+      tone: 'cyan'
+    },
+    {
+      title: 'Chenji Learning Hub',
+      description: '同学的全栈学习工作台，和这台服务器一起成长中。',
+      url: 'https://chenji.felixfu.xyz/',
+      avatar: 'CJ',
+      tone: 'green'
+    },
+    {
+      title: 'ZJU CS-All Sum In One',
+      description: '浙大 CS 课程资料集合，查课设和复习资料很方便。',
+      url: 'https://qsctech.github.io/zju-icicles/',
+      avatar: 'CS',
+      tone: 'purple'
+    },
+    {
+      title: 'MkDocs Material',
+      description: '技术笔记站的经典参考，后面整理课程笔记可以借鉴。',
+      url: 'https://squidfunk.github.io/mkdocs-material/',
+      avatar: 'MD',
+      tone: 'teal'
+    },
+    {
+      title: 'GitHub',
+      description: '项目、笔记和小工具的公开仓库入口。',
+      url: 'https://github.com/firefelixfu026',
+      avatar: 'GH',
+      tone: 'gray'
+    }
+  ];
 
   return (
     <section className="workspace homepage-workspace">
@@ -3724,6 +3775,25 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
             ))}
           </div>
         </article>
+      </section>
+
+      <section className="content-band friend-links-band">
+        <div className="section-heading">
+          <p className="eyebrow">友链</p>
+          <h2>我愿意挂出来的站点</h2>
+        </div>
+        <div className="friend-link-grid">
+          {friendLinks.map((link) => (
+            <a className={`friend-link-card ${link.tone}`} href={link.url} target="_blank" rel="noreferrer" key={link.title}>
+              <span className="friend-link-avatar" aria-hidden="true">{link.avatar}</span>
+              <div>
+                <strong>{link.title}</strong>
+                <p>{link.description}</p>
+              </div>
+              <ExternalLink size={17} />
+            </a>
+          ))}
+        </div>
       </section>
 
       <section className="content-band live-status-band">
@@ -5427,6 +5497,45 @@ function getSevenDayAppUsage(appUsageDays, selectedDate) {
   });
 }
 
+function parseMetricNumber(value) {
+  const match = String(value || '').match(/-?\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : 0;
+}
+
+function formatPlanChartLabel(label) {
+  return String(label || '')
+    .replace('8月', '8/')
+    .replace('日', '')
+    .replace('月', '/')
+    .replace('日', '');
+}
+
+function getRecentRows(rows, limit = 7) {
+  const source = Array.isArray(rows) ? rows : [];
+  return source.slice(Math.max(0, source.length - limit));
+}
+
+function getBodyMetricChartData(rows) {
+  return getRecentRows(rows).map((row) => {
+    const filledCount = ['weight', 'exercise', 'mood'].filter((field) => String(row[field] || '').trim()).length;
+    return {
+      label: row.date || '未填日期',
+      actual: parseMetricNumber(row.weight),
+      barValue: filledCount,
+      limit: 3
+    };
+  });
+}
+
+function getSleepMetricChartData(rows) {
+  return getRecentRows(rows).map((row) => ({
+    label: row.date || '未填日期',
+    actual: parseMetricNumber(row.hours),
+    barValue: parseMetricNumber(row.hours),
+    limit: 8
+  }));
+}
+
 function normalizeSummerPlan(plan) {
   const dailyPlans = normalizeDailyPlans(plan);
   const appUsageDays = normalizeAppUsageDays(plan);
@@ -5468,6 +5577,8 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
   const selectedCompletionRows = getCompletionRowsForDay(selectedCompletionDay, dayPlans);
   const completionRate = calculateCompletionRate(selectedCompletionRows);
   const completionChartData = getSevenDayCompletion(completionDays, selectedCompletionDay.date, dayPlans);
+  const bodyMetricChartData = getBodyMetricChartData(plan.bodyMetrics);
+  const sleepMetricChartData = getSleepMetricChartData(plan.sleep);
 
   useEffect(() => {
     let cancelled = false;
@@ -5879,6 +5990,10 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
             <PlusCircle size={16} />
             <span>新增记录</span>
           </button>
+          <div className="usage-chart-grid">
+            <MetricLineChart data={bodyMetricChartData} title="体重折线图" subtitle="最近 7 条记录" unit="kg" fallbackMax={100} />
+            <MetricBarChart data={bodyMetricChartData} title="记录完整度柱状图" subtitle="体重 / 运动 / 状态" unit="项" valueKey="barValue" fallbackMax={3} />
+          </div>
           <EditableTable
             columns={[
               ['date', '日期', 'input'],
@@ -5899,6 +6014,10 @@ function SummerPlanWorkspace({ currentUser, authToken }) {
             <PlusCircle size={16} />
             <span>新增睡眠</span>
           </button>
+          <div className="usage-chart-grid">
+            <MetricLineChart data={sleepMetricChartData} title="睡眠时长折线图" subtitle="最近 7 条记录" unit="h" fallbackMax={10} />
+            <MetricBarChart data={sleepMetricChartData} title="睡眠时长柱状图" subtitle="目标参考 8h" unit="h" valueKey="barValue" fallbackMax={10} />
+          </div>
           <EditableTable
             columns={[
               ['date', '日期范围', 'input'],
@@ -6238,6 +6357,78 @@ function CompletionBarChart({ data }) {
               <rect className="chart-bar-limit" x={x} y={padding} width={barWidth} height={height - padding * 2} rx="5" />
               <rect className="chart-bar-actual completion-bar" x={x} y={height - padding - barHeight} width={barWidth} height={barHeight} rx="5" />
               <text className="chart-label" x={x + barWidth / 2} y={height - 10} textAnchor="middle">{item.label.replace('8月', '8/').replace('日', '')}</text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function MetricLineChart({ data, title, subtitle, unit = '', fallbackMax = 10 }) {
+  const width = 560;
+  const height = 220;
+  const padding = 34;
+  const maxValue = Math.max(fallbackMax, ...data.map((item) => item.actual || 0));
+  const minPositive = data.some((item) => item.actual > 0) ? Math.min(...data.filter((item) => item.actual > 0).map((item) => item.actual)) : 0;
+  const minValue = minPositive > 20 ? Math.floor(minPositive - 2) : 0;
+  const range = Math.max(1, maxValue - minValue);
+  const points = data.map((item, index) => {
+    const x = padding + (index * (width - padding * 2)) / Math.max(1, data.length - 1);
+    const y = height - padding - ((Math.max(item.actual || 0, minValue) - minValue) / range) * (height - padding * 2);
+    return { ...item, x, y };
+  });
+  const path = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+
+  return (
+    <div className="usage-chart-card">
+      <div className="usage-chart-heading">
+        <h3>{title}</h3>
+        <span>{subtitle}</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
+        <line className="chart-axis" x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} />
+        <line className="chart-axis" x1={padding} y1={padding} x2={padding} y2={height - padding} />
+        <path className="chart-line metric-line" d={path} />
+        {points.map((point) => (
+          <g key={point.label}>
+            <circle className="chart-point metric-point" cx={point.x} cy={point.y} r="4" />
+            <text className="chart-value-label" x={point.x} y={Math.max(18, point.y - 10)} textAnchor="middle">{point.actual ? `${point.actual}${unit}` : '0'}</text>
+            <text className="chart-label" x={point.x} y={height - 10} textAnchor="middle">{formatPlanChartLabel(point.label)}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function MetricBarChart({ data, title, subtitle, unit = '', valueKey = 'actual', fallbackMax = 10 }) {
+  const width = 560;
+  const height = 220;
+  const padding = 34;
+  const maxValue = Math.max(fallbackMax, ...data.map((item) => item[valueKey] || 0), ...data.map((item) => item.limit || 0));
+  const barWidth = (width - padding * 2) / Math.max(1, data.length) * 0.52;
+
+  return (
+    <div className="usage-chart-card">
+      <div className="usage-chart-heading">
+        <h3>{title}</h3>
+        <span>{subtitle}</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
+        <line className="chart-axis" x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} />
+        {data.map((item, index) => {
+          const groupWidth = (width - padding * 2) / Math.max(1, data.length);
+          const x = padding + index * groupWidth + (groupWidth - barWidth) / 2;
+          const value = item[valueKey] || 0;
+          const barHeight = (value / maxValue) * (height - padding * 2);
+          const limitHeight = ((item.limit || 0) / maxValue) * (height - padding * 2);
+          return (
+            <g key={item.label}>
+              {item.limit ? <rect className="chart-bar-limit" x={x} y={height - padding - limitHeight} width={barWidth} height={limitHeight} rx="5" /> : null}
+              <rect className="chart-bar-actual metric-bar" x={x} y={height - padding - barHeight} width={barWidth} height={barHeight} rx="5" />
+              <text className="chart-value-label" x={x + barWidth / 2} y={Math.max(18, height - padding - barHeight - 8)} textAnchor="middle">{value ? `${value}${unit}` : '0'}</text>
+              <text className="chart-label" x={x + barWidth / 2} y={height - 10} textAnchor="middle">{formatPlanChartLabel(item.label)}</text>
             </g>
           );
         })}
