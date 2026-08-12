@@ -126,6 +126,7 @@ const LIVE2D_TEXTURE_FALLBACK_URL = '/live2d/shu-bubble/textures/texture_00.png'
 const LIVE2D_HIDDEN_KEY = 'felix_blog_live2d_hidden';
 const LIVE2D_POSITION_KEY = 'felix_blog_live2d_position_v2';
 const LIVE2D_MODE_KEY = 'felix_blog_live2d_mode';
+const LIVE2D_QUIET_KEY = 'felix_blog_live2d_quiet';
 const LIVE2D_SHOW_EVENT = 'felix-live2d-show';
 const LIVE2D_SCRIPT_SOURCES = [
   'https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js',
@@ -180,6 +181,8 @@ const SIDEBAR_COLLAPSED_KEY = 'felix_blog_sidebar_collapsed';
 const AUTH_FAIL_STATE_KEY = 'felix_blog_auth_fail_state';
 const DEFAULT_SITE_PREFERENCES = { summerPlanVisible: false };
 const SITE_LAUNCH_DATE = '2026-07-22T00:00:00+08:00';
+const MARKDOWN_CACHE_LIMIT = 60;
+const markdownBlockCache = new Map();
 const LOGIN_LOCK_MS = 60 * 1000;
 const emptyReactionState = { like: false, favorite: false, downvote: false, question: false };
 const ALL_FILTER = '全部';
@@ -447,6 +450,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.2.0',
+    title: '知识库、音乐和助手体验继续打磨',
+    date: '2026-08-12',
+    status: '已上线',
+    points: ['Mermaid 流程图支持轻量图形预览，并保留源码切换', '技术笔记目录尊重后台排序，内容库目录增加统计概览', '黍泡泡新增低打扰模式，切页面不再强制弹话', '音乐歌词支持 LRC 时间戳高亮和自动滚动', 'Markdown 解析加入缓存，长文预览和目录生成更顺']
+  },
   {
     version: 'v6.1.0',
     title: '体验细化与内容系统迭代',
@@ -1544,6 +1554,7 @@ function getArticleNotePathSegments(article = {}) {
 function createNoteTreeNode(name) {
   return {
     name,
+    order: Number.MAX_SAFE_INTEGER,
     children: new Map(),
     articles: []
   };
@@ -1551,18 +1562,27 @@ function createNoteTreeNode(name) {
 
 function buildNoteTree(articles = []) {
   const root = new Map();
-  articles.forEach((article) => {
+  articles.forEach((article, index) => {
+    const articleOrder = getArticleSortValue(article, index);
     const collectionName = getArticleNoteCollection(article);
     if (!root.has(collectionName)) root.set(collectionName, createNoteTreeNode(collectionName));
     let currentNode = root.get(collectionName);
+    currentNode.order = Math.min(currentNode.order, articleOrder);
     getArticleNotePathSegments(article).forEach((segment) => {
       if (segment === collectionName) return;
       if (!currentNode.children.has(segment)) currentNode.children.set(segment, createNoteTreeNode(segment));
       currentNode = currentNode.children.get(segment);
+      currentNode.order = Math.min(currentNode.order, articleOrder);
     });
     currentNode.articles.push(article);
   });
-  return Array.from(root.values());
+  return Array.from(root.values()).sort((first, second) => (first.order || 0) - (second.order || 0));
+}
+
+function getArticleSortValue(article = {}, fallbackIndex = 0) {
+  const candidates = [article.sortOrder, article.order, article.displayOrder, article.position];
+  const numeric = candidates.map(Number).find((value) => Number.isFinite(value));
+  return Number.isFinite(numeric) ? numeric : fallbackIndex;
 }
 
 function noteNodeHasActiveArticle(node, activeArticleId) {
@@ -4210,8 +4230,7 @@ function Overview({ profile, articles, setActiveView, currentUser, canViewSummer
   const liveStats = [
     { label: '上线时间', value: formatLaunchDuration(homeNow), detail: '精准到秒' },
     { label: '公开文章', value: `${publishedArticles.length} 篇`, detail: currentMonthCount ? `本月 ${currentMonthCount} 篇` : '等待新内容' },
-    { label: '阅读记录', value: `${totalViews} 次`, detail: '来自文章详情页' },
-    { label: '评论互动', value: `${totalComments} 条`, detail: currentUser ? '已登录可参与' : 'GitHub 登录后可评论' }
+    { label: '阅读记录', value: `${totalViews} 次`, detail: totalComments ? `${totalComments} 条评论` : '来自文章详情页' }
   ];
   const recentArticles = [...articles].slice(0, 3);
   const homeEntryCards = [
@@ -4977,8 +4996,8 @@ function NoteTree({ articles, activeArticleId, openArticle }) {
 }
 
 function NoteTreeNode({ node, activeArticleId, openArticle, level }) {
-  const childNodes = Array.from(node.children.values()).sort((first, second) => first.name.localeCompare(second.name, 'zh-CN'));
-  const articles = [...node.articles].sort((first, second) => (first.title || '').localeCompare(second.title || '', 'zh-CN'));
+  const childNodes = Array.from(node.children.values()).sort((first, second) => (first.order || 0) - (second.order || 0));
+  const articles = [...node.articles].sort((first, second) => getArticleSortValue(first) - getArticleSortValue(second));
   const isOpenByDefault = level < 1 || noteNodeHasActiveArticle(node, activeArticleId);
   const [isOpen, setIsOpen] = useState(isOpenByDefault);
 
@@ -5102,6 +5121,121 @@ function MarkdownCodeBlock({ language, text }) {
   );
 }
 
+function MarkdownMermaidBlock({ text }) {
+  const diagram = useMemo(() => parseSimpleMermaidDiagram(text), [text]);
+  const [showSource, setShowSource] = useState(!diagram);
+
+  if (!diagram) {
+    return (
+      <div className="markdown-mermaid source-only">
+        <div className="markdown-mermaid-toolbar">
+          <span>Mermaid</span>
+          <em>暂不支持的图表，显示源码</em>
+        </div>
+        <pre>{text}</pre>
+      </div>
+    );
+  }
+
+  return (
+    <div className="markdown-mermaid">
+      <div className="markdown-mermaid-toolbar">
+        <span>Mermaid</span>
+        <button type="button" onClick={() => setShowSource((current) => !current)}>
+          {showSource ? '看图表' : '看源码'}
+        </button>
+      </div>
+      {showSource ? (
+        <pre>{text}</pre>
+      ) : (
+        <svg
+          className="markdown-mermaid-svg"
+          viewBox={`0 0 ${diagram.width} ${diagram.height}`}
+          role="img"
+          aria-label="Mermaid 流程图"
+        >
+          <defs>
+            <marker id="mermaid-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" />
+            </marker>
+          </defs>
+          {diagram.edges.map((edge) => (
+            <path
+              className="markdown-mermaid-edge"
+              d={`M ${edge.from.x + edge.from.width} ${edge.from.y + edge.from.height / 2} C ${edge.from.x + edge.from.width + 40} ${edge.from.y + edge.from.height / 2}, ${edge.to.x - 40} ${edge.to.y + edge.to.height / 2}, ${edge.to.x} ${edge.to.y + edge.to.height / 2}`}
+              key={`${edge.from.id}-${edge.to.id}`}
+            />
+          ))}
+          {diagram.nodes.map((node) => (
+            <g className="markdown-mermaid-node" key={node.id}>
+              <rect x={node.x} y={node.y} width={node.width} height={node.height} rx="10" />
+              <text x={node.x + node.width / 2} y={node.y + node.height / 2 + 5}>{node.label}</text>
+            </g>
+          ))}
+        </svg>
+      )}
+    </div>
+  );
+}
+
+function parseSimpleMermaidDiagram(source = '') {
+  const lines = source
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('%%') && !/^graph\s+/i.test(line) && !/^flowchart\s+/i.test(line));
+  const nodeMap = new Map();
+  const edges = [];
+
+  function readNode(raw) {
+    const cleaned = raw.trim().replace(/;$/, '');
+    const match = cleaned.match(/^([A-Za-z0-9_-]+)(?:\[(.+?)\]|\((.+?)\)|\{(.+?)\})?$/);
+    if (!match) return null;
+    const id = match[1];
+    const label = (match[2] || match[3] || match[4] || id).replace(/^["']|["']$/g, '');
+    if (!nodeMap.has(id)) {
+      nodeMap.set(id, { id, label });
+    } else if (label !== id) {
+      nodeMap.set(id, { ...nodeMap.get(id), label });
+    }
+    return nodeMap.get(id);
+  }
+
+  lines.forEach((line) => {
+    const arrow = line.includes('-->') ? '-->' : line.includes('---') ? '---' : null;
+    if (!arrow) return;
+    const [leftRaw, rightRaw] = line.split(arrow);
+    const from = readNode(leftRaw);
+    const to = readNode(rightRaw);
+    if (from && to) edges.push({ fromId: from.id, toId: to.id });
+  });
+
+  const nodes = Array.from(nodeMap.values());
+  if (!nodes.length || !edges.length || nodes.length > 18) return null;
+
+  const columns = Math.min(3, Math.max(2, Math.ceil(Math.sqrt(nodes.length))));
+  const nodeWidth = 150;
+  const nodeHeight = 52;
+  const gapX = 72;
+  const gapY = 44;
+  const laidOutNodes = nodes.map((node, index) => ({
+    ...node,
+    width: nodeWidth,
+    height: nodeHeight,
+    x: 20 + (index % columns) * (nodeWidth + gapX),
+    y: 22 + Math.floor(index / columns) * (nodeHeight + gapY)
+  }));
+  const laidOutMap = new Map(laidOutNodes.map((node) => [node.id, node]));
+  return {
+    width: 40 + columns * nodeWidth + (columns - 1) * gapX,
+    height: 44 + Math.ceil(nodes.length / columns) * nodeHeight + (Math.ceil(nodes.length / columns) - 1) * gapY,
+    nodes: laidOutNodes,
+    edges: edges
+      .map((edge) => ({ from: laidOutMap.get(edge.fromId), to: laidOutMap.get(edge.toId) }))
+      .filter((edge) => edge.from && edge.to)
+  };
+}
+
 function MarkdownImage({ src, alt, className = '' }) {
   const [hasError, setHasError] = useState(false);
   const imageAlt = alt || '文章图片';
@@ -5126,6 +5260,19 @@ function MarkdownImage({ src, alt, className = '' }) {
 }
 
 function parseMarkdownBlocks(content) {
+  const cacheKey = String(content || '');
+  if (markdownBlockCache.has(cacheKey)) {
+    return markdownBlockCache.get(cacheKey);
+  }
+  const blocks = parseMarkdownBlocksUncached(cacheKey);
+  markdownBlockCache.set(cacheKey, blocks);
+  if (markdownBlockCache.size > MARKDOWN_CACHE_LIMIT) {
+    markdownBlockCache.delete(markdownBlockCache.keys().next().value);
+  }
+  return blocks;
+}
+
+function parseMarkdownBlocksUncached(content) {
   const lines = content.replace(/\r\n/g, '\n').split('\n');
   const blocks = [];
   let index = 0;
@@ -5438,15 +5585,7 @@ function renderMarkdownBlock(block, index) {
   }
   if (block.type === 'code') {
     if ((block.language || '').trim().toLowerCase() === 'mermaid') {
-      return (
-        <div className="markdown-mermaid" key={index}>
-          <div className="markdown-mermaid-toolbar">
-            <span>Mermaid</span>
-            <em>图表源码</em>
-          </div>
-          <pre>{block.text}</pre>
-        </div>
-      );
+      return <MarkdownMermaidBlock text={block.text} key={index} />;
     }
     return <MarkdownCodeBlock language={block.language} text={block.text} key={index} />;
   }
@@ -7772,6 +7911,9 @@ function Live2DMascot({ activeView = 'overview' }) {
     if (typeof localStorage === 'undefined') return 'pet';
     return localStorage.getItem(LIVE2D_MODE_KEY) === 'window' ? 'window' : 'pet';
   });
+  const [isQuiet, setIsQuiet] = useState(() => (
+    typeof localStorage !== 'undefined' && localStorage.getItem(LIVE2D_QUIET_KEY) === 'true'
+  ));
   const [position, setPosition] = useState(() => {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
       return { x: 0, y: 0 };
@@ -7898,13 +8040,13 @@ function Live2DMascot({ activeView = 'overview' }) {
   }, [activeMascotLines.length, isHidden, reloadKey]);
 
   useEffect(() => {
-    if (isHidden) return undefined;
+    if (isHidden || isQuiet) return undefined;
     setLineIndex(0);
     setSpeechVisible(true);
     if (speechTimerRef.current) window.clearTimeout(speechTimerRef.current);
     speechTimerRef.current = window.setTimeout(() => setSpeechVisible(false), 4200);
     return undefined;
-  }, [activeView, isHidden]);
+  }, [activeView, isHidden, isQuiet]);
 
   useEffect(() => {
     function showMascotFromAccount() {
@@ -7960,6 +8102,17 @@ function Live2DMascot({ activeView = 'overview' }) {
       localStorage.setItem(LIVE2D_MODE_KEY, nextMode);
     }
     savePosition(clampPosition(getDefaultPosition(nextMode)));
+    setMenuPosition(null);
+  }
+
+  function toggleQuietMode() {
+    setIsQuiet((current) => {
+      const next = !current;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(LIVE2D_QUIET_KEY, String(next));
+      }
+      return next;
+    });
     setMenuPosition(null);
   }
 
@@ -8049,6 +8202,7 @@ function Live2DMascot({ activeView = 'overview' }) {
         >
           <button type="button" onClick={() => speak()}>说句话</button>
           <button type="button" onClick={toggleMode}>{mode === 'window' ? '切回贴边模式' : '变成悬浮窗'}</button>
+          <button type="button" onClick={toggleQuietMode}>{isQuiet ? '关闭低打扰' : '低打扰模式'}</button>
           <button className="danger" type="button" onClick={hideMascot}>关闭</button>
         </div>
       )}
@@ -8103,6 +8257,32 @@ function SidebarMusicPlayer({ track, isPlaying, progress, duration, togglePlayba
   );
 }
 
+function parseLyrics(source = '') {
+  const parsed = String(source)
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .flatMap((rawLine) => {
+      const line = rawLine.trim();
+      if (!line) return [];
+      const timeMatches = Array.from(line.matchAll(/\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?]/g));
+      const text = line.replace(/\[[^\]]+]/g, '').trim();
+      if (!timeMatches.length) return [{ time: null, text: text || line }];
+      return timeMatches.map((match) => {
+        const minutes = Number(match[1]);
+        const seconds = Number(match[2]);
+        const fraction = match[3] ? Number(`0.${match[3].padEnd(3, '0').slice(0, 3)}`) : 0;
+        return { time: minutes * 60 + seconds + fraction, text: text || '♪' };
+      });
+    })
+    .filter((line) => line.text)
+    .sort((first, second) => {
+      if (!Number.isFinite(first.time)) return 1;
+      if (!Number.isFinite(second.time)) return -1;
+      return first.time - second.time;
+    });
+  return parsed.slice(0, 120);
+}
+
 function MusicWorkspace({
   tracks,
   queue,
@@ -8135,15 +8315,26 @@ function MusicWorkspace({
   const [draggingTrackFilename, setDraggingTrackFilename] = useState(null);
   const [dragOverTrackFilename, setDragOverTrackFilename] = useState(null);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const lyricListRef = useRef(null);
   const selectedTrackNames = new Set(selectedPlaylist?.trackFilenames || []);
   const displayTracks = selectedPlaylist ? queue : tracks;
-  const currentLyrics = useMemo(() => (
-    (currentTrack?.lyrics || '')
-      .split(/\r?\n/)
-      .map((line) => line.replace(/^\[[^\]]+\]\s*/, '').trim())
-      .filter(Boolean)
-      .slice(0, 80)
-  ), [currentTrack?.lyrics]);
+  const currentLyrics = useMemo(() => parseLyrics(currentTrack?.lyrics || ''), [currentTrack?.lyrics]);
+  const activeLyricIndex = useMemo(() => {
+    if (!currentLyrics.length) return -1;
+    const timedLyrics = currentLyrics.filter((line) => Number.isFinite(line.time));
+    if (!timedLyrics.length) return -1;
+    let nextIndex = 0;
+    currentLyrics.forEach((line, index) => {
+      if (Number.isFinite(line.time) && line.time <= progress + 0.25) nextIndex = index;
+    });
+    return nextIndex;
+  }, [currentLyrics, progress]);
+
+  useEffect(() => {
+    if (activeLyricIndex < 0 || !lyricListRef.current) return;
+    const target = lyricListRef.current.querySelector(`[data-lyric-index="${activeLyricIndex}"]`);
+    target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [activeLyricIndex]);
 
   return (
     <section className="workspace music-workspace">
@@ -8178,9 +8369,15 @@ function MusicWorkspace({
               <span>{currentTrack?.lyricsUrl ? '已上传歌词' : '后台可上传 .lrc / .txt'}</span>
             </div>
             {currentLyrics.length ? (
-              <div className="music-lyric-lines">
+              <div className="music-lyric-lines" ref={lyricListRef}>
                 {currentLyrics.map((line, index) => (
-                  <p key={`${line}-${index}`}>{line}</p>
+                  <p
+                    className={index === activeLyricIndex ? 'active' : ''}
+                    data-lyric-index={index}
+                    key={`${line.text}-${index}`}
+                  >
+                    {line.text}
+                  </p>
                 ))}
               </div>
             ) : (
@@ -9300,6 +9497,12 @@ function AdminWorkspace({
   const selectedManagerArticles = filteredManagerArticles.filter((article) => selectedManagerArticleIds.includes(article.id));
   const isAllManagerArticlesSelected = filteredManagerArticles.length > 0
     && filteredManagerArticles.every((article) => selectedManagerArticleIds.includes(article.id));
+  const articleExplorerStats = useMemo(() => {
+    const folderCount = articleExplorerGroups.length;
+    const uncollectedCount = filteredManagerArticles.filter((article) => isTechnicalArticle(article) && !article.noteCollection && !article.notePath).length;
+    const draftVisibleCount = filteredManagerArticles.filter((article) => article.status === 'draft').length;
+    return { folderCount, uncollectedCount, draftVisibleCount };
+  }, [articleExplorerGroups, filteredManagerArticles]);
 
   function toggleManagerArticleSelection(articleId) {
     setSelectedManagerArticleIds((current) => (
@@ -10840,11 +11043,16 @@ function AdminWorkspace({
                     <BookOpen size={17} />
                     <strong>内容目录</strong>
                   </div>
+                  <div className="content-library-stats">
+                    <span>{articleExplorerStats.folderCount} 个目录</span>
+                    <span>{articleExplorerStats.draftVisibleCount} 篇草稿</span>
+                    <span>{articleExplorerStats.uncollectedCount} 篇未收纳</span>
+                  </div>
                   {articleExplorerGroups.map((group) => (
                     <div className="content-library-tree-group" key={group.key}>
                       <span>{group.section}</span>
                       <button type="button" onClick={() => setArticleManagerQuery(group.folder)}>
-                        <ChevronRight size={14} />
+                        <BookOpen size={14} />
                         <strong>{group.folder}</strong>
                         <em>{group.articles.length}</em>
                       </button>

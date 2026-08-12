@@ -3554,6 +3554,49 @@ h3 {
   font-size: 0.92rem;
 }
 
+.markdown-mermaid-toolbar button {
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid rgba(47, 143, 131, 0.24);
+  border-radius: 7px;
+  color: #176f65;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.markdown-mermaid-svg {
+  display: block;
+  width: 100%;
+  min-height: 180px;
+  padding: 10px;
+}
+
+.markdown-mermaid-edge {
+  fill: none;
+  stroke: rgba(47, 143, 131, 0.58);
+  stroke-width: 2;
+  marker-end: url(#mermaid-arrow);
+}
+
+.markdown-mermaid-svg marker path {
+  fill: rgba(47, 143, 131, 0.8);
+}
+
+.markdown-mermaid-node rect {
+  fill: #ffffff;
+  stroke: rgba(47, 143, 131, 0.36);
+  stroke-width: 1.5;
+}
+
+.markdown-mermaid-node text {
+  fill: #102033;
+  font-size: 13px;
+  font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
 .icon-toggle.active {
   color: #ffffff;
   border-color: #c44d58;
@@ -4430,6 +4473,19 @@ h3 {
 .music-lyric-lines p,
 .music-sidecar-tip p {
   margin: 0;
+}
+
+.music-lyric-lines p {
+  padding: 4px 8px;
+  border-radius: 7px;
+  transition: color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.music-lyric-lines p.active {
+  color: #0f766e;
+  background: rgba(47, 143, 131, 0.12);
+  transform: translateX(4px);
+  font-weight: 900;
 }
 
 .music-sidecar-tip {
@@ -7141,10 +7197,31 @@ h3 {
   font-weight: 900;
 }
 
+.content-library-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.content-library-stats span {
+  display: grid;
+  place-items: center;
+  min-height: 34px;
+  padding: 5px;
+  border: 1px solid rgba(47, 143, 131, 0.18);
+  border-radius: 7px;
+  color: #1f7a6d;
+  background: rgba(47, 143, 131, 0.08);
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+}
+
 .content-library-tree-group {
   display: grid;
   gap: 6px;
-  padding: 8px 0;
+  padding: 9px 0;
   border-top: 1px solid #edf2f7;
 }
 
@@ -8486,6 +8563,29 @@ h3 {
   color: rgba(226, 232, 240, 0.82);
 }
 
+:root[data-theme='dark'] .markdown-mermaid-toolbar button {
+  border-color: rgba(69, 211, 194, 0.24);
+  color: #8df3e6;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+:root[data-theme='dark'] .markdown-mermaid-edge {
+  stroke: rgba(69, 211, 194, 0.62);
+}
+
+:root[data-theme='dark'] .markdown-mermaid-svg marker path {
+  fill: rgba(69, 211, 194, 0.82);
+}
+
+:root[data-theme='dark'] .markdown-mermaid-node rect {
+  fill: rgba(15, 23, 42, 0.9);
+  stroke: rgba(69, 211, 194, 0.34);
+}
+
+:root[data-theme='dark'] .markdown-mermaid-node text {
+  fill: #f7fbff;
+}
+
 :root[data-theme='dark'] .editor-preview-scroll {
   background:
     radial-gradient(circle at 18px 18px, rgba(52, 211, 153, 0.08) 0 1px, transparent 1px),
@@ -8920,6 +9020,11 @@ h3 {
 
 :root[data-theme='dark'] .music-lyric-lines {
   color: var(--text-main);
+}
+
+:root[data-theme='dark'] .music-lyric-lines p.active {
+  color: #8df3e6;
+  background: rgba(69, 211, 194, 0.12);
 }
 
 :root[data-theme='dark'] .release-major-head > strong,
