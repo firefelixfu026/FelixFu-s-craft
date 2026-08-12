@@ -438,6 +438,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.0.4',
+    title: '文章表单置顶开关和阅读时长优化',
+    date: '2026-08-12',
+    status: '已上线',
+    points: ['置顶文章从突兀的方框改成更轻量的胶囊开关', '预计阅读时间改为按正文内容自动计算，不再需要手填', '后端保存文章时同步兜底重算阅读时长，避免旧数据混入']
+  },
+  {
     version: 'v6.0.3',
     title: '站点名称和公开资料后台可编辑',
     date: '2026-08-12',
@@ -1539,6 +1546,28 @@ function readFileAsText(file) {
     reader.onerror = () => reject(reader.error);
     reader.readAsText(file, 'utf-8');
   });
+}
+
+function countReadableWords(content = '') {
+  const plainText = String(content)
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]*]\([^)]*\)/g, ' ')
+    .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[#>*_\-~=[\]{}()|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const cjkCount = (plainText.match(/[\u3400-\u9fff]/g) || []).length;
+  const latinWordCount = (plainText.replace(/[\u3400-\u9fff]/g, ' ').match(/[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*/g) || []).length;
+  return cjkCount + latinWordCount;
+}
+
+function estimateReadingTime(content = '') {
+  const wordCount = countReadableWords(content);
+  const minutes = Math.max(1, Math.ceil(wordCount / 500));
+  return `${minutes} min`;
 }
 
 function normalizeUploadPath(path = '') {
@@ -2772,7 +2801,13 @@ function App() {
   }
 
   function updateArticleForm(field, value) {
-    setArticleForm((current) => ({ ...current, [field]: value }));
+    setArticleForm((current) => {
+      const next = { ...current, [field]: value };
+      if (field === 'content') {
+        next.readTime = estimateReadingTime(value);
+      }
+      return next;
+    });
   }
 
   function clearArticleDraft(message = '') {
@@ -3091,7 +3126,7 @@ function App() {
       const content = replaceMarkdownRelativeImages(rawContent, imageUrlMap);
       const title = extractNoteTitle(markdownFile.name, content);
       const summary = extractNoteSummary(content);
-      const estimatedMinutes = Math.max(2, Math.ceil(content.replace(/[#>*_`[\]()!-]/g, '').length / 500));
+      const readTime = estimateReadingTime(content);
 
       setEditingArticleId(null);
       setArticleForm({
@@ -3101,7 +3136,7 @@ function App() {
         content,
         tags: '技术笔记, Markdown',
         category: '技术笔记',
-        readTime: `${estimatedMinutes} min`,
+        readTime,
         noteCollection: 'X-lab 软件团队学习笔记',
         notePath: '未分组',
         status: 'draft'
@@ -3127,7 +3162,7 @@ function App() {
       coverUrl: article.coverUrl || '',
       tags: article.tags.join(', '),
       date: article.date,
-      readTime: article.readTime,
+      readTime: estimateReadingTime(article.content),
       createdAt: article.createdAt || '',
       updatedAt: article.updatedAt || '',
       status: article.status || 'published',
@@ -3163,7 +3198,7 @@ function App() {
         .map((tag) => tag.trim())
         .filter(Boolean),
       date: articleForm.date,
-      readTime: articleForm.readTime,
+      readTime: estimateReadingTime(articleForm.content),
       status: nextStatus,
       category: articleForm.category,
       noteCollection: articleForm.noteCollection,
@@ -10349,9 +10384,10 @@ function AdminWorkspace({
             <label>
               <span>阅读时长</span>
               <input
-                value={articleForm.readTime}
-                onChange={(event) => updateArticleForm('readTime', event.target.value)}
-                placeholder="3 min"
+                value={estimateReadingTime(articleForm.content)}
+                readOnly
+                disabled
+                aria-label="按正文自动计算的预计阅读时长"
               />
             </label>
             <label>
@@ -10372,13 +10408,14 @@ function AdminWorkspace({
                 <option value="draft">草稿</option>
               </select>
             </label>
-            <label className="checkbox-control">
+            <label className="pin-switch-control">
               <input
                 type="checkbox"
                 checked={articleForm.pinned}
                 onChange={(event) => updateArticleForm('pinned', event.target.checked)}
               />
-              <span>置顶文章</span>
+              <span aria-hidden="true" />
+              <strong>{articleForm.pinned ? '已置顶' : '普通文章'}</strong>
             </label>
           </div>
 

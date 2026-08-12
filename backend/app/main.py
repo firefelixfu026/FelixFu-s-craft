@@ -408,6 +408,20 @@ class ArticleOrderIn(BaseModel):
     articleIds: list[str]
 
 
+def _estimate_read_time(content: str) -> str:
+    plain_text = re.sub(r"```[\s\S]*?```", " ", content or "")
+    plain_text = re.sub(r"`[^`]*`", " ", plain_text)
+    plain_text = re.sub(r"!\[[^\]]*]\([^)]*\)", " ", plain_text)
+    plain_text = re.sub(r"\[[^\]]*]\([^)]*\)", " ", plain_text)
+    plain_text = re.sub(r"https?://\S+", " ", plain_text)
+    plain_text = re.sub(r"<[^>]+>", " ", plain_text)
+    plain_text = re.sub(r"[#>*_\-~=\[\]{}()|]", " ", plain_text)
+    cjk_count = len(re.findall(r"[\u3400-\u9fff]", plain_text))
+    latin_word_count = len(re.findall(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*", re.sub(r"[\u3400-\u9fff]", " ", plain_text)))
+    minutes = max(1, (cjk_count + latin_word_count + 499) // 500)
+    return f"{minutes} min"
+
+
 class RegisterIn(BaseModel):
     email: str
     password: str
@@ -931,7 +945,7 @@ def create_admin_article(
         content=_required_text(payload.content, "Article content is required"),
         cover_url=_optional_text(payload.coverUrl),
         date=(payload.date or datetime.utcnow().date().isoformat()).strip(),
-        read_time=(payload.readTime or "3 min").strip(),
+        read_time=_estimate_read_time(payload.content),
         status=payload.status,
         category=(_optional_text(payload.category) or "学习笔记")[:80],
         note_collection=(_optional_text(payload.noteCollection) or "")[:120],
@@ -965,7 +979,7 @@ def update_admin_article(
     article.content = _required_text(payload.content, "Article content is required")
     article.cover_url = _optional_text(payload.coverUrl)
     article.date = (payload.date or article.date).strip()
-    article.read_time = (payload.readTime or article.read_time).strip()
+    article.read_time = _estimate_read_time(payload.content)
     article.status = payload.status
     article.category = (_optional_text(payload.category) or "学习笔记")[:80]
     article.note_collection = (_optional_text(payload.noteCollection) or "")[:120]
