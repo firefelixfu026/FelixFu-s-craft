@@ -158,6 +158,7 @@ class ToolboxLink(Base):
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     category: Mapped[str] = mapped_column(String(60), default="自定义")
     url: Mapped[str] = mapped_column(Text, nullable=False)
+    image_url: Mapped[str] = mapped_column(Text, default="")
     description: Mapped[str] = mapped_column(Text, default="")
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)

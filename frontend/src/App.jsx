@@ -451,6 +451,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.3.0',
+    title: '站点设置、友链和音乐体验增强',
+    date: '2026-08-12',
+    status: '已上线',
+    points: ['工具箱和友链支持头像/封面图片链接，后台可统一编辑', '备份中心新增站点 JSON 导出，文章、资料、音乐和工具箱配置可一键打包', '音乐队列和最近播放显示歌曲封面，当前播放更清楚', '工具箱卡片和高频入口进一步瘦身，页面滚动更轻', '图片增加懒加载与异步解码，减少前台卡顿']
+  },
+  {
     version: 'v6.2.0',
     title: '知识库、音乐和助手体验继续打磨',
     date: '2026-08-12',
@@ -2250,6 +2257,19 @@ function App() {
     } finally {
       setIsLoadingMusicTracks(false);
     }
+  }
+
+  function downloadJsonFile(filename, payload) {
+    if (typeof document === 'undefined') return;
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
   }
 
   function hydrateArticleState(nextArticles) {
@@ -7310,6 +7330,7 @@ function createEmptyToolboxForm() {
     title: '',
     category: '自定义',
     url: '',
+    imageUrl: '',
     description: '',
     tags: '',
     pinned: false
@@ -7321,6 +7342,7 @@ function normalizeToolboxLink(link, index = 0) {
     ...link,
     id: link.id ?? (typeof index === 'string' ? index : `default-${index}`),
     tags: Array.isArray(link.tags) ? link.tags : [],
+    imageUrl: link.imageUrl || '',
     custom: Boolean(link.custom)
   };
 }
@@ -7429,6 +7451,7 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
     title: link.title,
     category: '友链',
     url: link.url,
+    imageUrl: link.imageUrl || '',
     description: link.description,
     tags: ['友链', '博客', index === 2 ? '同学' : '参考']
   }, `friend-${index}`)).map((link) => ({ ...link, sourceType: 'friend' }));
@@ -7520,6 +7543,7 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
       title: link.title || '',
       category: link.category || '自定义',
       url: link.url || '',
+      imageUrl: link.imageUrl || '',
       description: link.description || '',
       tags: (link.tags || []).join(', '),
       pinned: Boolean(link.pinned)
@@ -7537,6 +7561,7 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
       title: toolboxForm.title.trim(),
       category: toolboxForm.category.trim() || '自定义',
       url: toolboxForm.url.trim(),
+      imageUrl: toolboxForm.imageUrl.trim(),
       description: toolboxForm.description.trim(),
       tags: toolboxForm.tags
         .split(/[,，]/)
@@ -7650,6 +7675,10 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
           <input value={toolboxForm.url} onChange={(event) => updateToolboxForm('url', event.target.value)} placeholder="https://example.com" />
         </label>
         <label className="wide">
+          <span>图片链接</span>
+          <input value={toolboxForm.imageUrl} onChange={(event) => updateToolboxForm('imageUrl', event.target.value)} placeholder="头像或封面图片 URL，可留空" />
+        </label>
+        <label className="wide">
           <span>说明</span>
           <textarea value={toolboxForm.description} onChange={(event) => updateToolboxForm('description', event.target.value)} rows={2} placeholder="这个网站适合用来做什么" />
         </label>
@@ -7730,6 +7759,7 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
               <div>
                 <strong>{link.title}</strong>
                 <span>{source} · {link.category || '自定义'} · {link.url}</span>
+                {link.imageUrl && <span>图片：{link.imageUrl}</span>}
                 {link.description && <p>{link.description}</p>}
               </div>
               <div className="manager-actions">
@@ -7810,13 +7840,20 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
             </div>
             <div className="toolbox-grid">
               {section.links.map((link) => (
-                <article className="toolbox-card" key={`${link.custom ? 'custom' : 'default'}-${link.id || link.url}`}>
-                  <span className="toolbox-card-category">{link.category}</span>
-                  <div>
-                    <h2>{link.title}</h2>
+                <article className={`toolbox-card${link.category === '友链' ? ' friend-card' : ''}`} key={`${link.custom ? 'custom' : 'default'}-${link.id || link.url}`}>
+                  <div className="toolbox-card-topline">
+                    <span className="toolbox-card-category">{link.category}</span>
                     <a href={link.url} target="_blank" rel="noreferrer" aria-label={`打开 ${link.title}`}>
                       <ExternalLink size={17} />
                     </a>
+                  </div>
+                  {link.category === '友链' && (
+                    <div className="friend-link-avatar" aria-hidden="true">
+                      {link.imageUrl ? <img src={link.imageUrl} alt="" loading="lazy" decoding="async" /> : <span>{(link.title || 'F').slice(0, 2)}</span>}
+                    </div>
+                  )}
+                  <div>
+                    <h2>{link.title}</h2>
                   </div>
                   <p>{link.description}</p>
                   <span className="toolbox-url">{new URL(link.url).hostname.replace(/^www\./, '')}</span>
@@ -8191,7 +8228,7 @@ function Live2DMascot({ activeView = 'overview' }) {
         {status === 'loading' && <span className="live2d-loading">加载中</span>}
         {status === 'error' && (
           <span className="live2d-fallback">
-            <img src={LIVE2D_TEXTURE_FALLBACK_URL} alt="" loading="lazy" />
+            <img src={LIVE2D_TEXTURE_FALLBACK_URL} alt="" loading="lazy" decoding="async" />
           </span>
         )}
       </div>
@@ -8218,7 +8255,7 @@ function SidebarMusicPlayer({ track, isPlaying, progress, duration, togglePlayba
       <button className="sidebar-music-main" type="button" onClick={openMusic} title="打开音乐">
         <span className="sidebar-music-disc">
           {track?.coverUrl ? (
-            <img src={track.coverUrl} alt="" loading="lazy" />
+            <img src={track.coverUrl} alt="" loading="lazy" decoding="async" />
           ) : (
             <Music size={18} />
           )}
@@ -8350,7 +8387,7 @@ function MusicWorkspace({
         <div className="music-now">
           <div className="music-cover" aria-hidden="true">
             {currentTrack?.coverUrl ? (
-              <img src={currentTrack.coverUrl} alt="" />
+              <img src={currentTrack.coverUrl} alt="" decoding="async" />
             ) : (
               <Music size={42} />
             )}
@@ -8461,7 +8498,8 @@ function MusicWorkspace({
                   key={track.filename}
                   onClick={() => playTrack(track, selectedPlaylistId)}
                 >
-                  <span>{String(index + 1).padStart(2, '0')}</span>
+                  <span className="music-queue-index">{String(index + 1).padStart(2, '0')}</span>
+                  <span className="music-queue-thumb">{track.coverUrl ? <img src={track.coverUrl} alt="" loading="lazy" decoding="async" /> : <Music size={15} />}</span>
                   <strong>{track.title}</strong>
                   <em>{track.artist || formatFileSize(track.size)}</em>
                 </button>
@@ -8487,7 +8525,7 @@ function MusicWorkspace({
                 key={track.filename}
                 onClick={() => playTrack(track, 'all')}
               >
-                <span><Music size={16} /></span>
+                <span>{track.coverUrl ? <img src={track.coverUrl} alt="" loading="lazy" decoding="async" /> : <Music size={16} />}</span>
                 <strong>{track.title}</strong>
                 <em>{formatFileSize(track.size)}</em>
               </button>
@@ -9742,6 +9780,29 @@ function AdminWorkspace({
     setAdminMessage('已记录一次备份检查');
   }
 
+  function exportSiteBackup() {
+    const createdAt = new Date();
+    const payload = {
+      meta: {
+        siteTitle: profile.siteTitle || "FelixFu's Craft",
+        exportedAt: createdAt.toISOString(),
+        version: releaseRoadmap[0]?.version || 'unknown'
+      },
+      profile,
+      sitePreferences,
+      articles,
+      comments,
+      reactionCounts,
+      musicTracks,
+      musicPlaylists,
+      toolboxOverrides: readToolboxDefaultOverrides(),
+      backupRecords
+    };
+    const datePart = createdAt.toISOString().slice(0, 10);
+    downloadJsonFile(`felixfu-craft-backup-${datePart}.json`, payload);
+    setAdminMessage('已导出站点备份 JSON');
+  }
+
   function deleteBackupRecord(recordId) {
     const next = backupRecords.filter((record) => record.id !== recordId);
     setBackupRecords(next);
@@ -10346,10 +10407,16 @@ function AdminWorkspace({
               <h2>备份中心</h2>
               <span>大改、上线、迁移前先确认数据和配置有退路</span>
             </div>
-            <button className="primary-action" type="button" onClick={recordBackup}>
-              <Save size={17} />
-              <span>记录备份</span>
-            </button>
+            <div className="manager-actions">
+              <button className="ghost-button" type="button" onClick={exportSiteBackup}>
+                <Download size={17} />
+                <span>导出 JSON</span>
+              </button>
+              <button className="primary-action" type="button" onClick={recordBackup}>
+                <Save size={17} />
+                <span>记录检查</span>
+              </button>
+            </div>
           </div>
           <div className="release-metric-grid">
             <div className="release-metric">
@@ -10377,7 +10444,7 @@ function AdminWorkspace({
             {[
               ['数据库', '文章、评论、用户、AI 历史都在这里。'],
               ['上传图片', '封面和正文图片使用 Docker volume 保存。'],
-              ['AI 配置', '后台保存的 AI Key 位于后端持久目录。'],
+              ['工具箱/友链', '自定义链接和预置覆盖项会随 JSON 一起导出。'],
               ['部署脚本', 'GitHub Actions 和服务器脚本决定上线结果。']
             ].map(([title, detail]) => (
               <article key={title}>

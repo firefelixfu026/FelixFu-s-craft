@@ -395,6 +395,7 @@ class ToolboxLinkIn(BaseModel):
     title: str
     category: str = "自定义"
     url: str
+    imageUrl: str = ""
     description: str = ""
     tags: list[str] = []
     pinned: bool = False
@@ -2425,10 +2426,20 @@ def _clean_toolbox_payload(payload: ToolboxLinkIn) -> dict[str, Any]:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise HTTPException(status_code=400, detail="Toolbox URL must start with http:// or https://")
+    image_url = _optional_text(payload.imageUrl) or ""
+    if image_url:
+        parsed_image = urlparse(image_url)
+        if not (
+            image_url.startswith("/uploads/")
+            or image_url.startswith("data:image/")
+            or (parsed_image.scheme in {"http", "https"} and parsed_image.netloc)
+        ):
+            raise HTTPException(status_code=400, detail="Image URL must be an upload path or http(s) URL")
     return {
         "title": title,
         "category": (_optional_text(payload.category) or "自定义")[:60],
         "url": url[:1000],
+        "image_url": image_url[:1000],
         "description": (_optional_text(payload.description) or "")[:500],
         "tags": _clean_tags(payload.tags)[:8],
         "pinned": bool(payload.pinned),
@@ -2450,6 +2461,7 @@ def _clean_toolbox_overrides(payload: dict[str, Any]) -> dict[str, Any]:
             "title": 120,
             "category": 60,
             "url": 1000,
+            "imageUrl": 1000,
             "description": 500,
         }.items():
             value = str(raw_value.get(field) or "").strip()
@@ -2471,6 +2483,7 @@ def _toolbox_link_to_dict(link: ToolboxLink) -> dict[str, Any]:
         "title": link.title,
         "category": link.category or "自定义",
         "url": link.url,
+        "imageUrl": link.image_url or "",
         "description": link.description or "",
         "tags": link.tags or [],
         "pinned": bool(link.pinned),

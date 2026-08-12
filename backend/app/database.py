@@ -36,6 +36,7 @@ def _ensure_schema_updates() -> None:
     user_columns = {column["name"] for column in inspector.get_columns("users")}
     article_columns = {column["name"] for column in inspector.get_columns("articles")} if "articles" in table_names else set()
     comment_columns = {column["name"] for column in inspector.get_columns("comments")} if "comments" in table_names else set()
+    toolbox_columns = {column["name"] for column in inspector.get_columns("toolbox_links")} if "toolbox_links" in table_names else set()
     with engine.begin() as connection:
         if "password_hash" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)"))
@@ -65,6 +66,8 @@ def _ensure_schema_updates() -> None:
             connection.execute(text("ALTER TABLE comments ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL"))
         if "comments" in table_names and "parent_id" not in comment_columns:
             connection.execute(text("ALTER TABLE comments ADD COLUMN parent_id INTEGER REFERENCES comments(id) ON DELETE SET NULL"))
+        if "toolbox_links" in table_names and "image_url" not in toolbox_columns:
+            connection.execute(text("ALTER TABLE toolbox_links ADD COLUMN image_url TEXT DEFAULT '' NOT NULL"))
 
         connection.execute(
             text(
