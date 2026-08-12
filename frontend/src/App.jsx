@@ -438,6 +438,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.0.5',
+    title: 'Markdown 预览向 Obsidian 体验靠拢',
+    date: '2026-08-12',
+    status: '已上线',
+    points: ['正文预览支持 Setext 标题、波浪线代码块、任务列表、分割线、删除线和高亮语法', '预览保留软换行，不再把连续换行错误合并', '写作台预览面板改成更舒服的阅读纸张样式，并补齐常用 Markdown 工具按钮']
+  },
+  {
     version: 'v6.0.4',
     title: '文章表单置顶开关和阅读时长优化',
     date: '2026-08-12',
@@ -5096,11 +5103,13 @@ function parseMarkdownBlocks(content) {
       continue;
     }
 
-    if (trimmed.startsWith('```')) {
-      const language = trimmed.slice(3).trim();
+    const fencedCode = trimmed.match(/^(```|~~~)\s*(.*)$/);
+    if (fencedCode) {
+      const fence = fencedCode[1];
+      const language = fencedCode[2].trim();
       const codeLines = [];
       index += 1;
-      while (index < lines.length && !lines[index].trim().startsWith('```')) {
+      while (index < lines.length && !lines[index].trim().startsWith(fence)) {
         codeLines.push(lines[index]);
         index += 1;
       }
@@ -5161,7 +5170,19 @@ function parseMarkdownBlocks(content) {
       continue;
     }
 
-    if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+    const nextTrimmed = index + 1 < lines.length ? lines[index + 1].trim() : '';
+    if (
+      nextTrimmed &&
+      /^(=+|-+)$/.test(nextTrimmed) &&
+      !isMarkdownControlLine(trimmed) &&
+      !parseMarkdownImage(trimmed)
+    ) {
+      blocks.push({ type: 'heading', level: nextTrimmed.startsWith('=') ? 1 : 2, text: trimmed });
+      index += 2;
+      continue;
+    }
+
+    if (/^(([-*_])\s*){3,}$/.test(trimmed)) {
       blocks.push({ type: 'divider' });
       index += 1;
       continue;
@@ -5186,10 +5207,11 @@ function parseMarkdownBlocks(content) {
       continue;
     }
 
-    if (/^[-*]\s+/.test(trimmed)) {
+    if (isUnorderedListLine(trimmed)) {
       const items = [];
-      while (index < lines.length && /^[-*]\s+/.test(lines[index].trim())) {
-        items.push(lines[index].trim().replace(/^[-*]\s+/, ''));
+      while (index < lines.length && isUnorderedListLine(lines[index].trim())) {
+        const parsedItem = parseListItem(lines[index].trim());
+        items.push(parsedItem);
         index += 1;
       }
       blocks.push({ type: 'list', items });
@@ -5225,7 +5247,7 @@ function parseMarkdownBlocks(content) {
         quotes.push(lines[index].trim().replace(/^>\s?/, ''));
         index += 1;
       }
-      blocks.push({ type: 'quote', text: quotes.join(' ') });
+      blocks.push({ type: 'quote', lines: quotes });
       continue;
     }
 
@@ -5235,23 +5257,59 @@ function parseMarkdownBlocks(content) {
       index < lines.length &&
       lines[index].trim() &&
       !lines[index].trim().startsWith('```') &&
+      !lines[index].trim().startsWith('~~~') &&
       !lines[index].trim().startsWith('$$') &&
       !lines[index].trim().startsWith('\\[') &&
-      !/^(-{3,}|\*{3,}|_{3,})$/.test(lines[index].trim()) &&
+      !/^(([-*_])\s*){3,}$/.test(lines[index].trim()) &&
       !/^(#{1,6})\s+/.test(lines[index].trim()) &&
       !parseMarkdownImage(lines[index].trim()) &&
-      !/^[-*]\s+/.test(lines[index].trim()) &&
+      !isUnorderedListLine(lines[index].trim()) &&
       !/^\d+[.)]\s+/.test(lines[index].trim()) &&
       !isMarkdownTableStart(lines, index) &&
+      !(index + 1 < lines.length && /^(=+|-+)$/.test(lines[index + 1].trim()) && !isMarkdownControlLine(lines[index].trim())) &&
       !lines[index].trim().startsWith('>')
     ) {
       paragraph.push(lines[index].trim());
       index += 1;
     }
-    blocks.push({ type: 'paragraph', text: paragraph.join(' ') });
+    blocks.push({ type: 'paragraph', lines: paragraph });
   }
 
   return blocks;
+}
+
+function isMarkdownControlLine(line) {
+  return (
+    /^#{1,6}\s+/.test(line) ||
+    /^(([-*_])\s*){3,}$/.test(line) ||
+    /^(```|~~~)/.test(line) ||
+    line.startsWith('$$') ||
+    line.startsWith('\\[') ||
+    line.startsWith('>') ||
+    isUnorderedListLine(line) ||
+    /^\d+[.)]\s+/.test(line) ||
+    isMarkdownTableRow(line)
+  );
+}
+
+function isUnorderedListLine(line) {
+  return /^[-*+](?:\s+|$)/.test(line) || /^[-*+]\[( |x|X)\]\s*/.test(line);
+}
+
+function parseListItem(line) {
+  const task = line.match(/^[-*+]\s*\[( |x|X)\]\s*(.*)$/);
+  if (task) {
+    return {
+      text: task[2],
+      checked: task[1].toLowerCase() === 'x',
+      task: true
+    };
+  }
+  return {
+    text: line.replace(/^[-*+]\s*/, ''),
+    checked: false,
+    task: false
+  };
 }
 
 function parseMarkdownImage(text) {
@@ -5330,9 +5388,12 @@ function renderMarkdownBlock(block, index) {
   }
   if (block.type === 'list') {
     return (
-      <ul key={index}>
+      <ul className={block.items.some((item) => item.task) ? 'markdown-task-list' : undefined} key={index}>
         {block.items.map((item, itemIndex) => (
-          <li key={itemIndex}>{renderInlineMarkdown(item)}</li>
+          <li className={item.task ? 'markdown-task-item' : undefined} key={itemIndex}>
+            {item.task && <input type="checkbox" checked={item.checked} readOnly />}
+            <span>{renderInlineMarkdown(item.text)}</span>
+          </li>
         ))}
       </ul>
     );
@@ -5375,9 +5436,17 @@ function renderMarkdownBlock(block, index) {
     );
   }
   if (block.type === 'quote') {
-    return <blockquote key={index}>{renderInlineMarkdown(block.text)}</blockquote>;
+    return <blockquote key={index}>{renderInlineLines(block.lines)}</blockquote>;
   }
-  return <p key={index}>{renderInlineMarkdown(block.text)}</p>;
+  return <p key={index}>{renderInlineLines(block.lines || [block.text])}</p>;
+}
+
+function renderInlineLines(lines = []) {
+  return lines.flatMap((line, index) => (
+    index === 0
+      ? [<React.Fragment key={`line-${index}`}>{renderInlineMarkdown(line)}</React.Fragment>]
+      : [<br key={`break-${index}`} />, <React.Fragment key={`line-${index}`}>{renderInlineMarkdown(line)}</React.Fragment>]
+  ));
 }
 
 function renderMathExpression(source, displayMode = false, key) {
@@ -5398,9 +5467,9 @@ function renderMathExpression(source, displayMode = false, key) {
   }
 }
 
-function renderInlineMarkdown(text) {
+function renderInlineMarkdown(text = '') {
   const parts = [];
-  const pattern = /(!\[[^\]]*\]\([^)]+\)|\\\([^\n]+?\\\)|\$[^$\n]+\$|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
+  const pattern = /(!\[[^\]]*\]\([^)]+\)|\\\([^\n]+?\\\)|\$[^$\n]+\$|`[^`]+`|==[^=\n]+==|~~[^~\n]+~~|\*\*[^*]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_)/g;
   let lastIndex = 0;
   let match;
 
@@ -5427,7 +5496,13 @@ function renderInlineMarkdown(text) {
       parts.push(renderMathExpression(value.slice(2, -2), false, parts.length));
     } else if (value.startsWith('`')) {
       parts.push(<code key={parts.length}>{value.slice(1, -1)}</code>);
+    } else if (value.startsWith('==')) {
+      parts.push(<mark key={parts.length}>{value.slice(2, -2)}</mark>);
+    } else if (value.startsWith('~~')) {
+      parts.push(<del key={parts.length}>{value.slice(2, -2)}</del>);
     } else if (value.startsWith('**')) {
+      parts.push(<strong key={parts.length}>{value.slice(2, -2)}</strong>);
+    } else if (value.startsWith('__')) {
       parts.push(<strong key={parts.length}>{value.slice(2, -2)}</strong>);
     } else {
       parts.push(<em key={parts.length}>{value.slice(1, -1)}</em>);
@@ -10284,8 +10359,17 @@ function AdminWorkspace({
                   <button type="button" title="列表" onClick={() => insertIntoContent('- ', '', '列表项')}>
                     <List size={16} />
                   </button>
+                  <button type="button" title="待办" onClick={() => insertIntoContent('- [ ] ', '', '待办事项')}>
+                    <CheckCircle2 size={16} />
+                  </button>
                   <button type="button" title="引用" onClick={() => insertIntoContent('> ', '', '引用内容')}>
                     <Quote size={16} />
+                  </button>
+                  <button type="button" title="删除线" onClick={() => insertIntoContent('~~', '~~', '删除线文字')}>
+                    <span>~~</span>
+                  </button>
+                  <button type="button" title="分割线" onClick={() => insertIntoContent('\n---\n', '', '')}>
+                    <span>—</span>
                   </button>
                   <button type="button" title="代码块" onClick={() => insertIntoContent('```js\n', '\n```', 'console.log("Hello Felix")')}>
                     <Code2 size={16} />
