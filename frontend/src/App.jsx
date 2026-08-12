@@ -48,6 +48,7 @@ import {
   ThumbsDown,
   Trash2,
   UserRound,
+  UploadCloud,
   Wrench,
   X,
   Zap
@@ -175,6 +176,8 @@ const ACTIVE_VIEW_KEY = 'felix_blog_active_view';
 const ADMIN_PAGE_KEY = 'felix_blog_admin_page';
 const MUSIC_PLAYLISTS_KEY = 'felix_blog_music_playlists';
 const MUSIC_RECENT_KEY = 'felix_blog_music_recent';
+const MUSIC_HISTORY_KEY = 'felix_blog_music_history';
+const MUSIC_FAVORITES_KEY = 'felix_blog_music_favorites';
 const MUSIC_VOLUME_KEY = 'felix_blog_music_volume';
 const MUSIC_SESSION_KEY = 'felix_blog_music_session';
 const TOOLBOX_DEFAULT_OVERRIDES_KEY = 'felix_blog_toolbox_default_overrides';
@@ -311,7 +314,7 @@ function readStoredSidebarCollapsed() {
 function readStoredAdminPage() {
   if (typeof localStorage === 'undefined') return 'overview';
   const storedPage = localStorage.getItem(ADMIN_PAGE_KEY) || 'overview';
-  const knownPages = new Set(['overview', 'ops', 'releases', 'editor', 'notes', 'articles', 'music', 'toolbox', 'comments', 'visual', 'security']);
+  const knownPages = new Set(['overview', 'ops', 'releases', 'editor', 'notes', 'articles', 'music', 'toolbox', 'comments', 'visual', 'security', 'backups', 'corpus', 'study']);
   return knownPages.has(storedPage) ? storedPage : 'overview';
 }
 
@@ -348,6 +351,26 @@ function readStoredMusicPlaylists() {
 function readStoredRecentMusic() {
   const stored = readStoredJson(MUSIC_RECENT_KEY, []);
   return Array.isArray(stored) ? stored.map((filename) => String(filename)).filter(Boolean).slice(0, 8) : [];
+}
+
+function readStoredMusicHistory() {
+  const stored = readStoredJson(MUSIC_HISTORY_KEY, []);
+  if (!Array.isArray(stored)) return [];
+  return stored
+    .filter((item) => item?.filename)
+    .map((item) => ({
+      filename: String(item.filename),
+      title: item.title ? String(item.title) : '',
+      artist: item.artist ? String(item.artist) : '',
+      coverUrl: item.coverUrl ? String(item.coverUrl) : '',
+      playedAt: item.playedAt ? String(item.playedAt) : ''
+    }))
+    .slice(0, 24);
+}
+
+function readStoredMusicFavorites() {
+  const stored = readStoredJson(MUSIC_FAVORITES_KEY, []);
+  return Array.isArray(stored) ? stored.map((filename) => String(filename)).filter(Boolean) : [];
 }
 
 function readStoredMusicSession() {
@@ -497,6 +520,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.5.0',
+    title: '音乐、写作和备份工作流增强',
+    date: '2026-08-13',
+    status: '已上线',
+    points: ['音乐页新增喜欢歌曲和播放足迹，歌单编辑之外也能快速回到常听内容', '写作台新增正文统计、常用 Markdown 插入按钮和拖拽图片上传', '首页进一步瘦身，移除展示型终端和大指标块', '内容库新增目录快捷筛选和收纳输入提示', '备份中心支持导入 JSON 预检，并可恢复个人资料、站点偏好、歌单和工具箱轻量配置', '长列表启用延迟绘制，歌词滚动减少平滑动画以提升流畅度']
+  },
   {
     version: 'v6.4.3',
     title: '页面贴纸轻量回归',
@@ -1844,6 +1874,8 @@ function App() {
   const [isUploadingMusic, setIsUploadingMusic] = useState(false);
   const [musicPlaylists, setMusicPlaylists] = useState(readStoredMusicPlaylists);
   const [recentMusicFilenames, setRecentMusicFilenames] = useState(readStoredRecentMusic);
+  const [musicHistory, setMusicHistory] = useState(readStoredMusicHistory);
+  const [favoriteMusicFilenames, setFavoriteMusicFilenames] = useState(readStoredMusicFavorites);
   const initialMusicSession = readStoredMusicSession();
   const [selectedMusicPlaylistId, setSelectedMusicPlaylistId] = useState(initialMusicSession.playlistId || 'all');
   const [musicCurrentFilename, setMusicCurrentFilename] = useState(initialMusicSession.filename || '');
@@ -1939,6 +1971,10 @@ function App() {
     const trackMap = new Map(musicTracks.map((track) => [track.filename, track]));
     return recentMusicFilenames.map((filename) => trackMap.get(filename)).filter(Boolean);
   }, [musicTracks, recentMusicFilenames]);
+  const favoriteMusicTracks = useMemo(() => {
+    const trackMap = new Map(musicTracks.map((track) => [track.filename, track]));
+    return favoriteMusicFilenames.map((filename) => trackMap.get(filename)).filter(Boolean);
+  }, [favoriteMusicFilenames, musicTracks]);
 
   useEffect(() => {
     if (!musicTracks.length || musicCurrentFilename) return;
@@ -1962,6 +1998,31 @@ function App() {
     setRecentMusicFilenames((current) => {
       const nextFilenames = [track.filename, ...current.filter((filename) => filename !== track.filename)].slice(0, 8);
       writeStoredJson(MUSIC_RECENT_KEY, nextFilenames);
+      return nextFilenames;
+    });
+    setMusicHistory((current) => {
+      const nextHistory = [
+        {
+          filename: track.filename,
+          title: track.title || track.filename,
+          artist: track.artist || '',
+          coverUrl: track.coverUrl || '',
+          playedAt: new Date().toISOString()
+        },
+        ...current.filter((item) => item.filename !== track.filename)
+      ].slice(0, 24);
+      writeStoredJson(MUSIC_HISTORY_KEY, nextHistory);
+      return nextHistory;
+    });
+  }
+
+  function toggleFavoriteMusicTrack(filename) {
+    if (!filename) return;
+    setFavoriteMusicFilenames((current) => {
+      const nextFilenames = current.includes(filename)
+        ? current.filter((item) => item !== filename)
+        : [filename, ...current];
+      writeStoredJson(MUSIC_FAVORITES_KEY, nextFilenames);
       return nextFilenames;
     });
   }
@@ -2173,6 +2234,40 @@ function App() {
       next.splice(targetIndex, 0, moved);
       return next;
     });
+  }
+
+  async function restorePortableBackup(payload) {
+    if (!payload || typeof payload !== 'object') return false;
+    if (Array.isArray(payload.musicPlaylists)) {
+      persistMusicPlaylists(payload.musicPlaylists
+        .filter((playlist) => playlist?.id && playlist?.name)
+        .map((playlist) => ({
+          id: String(playlist.id),
+          name: String(playlist.name),
+          trackFilenames: Array.isArray(playlist.trackFilenames)
+            ? playlist.trackFilenames.map((filename) => String(filename)).filter(Boolean)
+            : []
+        })));
+    }
+    if (payload.toolboxOverrides && typeof payload.toolboxOverrides === 'object') {
+      writeStoredJson(TOOLBOX_DEFAULT_OVERRIDES_KEY, payload.toolboxOverrides);
+    }
+    if (payload.sitePreferences && typeof payload.sitePreferences === 'object') {
+      await saveSitePreferences(payload.sitePreferences);
+    }
+    if (payload.profile && typeof payload.profile === 'object') {
+      setProfile(payload.profile);
+      setProfileForm({
+        siteTitle: payload.profile.siteTitle || "FelixFu's Craft",
+        name: payload.profile.name || '副将凡',
+        englishName: payload.profile.englishName || 'Felix Fu',
+        school: payload.profile.school || '',
+        role: payload.profile.role || '',
+        summary: payload.profile.summary || '',
+        interests: (payload.profile.interests || []).join('、')
+      });
+    }
+    return true;
   }
 
   useEffect(() => {
@@ -4274,6 +4369,9 @@ function App() {
             queue={activeMusicQueue}
             currentTrack={currentMusicTrack}
             recentTracks={recentMusicTracks}
+            favoriteTracks={favoriteMusicTracks}
+            favoriteFilenames={favoriteMusicFilenames}
+            musicHistory={musicHistory}
             isPlaying={musicIsPlaying}
             progress={musicProgress}
             duration={musicDuration}
@@ -4297,6 +4395,7 @@ function App() {
             stepTrack={stepMusicTrack}
             seekTrack={seekMusicTrack}
             reshuffleQueue={reshuffleMusicQueue}
+            toggleFavoriteTrack={toggleFavoriteMusicTrack}
           />
         )}
 
@@ -4427,6 +4526,7 @@ function App() {
             sitePreferences={sitePreferences}
             isSavingSitePreferences={isSavingSitePreferences}
             saveSitePreferences={saveSitePreferences}
+            restorePortableBackup={restorePortableBackup}
             logout={logout}
           />
         )}
@@ -4484,24 +4584,17 @@ function Overview({ profile, articles, setActiveView, currentUser, canViewSummer
   const clockTime = homeNow.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const clockDate = homeNow.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
   const clockZone = Intl.DateTimeFormat().resolvedOptions().timeZone || '本地时间';
-  const latestUpdates = releaseArchive.slice(0, 3);
+  const latestUpdates = releaseArchive.slice(0, 2);
   const liveStats = [
     { label: '上线时间', value: formatLaunchDuration(homeNow), detail: '精准到秒' },
     { label: '公开文章', value: `${publishedArticles.length} 篇`, detail: currentMonthCount ? `本月 ${currentMonthCount} 篇` : '等待新内容' },
     { label: '阅读记录', value: `${totalViews} 次`, detail: totalComments ? `${totalComments} 条评论` : '来自文章详情页' }
   ];
-  const recentArticles = [...articles].slice(0, 3);
   const homeEntryCards = [
-    { title: '随笔和文章', detail: '生活、游戏、番剧、读书和普通文章。', view: 'articles', icon: BookOpen, meta: `${publishedArticles.length} 篇` },
+    { title: '随笔和文章', detail: '生活、游戏、番剧、读书。', view: 'articles', icon: BookOpen, meta: `${publishedArticles.length} 篇` },
     { title: '技术笔记', detail: '课程笔记、项目文档和代码学习记录。', view: 'articles', section: 'notes', icon: Code2, meta: '/notes' },
-    { title: '音乐', detail: '私人歌单、最近播放和站内迷你播放器。', view: 'music', icon: Music, meta: 'Felix Music' },
+    { title: '音乐', detail: '歌单、歌词和最近播放。', view: 'music', icon: Music, meta: 'Music' },
     { title: '工具箱', detail: '常用网站、友链和维护入口。', view: 'toolbox', icon: Wrench, meta: 'Links' }
-  ];
-  const terminalLines = [
-    ['boot', 'personal site online'],
-    ['stack', 'React + FastAPI + PostgreSQL + Docker'],
-    ['latest', recentArticles[0]?.title || '等待第一篇新文章'],
-    ['mode', currentUser?.role === 'admin' ? 'admin workspace unlocked' : 'reader mode']
   ];
   return (
     <section className="workspace homepage-workspace">
@@ -4526,22 +4619,6 @@ function Overview({ profile, articles, setActiveView, currentUser, canViewSummer
           <p className="geek-summary">
             {profile.summary}
           </p>
-          <div className="hero-terminal" aria-label="站点动态摘要">
-            <div className="hero-terminal-bar">
-              <span />
-              <span />
-              <span />
-              <strong>felixfu@site:~</strong>
-            </div>
-            <div className="hero-terminal-lines">
-              {terminalLines.map(([label, value]) => (
-                <p key={label}>
-                  <span>$ {label}</span>
-                  <strong>{value}</strong>
-                </p>
-              ))}
-            </div>
-          </div>
           <div className="hero-actions">
             <button className="primary-action" type="button" onClick={() => setActiveView('articles')}>
               <BookOpen size={17} />
@@ -4562,14 +4639,6 @@ function Overview({ profile, articles, setActiveView, currentUser, canViewSummer
           <div className="interest-row geek-interest-row">
             {profile.interests.map((interest) => (
               <span key={interest}>{interest}</span>
-            ))}
-          </div>
-          <div className="metric-grid hero-metrics">
-            {profile.metrics.map((metric) => (
-              <div className="metric" key={metric.label}>
-                <span>{metric.label}</span>
-                <strong>{metric.value}</strong>
-              </div>
             ))}
           </div>
         </div>
@@ -8700,6 +8769,9 @@ function MusicWorkspace({
   queue,
   currentTrack,
   recentTracks,
+  favoriteTracks,
+  favoriteFilenames,
+  musicHistory,
   isPlaying,
   progress,
   duration,
@@ -8722,7 +8794,8 @@ function MusicWorkspace({
   togglePlayback,
   stepTrack,
   seekTrack,
-  reshuffleQueue
+  reshuffleQueue,
+  toggleFavoriteTrack
 }) {
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [draggingTrackFilename, setDraggingTrackFilename] = useState(null);
@@ -8730,6 +8803,8 @@ function MusicWorkspace({
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const lyricListRef = useRef(null);
   const selectedTrackNames = new Set(selectedPlaylist?.trackFilenames || []);
+  const favoriteFilenameSet = new Set(favoriteFilenames || []);
+  const currentTrackIsFavorite = currentTrack?.filename && favoriteFilenameSet.has(currentTrack.filename);
   const displayTracks = selectedPlaylist ? queue : tracks;
   const currentLyrics = useMemo(() => parseLyrics(currentTrack?.lyrics || ''), [currentTrack?.lyrics]);
   const activeLyricIndex = useMemo(() => {
@@ -8746,7 +8821,7 @@ function MusicWorkspace({
   useEffect(() => {
     if (activeLyricIndex < 0 || !lyricListRef.current) return;
     const target = lyricListRef.current.querySelector(`[data-lyric-index="${activeLyricIndex}"]`);
-    target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    target?.scrollIntoView({ block: 'center', behavior: 'auto' });
   }, [activeLyricIndex]);
 
   return (
@@ -8864,6 +8939,15 @@ function MusicWorkspace({
             <Shuffle size={16} />
             <span>重洗队列</span>
           </button>
+          <button
+            className={currentTrackIsFavorite ? 'ghost-button active-soft' : 'ghost-button'}
+            type="button"
+            onClick={() => toggleFavoriteTrack(currentTrack?.filename)}
+            disabled={!currentTrack}
+          >
+            <Heart size={16} />
+            <span>{currentTrackIsFavorite ? '已喜欢' : '喜欢'}</span>
+          </button>
         </div>
 
         {isQueueOpen && (
@@ -8913,6 +8997,66 @@ function MusicWorkspace({
               </button>
             ))}
           </div>
+        </section>
+      )}
+
+      {(favoriteTracks.length > 0 || musicHistory.length > 0) && (
+        <section className="music-memory-grid">
+          <article className="music-recent-panel">
+            <div className="admin-panel-heading compact-heading">
+              <div>
+                <h2>喜欢歌曲</h2>
+                <span>{favoriteTracks.length ? `${favoriteTracks.length} 首` : '点喜欢后会出现在这里'}</span>
+              </div>
+            </div>
+            {favoriteTracks.length ? (
+              <div className="music-recent-list compact">
+                {favoriteTracks.slice(0, 8).map((track) => (
+                  <button
+                    className={track.filename === currentTrack?.filename ? 'music-recent-card active' : 'music-recent-card'}
+                    type="button"
+                    key={track.filename}
+                    onClick={() => playTrack(track, 'all')}
+                  >
+                    <span>{track.coverUrl ? <img src={track.coverUrl} alt="" loading="lazy" decoding="async" /> : <Music size={16} />}</span>
+                    <strong>{track.title}</strong>
+                    <em>{track.artist || formatFileSize(track.size)}</em>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="empty-state compact">还没有喜欢的歌。</p>
+            )}
+          </article>
+
+          <article className="music-recent-panel">
+            <div className="admin-panel-heading compact-heading">
+              <div>
+                <h2>播放足迹</h2>
+                <span>{musicHistory.length ? `${musicHistory.length} 条` : '暂无记录'}</span>
+              </div>
+            </div>
+            {musicHistory.length ? (
+              <div className="music-history-list">
+                {musicHistory.slice(0, 8).map((item) => {
+                  const track = tracks.find((candidate) => candidate.filename === item.filename);
+                  return (
+                    <button
+                      type="button"
+                      key={`${item.filename}-${item.playedAt}`}
+                      onClick={() => track && playTrack(track, 'all')}
+                      disabled={!track}
+                    >
+                      <strong>{track?.title || item.title || item.filename}</strong>
+                      <span>{item.playedAt ? new Date(item.playedAt).toLocaleString('zh-CN', { hour12: false }) : '未知时间'}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="empty-state compact">播放一首歌后，这里会留下最近记录。</p>
+            )}
+          </article>
         </section>
       )}
 
@@ -9045,6 +9189,14 @@ function MusicWorkspace({
                   <span>{String(index + 1).padStart(2, '0')}</span>
                   <strong>{track.title}</strong>
                   <em>{formatFileSize(track.size)}</em>
+                </button>
+                <button
+                  className={favoriteFilenameSet.has(track.filename) ? 'music-track-like active' : 'music-track-like'}
+                  type="button"
+                  onClick={() => toggleFavoriteTrack(track.filename)}
+                  aria-label={favoriteFilenameSet.has(track.filename) ? '取消喜欢' : '喜欢歌曲'}
+                >
+                  <Heart size={15} />
                 </button>
                 {selectedPlaylist && (
                   <div className="music-track-order-actions">
@@ -9792,6 +9944,7 @@ function AdminWorkspace({
   sitePreferences,
   isSavingSitePreferences,
   saveSitePreferences,
+  restorePortableBackup,
   logout
 }) {
   const adminCommentArticleOptions = uniqueCommentOptions(adminComments, 'articleTitle', 'articleId');
@@ -9888,12 +10041,23 @@ function AdminWorkspace({
   const [frontendErrorLogs, setFrontendErrorLogs] = useState(readFrontendErrorLogs);
   const [backupRecords, setBackupRecords] = useState(readBackupRecords);
   const [backupNote, setBackupNote] = useState('');
+  const [backupImportPreview, setBackupImportPreview] = useState(null);
   const [botCorpusSamples, setBotCorpusSamples] = useState(readBotCorpusSamples);
   const [corpusInput, setCorpusInput] = useState('');
   const [studyState, setStudyState] = useState(readStudyState);
   const [studyInput, setStudyInput] = useState('');
   const shouldShowAdminLayout = ['editor', 'notes', 'articles', 'music', 'comments', 'toolbox'].includes(activeAdminPage);
   const deferredArticleContent = useDeferredValue(articleForm.content);
+  const editorStats = useMemo(() => {
+    const content = articleForm.content || '';
+    return {
+      words: countReadableWords(content),
+      readTime: estimateReadingTime(content),
+      headings: (content.match(/^#{1,6}\s+.+$/gm) || []).length + (content.match(/^[^\n]+\n[=-]{3,}\s*$/gm) || []).length,
+      tasks: (content.match(/^- \[[ xX]\]\s+/gm) || []).length,
+      images: (content.match(/!\[[^\]]*]\([^)]*\)/g) || []).length
+    };
+  }, [articleForm.content]);
 
   useEffect(() => {
     localStorage.setItem(ADMIN_PAGE_KEY, activeAdminPage);
@@ -9916,6 +10080,9 @@ function AdminWorkspace({
     );
   });
   const articleExplorerGroups = buildArticleExplorerGroups(filteredManagerArticles);
+  const articleFolderOptions = useMemo(() => (
+    Array.from(new Set(buildArticleExplorerGroups(articles).map((group) => group.folder))).sort((first, second) => first.localeCompare(second, 'zh-CN'))
+  ), [articles]);
   const selectedManagerArticles = filteredManagerArticles.filter((article) => selectedManagerArticleIds.includes(article.id));
   const isAllManagerArticlesSelected = filteredManagerArticles.length > 0
     && filteredManagerArticles.every((article) => selectedManagerArticleIds.includes(article.id));
@@ -10067,6 +10234,13 @@ function AdminWorkspace({
     insertContentSnippet(`![${altText}](${url})`);
   }
 
+  async function uploadDroppedArticleImage(file) {
+    if (!file?.type?.startsWith('image/')) return false;
+    const textarea = contentTextareaRef.current;
+    await uploadArticleContentImage(file, textarea?.selectionStart, textarea?.selectionEnd);
+    return true;
+  }
+
   function syncPreviewScroll(event) {
     const source = event.currentTarget;
     const target = previewScrollRef.current;
@@ -10185,6 +10359,38 @@ function AdminWorkspace({
     const datePart = createdAt.toISOString().slice(0, 10);
     downloadJsonFile(`felixfu-craft-backup-${datePart}.json`, payload);
     setAdminMessage('已导出站点备份 JSON');
+  }
+
+  async function importBackupFile(file) {
+    if (!file) return;
+    try {
+      const payload = JSON.parse(await file.text());
+      setBackupImportPreview({
+        payload,
+        fileName: file.name,
+        exportedAt: payload?.meta?.exportedAt || '',
+        version: payload?.meta?.version || '未知版本',
+        counts: {
+          articles: Array.isArray(payload?.articles) ? payload.articles.length : 0,
+          playlists: Array.isArray(payload?.musicPlaylists) ? payload.musicPlaylists.length : 0,
+          toolbox: payload?.toolboxOverrides && typeof payload.toolboxOverrides === 'object' ? Object.keys(payload.toolboxOverrides).length : 0,
+          backups: Array.isArray(payload?.backupRecords) ? payload.backupRecords.length : 0
+        }
+      });
+      setAdminMessage('备份文件已读取，可以先看摘要再恢复轻量配置');
+    } catch {
+      setBackupImportPreview(null);
+      setAdminMessage('备份文件读取失败，请确认是本站导出的 JSON');
+    }
+  }
+
+  async function restoreImportedBackup() {
+    if (!backupImportPreview?.payload) return;
+    if (!window.confirm('确认恢复备份里的站点偏好、个人资料、音乐歌单和工具箱覆盖项？文章数据库不会在这里回滚。')) return;
+    const ok = await restorePortableBackup?.(backupImportPreview.payload);
+    if (ok) {
+      setAdminMessage('已恢复备份里的轻量配置。个人资料如需永久生效，请到账号资料区再保存一次。');
+    }
   }
 
   function deleteBackupRecord(recordId) {
@@ -10811,6 +11017,18 @@ function AdminWorkspace({
               <span>大改、上线、迁移前先确认数据和配置有退路</span>
             </div>
             <div className="manager-actions">
+              <label className="ghost-button file-upload-control compact-upload">
+                <UploadCloud size={17} />
+                <span>导入检查</span>
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={(event) => {
+                    importBackupFile(event.target.files?.[0]);
+                    event.target.value = '';
+                  }}
+                />
+              </label>
               <button className="ghost-button" type="button" onClick={exportSiteBackup}>
                 <Download size={17} />
                 <span>导出 JSON</span>
@@ -10848,7 +11066,7 @@ function AdminWorkspace({
               ['数据库', '文章、评论、用户、AI 历史都在这里。'],
               ['上传图片', '封面和正文图片使用 Docker volume 保存。'],
               ['工具箱/友链', '自定义链接和预置覆盖项会随 JSON 一起导出。'],
-              ['部署脚本', 'GitHub Actions 和服务器脚本决定上线结果。']
+              ['轻量回滚', '浏览器里只恢复个人资料、站点开关、歌单和工具箱配置。']
             ].map(([title, detail]) => (
               <article key={title}>
                 <strong>{title}</strong>
@@ -10856,6 +11074,24 @@ function AdminWorkspace({
               </article>
             ))}
           </div>
+          {backupImportPreview && (
+            <div className="backup-import-preview">
+              <div>
+                <strong>{backupImportPreview.fileName}</strong>
+                <span>{backupImportPreview.version} · {backupImportPreview.exportedAt ? new Date(backupImportPreview.exportedAt).toLocaleString('zh-CN', { hour12: false }) : '未知导出时间'}</span>
+              </div>
+              <div className="backup-import-counts">
+                <span>{backupImportPreview.counts.articles} 篇文章</span>
+                <span>{backupImportPreview.counts.playlists} 个歌单</span>
+                <span>{backupImportPreview.counts.toolbox} 项工具箱覆盖</span>
+                <span>{backupImportPreview.counts.backups} 条备份记录</span>
+              </div>
+              <button className="primary-action" type="button" onClick={restoreImportedBackup}>
+                <RefreshCw size={16} />
+                <span>恢复到当前浏览器</span>
+              </button>
+            </div>
+          )}
           <div className="ops-list">
             {backupRecords.length === 0 ? (
               <p className="empty-state">暂无备份记录。真正执行备份仍在服务器脚本里，这里先作为上线前检查账本。</p>
@@ -11163,7 +11399,13 @@ function AdminWorkspace({
           <section className="editor-compose-block" aria-label="正文编辑和预览">
             <div className="editor-compose-heading">
               <span>正文</span>
-              <em>Markdown / LaTeX 实时预览</em>
+              <div className="editor-stat-strip" aria-label="正文统计">
+                <em>{editorStats.words} 字</em>
+                <em>{editorStats.readTime}</em>
+                <em>{editorStats.headings} 个标题</em>
+                <em>{editorStats.tasks} 个待办</em>
+                <em>{editorStats.images} 张图</em>
+              </div>
             </div>
             <div className="editor-compose-grid">
               <div className="editor-source-pane">
@@ -11173,6 +11415,9 @@ function AdminWorkspace({
                   </button>
                   <button type="button" title="加粗" onClick={() => insertIntoContent('**', '**', '加粗文字')}>
                     <strong>B</strong>
+                  </button>
+                  <button type="button" title="高亮" onClick={() => insertIntoContent('==', '==', '重点内容')}>
+                    <span>==</span>
                   </button>
                   <button type="button" title="列表" onClick={() => insertIntoContent('- ', '', '列表项')}>
                     <List size={16} />
@@ -11188,6 +11433,20 @@ function AdminWorkspace({
                   </button>
                   <button type="button" title="分割线" onClick={() => insertIntoContent('\n---\n', '', '')}>
                     <span>—</span>
+                  </button>
+                  <button
+                    type="button"
+                    title="表格"
+                    onClick={() => insertContentSnippet('\n| 项目 | 说明 |\n| --- | --- |\n| 内容 | 备注 |\n')}
+                  >
+                    <span>| |</span>
+                  </button>
+                  <button
+                    type="button"
+                    title="脚注"
+                    onClick={() => insertContentSnippet('[^1]\n\n[^1]: 这里写脚注说明')}
+                  >
+                    <span>fn</span>
                   </button>
                   <button type="button" title="代码块" onClick={() => insertIntoContent('```js\n', '\n```', 'console.log("Hello Felix")')}>
                     <Code2 size={16} />
@@ -11210,6 +11469,18 @@ function AdminWorkspace({
                   value={articleForm.content}
                   onChange={(event) => updateArticleForm('content', event.target.value)}
                   onScroll={syncPreviewScroll}
+                  onDragOver={(event) => {
+                    if ([...event.dataTransfer.items].some((item) => item.type.startsWith('image/'))) {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = 'copy';
+                    }
+                  }}
+                  onDrop={async (event) => {
+                    const imageFile = [...event.dataTransfer.files].find((file) => file.type.startsWith('image/'));
+                    if (!imageFile) return;
+                    event.preventDefault();
+                    await uploadDroppedArticleImage(imageFile);
+                  }}
                   placeholder="在这里写 Markdown，右侧会像 VS Code 预览一样同步显示"
                   rows={18}
                   required
@@ -11502,18 +11773,43 @@ function AdminWorkspace({
               onChange={(event) => setManagerCollectionDraft(event.target.value)}
               placeholder="合集，比如 X-lab 软件团队学习笔记"
               aria-label="笔记合集"
+              list="article-collection-options"
             />
             <input
               value={managerPathDraft}
               onChange={(event) => setManagerPathDraft(event.target.value)}
               placeholder="目录路径，比如 React / Hooks"
               aria-label="笔记目录路径"
+              list="article-folder-options"
             />
+            <datalist id="article-collection-options">
+              {Array.from(new Set(articles.map((article) => article.noteCollection).filter(Boolean))).map((collection) => (
+                <option key={collection} value={collection} />
+              ))}
+            </datalist>
+            <datalist id="article-folder-options">
+              {articleFolderOptions.map((folder) => (
+                <option key={folder} value={folder} />
+              ))}
+            </datalist>
             <button type="button" onClick={runManagerCollectAction} disabled={!selectedManagerArticles.length || isSavingArticle}>
               <BookOpen size={16} />
               <span>收纳所选</span>
             </button>
           </div>
+
+          {articleFolderOptions.length > 0 && (
+            <div className="content-library-folder-strip" aria-label="目录快捷筛选">
+              <button type="button" onClick={() => setArticleManagerQuery('')}>
+                全部目录
+              </button>
+              {articleFolderOptions.slice(0, 12).map((folder) => (
+                <button type="button" key={folder} onClick={() => setArticleManagerQuery(folder)}>
+                  {folder}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="manager-list">
             {filteredManagerArticles.length === 0 ? (

@@ -4633,6 +4633,13 @@ h3 {
   align-items: center;
 }
 
+.ghost-button.active-soft,
+.music-track-like.active {
+  border-color: rgba(238, 113, 151, 0.45);
+  color: #b23b62;
+  background: rgba(238, 113, 151, 0.12);
+}
+
 .music-volume-control {
   display: inline-grid;
   grid-template-columns: auto 116px auto;
@@ -4728,6 +4735,16 @@ h3 {
   gap: 10px;
 }
 
+.music-recent-list.compact {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.music-memory-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 14px;
+}
+
 .music-recent-card {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
@@ -4770,6 +4787,49 @@ h3 {
 .music-recent-card.active {
   border-color: #1f7a6d;
   background: #eefaf6;
+}
+
+.music-history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.music-history-list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-main);
+  background: var(--panel-soft);
+  text-align: left;
+}
+
+.music-history-list strong,
+.music-history-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-history-list span {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.music-track-like {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  background: var(--panel-soft);
 }
 
 .playlist-toolbar {
@@ -5807,6 +5867,47 @@ h3 {
   min-width: 0;
 }
 
+.backup-import-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(47, 143, 131, 0.22);
+  border-radius: 8px;
+  background: rgba(47, 143, 131, 0.08);
+}
+
+.backup-import-preview > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.backup-import-preview strong {
+  color: var(--text-main);
+}
+
+.backup-import-preview span {
+  color: var(--text-muted);
+}
+
+.backup-import-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.backup-import-counts span {
+  min-height: 26px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .ops-service-card,
 .ops-list-row {
   min-width: 0;
@@ -6683,10 +6784,25 @@ h3 {
   font-weight: 800;
 }
 
-.editor-compose-heading em {
+.editor-stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.editor-compose-heading em,
+.editor-stat-strip em {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid rgba(47, 143, 131, 0.18);
+  border-radius: 999px;
   color: #6a7685;
   font-size: 12px;
   font-style: normal;
+  background: rgba(47, 143, 131, 0.08);
 }
 
 .editor-compose-grid {
@@ -7232,6 +7348,31 @@ h3 {
   gap: 12px;
   min-width: 0;
   max-width: 100%;
+}
+
+.content-library-folder-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+
+.content-library-folder-strip button {
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid rgba(47, 143, 131, 0.2);
+  border-radius: 8px;
+  color: var(--text-soft);
+  background: var(--panel);
+  font-weight: 800;
+}
+
+.content-library-folder-strip button:hover {
+  border-color: rgba(47, 143, 131, 0.48);
+  color: var(--accent);
 }
 
 .article-explorer {
@@ -10242,6 +10383,19 @@ h3 {
 
 :root[data-theme='dark'] .live2d-context-menu .danger {
   color: #fda4af;
+}
+
+.article-card,
+.home-entry-card,
+.home-update-item,
+.music-recent-card,
+.music-track,
+.toolbox-card,
+.ops-list-row,
+.content-library-row,
+.ai-history-item {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 140px;
 }
 
 @media (prefers-reduced-motion: reduce) {

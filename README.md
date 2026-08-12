@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/firefelixfu026/the-piggy-home-of-felixfu/actions/workflows/ci.yml/badge.svg)](https://github.com/firefelixfu026/the-piggy-home-of-felixfu/actions/workflows/ci.yml)
 
-这是副将凡的个人网站，用来放个人介绍、随笔、技术笔记、音乐、小游戏和常用工具入口。项目已经从一个普通博客，逐步长成“个人主页 + 内容库 + 生活记录 + 小型后台”的站点。
+这是副将凡的个人网站，用来放随笔、技术笔记、音乐、工具箱、账号中心和管理后台。项目已经从普通博客逐步演进成“个人主页 + 内容库 + 知识库 + 音乐台 + 小型后台”的站点。
 
 线上地址：
 
@@ -12,14 +12,13 @@ https://www.felixfu.xyz
 
 ## 当前状态
 
-- 前台页面：主页、文章、计划、音乐、工具箱、游戏、账号中心。
+- 前台页面：主页、文章、技术笔记、音乐、工具箱、游戏、账号中心。
 - 文章中心分为“随笔 / 娱乐文章”和“技术笔记”两个入口。
-- 技术笔记采用知识库式阅读：左侧笔记树、中间正文、右侧阅读进度和文章目录。
-- 计划页拆成时间安排、完成度、课程、应用、记账、饮食、身体、睡眠等子页面。
-- 工具箱按分类展示常用网站，友链归入工具箱分类；自定义网站在后台管理。
-- 音乐模块支持上传本地歌曲、自建歌单、拖拽调整歌单顺序、上传封面和歌词、全站迷你播放器。
+- 技术笔记采用知识库式阅读：左侧笔记树，中间正文，右侧阅读进度和文章目录。
+- 音乐模块支持上传本地歌曲、封面、歌词，自建歌单，拖拽排序，随机播放，喜欢歌曲，播放足迹和全站迷你播放器。
+- 工具箱按分类展示常用网站和友链，后台可以统一添加、编辑、删除和上传图片。
 - 黍泡泡作为站点吉祥物，以可拖动悬浮窗形式出现；模型来源：Bilibili UP 主切丁鱼片。
-- 管理后台支持写文章、导入笔记、文件管理器式内容库、批量收纳笔记、拖拽排序、评论删除、音乐管理、工具箱统一管理、版本记录、视觉巡检、运维和安全日志。
+- 管理后台支持写文章、导入 Markdown 笔记、内容库整理、拖拽排序、评论删除、音乐管理、工具箱管理、版本记录、视觉巡检、运维、安全日志和备份中心。
 
 ## 页面路径
 
@@ -28,24 +27,23 @@ https://www.felixfu.xyz
 - 技术笔记：`/notes`
 - 普通文章详情：`/articles/:id`
 - 技术笔记详情：`/notes/:id`
-- 暑期计划：`/plan`
-- 计划子页面：`/plan/schedule`、`/plan/completion`、`/plan/courses`、`/plan/apps`、`/plan/finance`、`/plan/meals`、`/plan/body`、`/plan/sleep`
 - 音乐：`/music`
 - 工具箱：`/toolbox`
 - 游戏：`/game`
 - 账号中心：`/account`
 - 管理后台：`/admin`
+- 暑期计划：`/plan`，默认由后台开关控制是否对访客显示。
 
 前端容器的 Nginx 已配置 SPA fallback，直接刷新这些路径时会回到前端应用处理。
 
 ## 技术栈
 
-- 前端：React、Vite、KaTeX、自定义 Markdown 渲染
-- 后端：FastAPI、SQLAlchemy、Pydantic
-- 数据库：PostgreSQL
-- 登录：邮箱登录、GitHub OAuth、Token 鉴权
-- 部署：Docker Compose、Nginx、HTTPS、GitHub Actions
-- 持久化：数据库、上传文件目录、Docker volume
+- 前端：React、Vite、KaTeX、自定义 Markdown 渲染。
+- 后端：FastAPI、SQLAlchemy、Pydantic。
+- 数据库：PostgreSQL。
+- 登录：邮箱登录、GitHub OAuth、Token 鉴权。
+- 部署：Docker Compose、Nginx、HTTPS、GitHub Actions。
+- 持久化：数据库、上传文件目录、Docker volume。
 
 ## 项目结构
 
@@ -124,6 +122,10 @@ Markdown 中可以写：
 ```
 
 在后台“笔记上传”中选择整个文件夹后，系统会上传图片，并尽量把相对图片路径替换成站内 `/uploads/...` 地址。导入内容会先进入写作台草稿，不会直接发布。
+
+## 备份说明
+
+后台“备份中心”可以导出站点 JSON，用来保存个人资料、站点偏好、文章快照、评论快照、音乐歌单和工具箱配置。浏览器里的导入恢复只处理轻量配置；数据库级回滚仍应通过服务器备份脚本完成。
 
 ## 项目性质
 
