@@ -9219,12 +9219,12 @@ function MusicWorkspace({
 
 function GameWorkspace() {
   const [frameKey, setFrameKey] = useState(0);
-  const [selectedGameId, setSelectedGameId] = useState('card-war');
+  const [selectedGameId, setSelectedGameId] = useState('yuan-qi');
   const gameCatalog = [
     {
-      id: 'card-war',
-      title: '决斗小游戏',
-      subtitle: 'Card War',
+      id: 'yuan-qi',
+      title: '元气',
+      subtitle: '策略对战',
       status: gameModule.status || '已嵌入',
       plan: gameModule.plan,
       repository: gameModule.repository,
@@ -9256,6 +9256,26 @@ function GameWorkspace() {
       <div className="section-heading">
         <p className="eyebrow">小游戏</p>
         <h1>游戏库</h1>
+      </div>
+
+      <div className="game-picker-bar">
+        <label className="game-picker">
+          <Gamepad2 size={18} />
+          <span>选择游戏</span>
+          <select
+            value={selectedGameId}
+            onChange={(event) => {
+              setSelectedGameId(event.target.value);
+              setFrameKey((current) => current + 1);
+            }}
+            aria-label="选择游戏"
+          >
+            {gameCatalog.map((game) => (
+              <option key={game.id} value={game.id}>{game.title} - {game.subtitle}</option>
+            ))}
+          </select>
+        </label>
+        <span>{selectedGame.playUrl ? '当前可试玩' : '当前为计划项'}</span>
       </div>
 
       <div className="game-selector-grid" aria-label="选择游戏">

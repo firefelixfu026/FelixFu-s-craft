@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>元气 - 策略对战</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <main class="container">
+        <h1>元气</h1>
+
+        <section class="game-info" aria-label="对战状态">
+            <div class="player player1">
+                <h2>你 <span class="mp-badge">元气 <span id="mp1">0</span></span></h2>
+                <div class="stats">
+                    <div class="hp">状态：<span id="hp1">存活</span></div>
+                </div>
+            </div>
+            <div class="vs">VS</div>
+            <div class="player player2">
+                <h2>AI <span class="mp-badge">元气 <span id="mp2">0</span></span></h2>
+                <div class="stats">
+                    <div class="hp">状态：<span id="hp2">存活</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="round-info" aria-live="polite">
+            <div id="round-status">第 <span id="round">1</span> 回合 - 请选择技能</div>
+        </section>
+
+        <section class="skills" aria-label="你的技能">
+            <div class="player-skills">
+                <h3>你的技能</h3>
+                <div class="skill-buttons" id="skills1">
+                    <button class="skill" data-skill="ramen">拉面<br><small>获得 2 点元气</small></button>
+                    <button class="skill" data-skill="slash">一斩<br><small>造成 0.5 点伤害</small></button>
+                    <button class="skill" data-skill="Ldef">L 防<br><small>获得 1 点元气，防一斩</small></button>
+                    <button class="skill" data-skill="wave">波<br><small>消耗 2 点元气，造成 2 点伤害</small></button>
+                    <button class="skill" data-skill="Xdef">X 防<br><small>获得 1 点元气，防波和一斩</small></button>
+                </div>
+            </div>
+        </section>
+
+        <section class="battle-log-container" aria-label="战斗记录">
+            <div class="battle-log" id="player-log">
+                <h3>你的记录</h3>
+                <div id="player-log-content"></div>
+            </div>
+            <div class="battle-log" id="ai-log">
+                <h3>AI 的记录</h3>
+                <div id="ai-log-content"></div>
+            </div>
+        </section>
+
+        <div class="actions">
+            <button id="next-round" style="display:none;">重新开始</button>
+        </div>
+
+        <section class="result" id="result" style="display:none;" aria-live="assertive">
+            <h2 id="winner"></h2>
+            <button id="restart">重新开始</button>
+        </section>
+    </main>
+
+    <script src="js/game.js"></script>
+</body>
+</html>

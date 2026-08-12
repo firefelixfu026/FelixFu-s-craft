@@ -30,9 +30,9 @@ export const aiNews = [
 ];
 
 export const gameModule = {
-  title: '决斗小游戏',
-  repository: 'https://github.com/firefelixfu026/card-war-made-by-class-3',
-  playUrl: 'https://firefelixfu026.github.io/card-war-made-by-class-3/',
-  status: '已嵌入',
-  plan: '当前通过 GitHub Pages 页面直接嵌入博客，后续可以继续补充游戏介绍、排行榜和登录后的分数记录。'
+  title: '元气',
+  repository: 'https://github.com/firefelixfu026/yuan-qi-made-by-class-3',
+  playUrl: '/games/yuan-qi-made-by-class-3/',
+  status: '已接入',
+  plan: '当前先作为博客小游戏板块里的静态试玩版嵌入，后续可以继续补充规则说明、角色技能、排行榜和登录后的战绩记录。'
 };
