@@ -166,7 +166,7 @@ DEFAULT_SUMMER_PLAN: dict[str, Any] = {
         {"id": "app-rednote", "name": "小红书", "limit": "20 分钟", "actual": ""},
     ],
     "expenses": [
-        {"id": "expense-1", "date": "8月4日", "item": "餐饮", "amount": "", "note": ""},
+        {"id": "expense-1", "date": "8月4日", "type": "支出", "item": "餐饮", "amount": "", "note": ""},
     ],
     "meals": [
         {"id": "meal-1", "date": "8月4日", "breakfast": "", "lunch": "", "dinner": "", "snack": ""},

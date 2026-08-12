@@ -40,6 +40,7 @@ import {
   Search,
   ShieldCheck,
   Sigma,
+  Shuffle,
   SkipBack,
   SkipForward,
   Star,
@@ -341,6 +342,22 @@ function readStoredMusicSession() {
   return stored && typeof stored === 'object' ? stored : {};
 }
 
+function shuffleMusicQueue(tracks, currentFilename = '') {
+  const nextQueue = [...tracks];
+  for (let index = nextQueue.length - 1; index > 0; index -= 1) {
+    const targetIndex = Math.floor(Math.random() * (index + 1));
+    [nextQueue[index], nextQueue[targetIndex]] = [nextQueue[targetIndex], nextQueue[index]];
+  }
+  if (currentFilename) {
+    const currentIndex = nextQueue.findIndex((track) => track.filename === currentFilename);
+    if (currentIndex > 0) {
+      const [currentTrack] = nextQueue.splice(currentIndex, 1);
+      nextQueue.unshift(currentTrack);
+    }
+  }
+  return nextQueue;
+}
+
 function readDraftHistory() {
   const stored = readStoredJson(ARTICLE_DRAFT_HISTORY_KEY, []);
   return Array.isArray(stored) ? stored.slice(0, 12) : [];
@@ -456,6 +473,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.3.3',
+    title: '随机播放与收入记账',
+    date: '2026-08-12',
+    status: '已上线',
+    points: ['音乐新增随机播放模式，每次生成一轮随机播放顺序', '播放器会记住随机播放模式', '记账模块新增收入类型，并显示收入、支出和结余']
+  },
   {
     version: 'v6.3.2',
     title: '音乐播放位置记忆',
@@ -1124,7 +1148,7 @@ const personalizedSummerPlan = {
     { id: 'app-bilibili', name: 'B 站', limit: '30 分钟', actual: '' },
     { id: 'app-rednote', name: '小红书', limit: '20 分钟', actual: '' }
   ],
-  expenses: [{ id: 'expense-1', date: '8月4日', item: '餐饮', amount: '', note: '' }],
+  expenses: [{ id: 'expense-1', date: '8月4日', type: '支出', item: '餐饮', amount: '', note: '' }],
   meals: [{ id: 'meal-1', date: '8月4日', breakfast: '', lunch: '', dinner: '', snack: '' }],
   bodyMetrics: [{ id: 'body-1', date: '8月4日', weight: '', exercise: '', mood: '' }],
   sleep: [{ id: 'sleep-1', date: '8月4-5日', bed: '', wake: '', hours: '', quality: '' }]
@@ -1774,7 +1798,8 @@ function App() {
   const [musicIsPlaying, setMusicIsPlaying] = useState(false);
   const [musicProgress, setMusicProgress] = useState(Number(initialMusicSession.progress) || 0);
   const [musicDuration, setMusicDuration] = useState(0);
-  const [musicRepeatMode, setMusicRepeatMode] = useState('list');
+  const [musicRepeatMode, setMusicRepeatMode] = useState(initialMusicSession.repeatMode || 'list');
+  const [musicShuffleQueue, setMusicShuffleQueue] = useState([]);
   const [musicVolume, setMusicVolume] = useState(() => {
     if (typeof localStorage === 'undefined') return 0.82;
     const saved = Number(localStorage.getItem(MUSIC_VOLUME_KEY));
@@ -1851,6 +1876,7 @@ function App() {
       .map((filename) => trackMap.get(filename))
       .filter(Boolean);
   }, [musicTracks, selectedMusicPlaylist]);
+  const activeMusicQueue = musicRepeatMode === 'shuffle' && musicShuffleQueue.length ? musicShuffleQueue : musicQueue;
   const currentMusicTrack = useMemo(() => {
     if (!musicQueue.length) return null;
     const saved = musicQueue.find((track) => track.filename === musicCurrentFilename);
@@ -1890,11 +1916,14 @@ function App() {
     writeStoredJson(MUSIC_SESSION_KEY, payload);
   }
 
-  function playMusicTrack(track, playlistId = selectedMusicPlaylistId) {
+  function playMusicTrack(track, playlistId = selectedMusicPlaylistId, options = {}) {
     if (!track) return;
     rememberMusicTrack(track);
     setSelectedMusicPlaylistId(playlistId);
     setMusicCurrentFilename(track.filename);
+    if (musicRepeatMode === 'shuffle' && options.resetShuffle !== false) {
+      setMusicShuffleQueue(shuffleMusicQueue(musicQueue, track.filename));
+    }
     pendingMusicResumeRef.current = 0;
     persistMusicSession({ filename: track.filename, playlistId, progress: 0 });
     setMusicIsPlaying(true);
@@ -1916,10 +1945,17 @@ function App() {
   }
 
   function stepMusicTrack(direction) {
-    if (!musicQueue.length) return;
-    const currentIndex = Math.max(0, musicQueue.findIndex((track) => track.filename === currentMusicTrack?.filename));
-    const nextIndex = (currentIndex + direction + musicQueue.length) % musicQueue.length;
-    playMusicTrack(musicQueue[nextIndex]);
+    const queue = musicRepeatMode === 'shuffle' && musicShuffleQueue.length ? musicShuffleQueue : musicQueue;
+    if (!queue.length) return;
+    const currentIndex = Math.max(0, queue.findIndex((track) => track.filename === currentMusicTrack?.filename));
+    const nextIndex = (currentIndex + direction + queue.length) % queue.length;
+    if (musicRepeatMode === 'shuffle' && direction > 0 && currentIndex === queue.length - 1 && queue.length > 1) {
+      const nextShuffleQueue = shuffleMusicQueue(musicQueue);
+      setMusicShuffleQueue(nextShuffleQueue);
+      playMusicTrack(nextShuffleQueue[0], selectedMusicPlaylistId, { resetShuffle: false });
+      return;
+    }
+    playMusicTrack(queue[nextIndex], selectedMusicPlaylistId, { resetShuffle: false });
   }
 
   function seekMusicTrack(nextTime) {
@@ -1936,8 +1972,9 @@ function App() {
       globalAudioRef.current.play().catch(() => setMusicIsPlaying(false));
       return;
     }
-    const currentIndex = musicQueue.findIndex((track) => track.filename === currentMusicTrack?.filename);
-    if (currentIndex < musicQueue.length - 1 || musicRepeatMode === 'list') {
+    const queue = musicRepeatMode === 'shuffle' && musicShuffleQueue.length ? musicShuffleQueue : musicQueue;
+    const currentIndex = queue.findIndex((track) => track.filename === currentMusicTrack?.filename);
+    if (currentIndex < queue.length - 1 || musicRepeatMode === 'list' || musicRepeatMode === 'shuffle') {
       stepMusicTrack(1);
       return;
     }
@@ -2104,6 +2141,14 @@ function App() {
   useEffect(() => {
     persistMusicSession({ repeatMode: musicRepeatMode });
   }, [musicRepeatMode]);
+
+  useEffect(() => {
+    if (musicRepeatMode !== 'shuffle') {
+      setMusicShuffleQueue([]);
+      return;
+    }
+    setMusicShuffleQueue(shuffleMusicQueue(musicQueue, currentMusicTrack?.filename));
+  }, [musicQueue, musicRepeatMode]);
 
   useEffect(() => {
     function saveMusicBeforeUnload() {
@@ -4117,7 +4162,7 @@ function App() {
         {activeView === 'music' && (
           <MusicWorkspace
             tracks={musicTracks}
-            queue={musicQueue}
+            queue={activeMusicQueue}
             currentTrack={currentMusicTrack}
             recentTracks={recentMusicTracks}
             isPlaying={musicIsPlaying}
@@ -6324,6 +6369,18 @@ function normalizeSleepRows(rows) {
   }));
 }
 
+function normalizeExpenseRows(rows) {
+  const source = Array.isArray(rows) && rows.length ? rows : personalizedSummerPlan.expenses;
+  return source.map((row, index) => ({
+    id: row.id || `expense-${index + 1}`,
+    date: row.date || '8月4日',
+    type: row.type === '收入' ? '收入' : '支出',
+    item: row.item || '',
+    amount: row.amount ?? '',
+    note: row.note || ''
+  }));
+}
+
 function normalizeSleepDateRange(date) {
   const value = String(date || '').trim();
   if (!value) return '8月4-5日';
@@ -6401,7 +6458,7 @@ function normalizeSummerPlan(plan) {
     completionDays,
     courses: Array.isArray(plan?.courses) && plan.courses.length ? plan.courses : personalizedSummerPlan.courses,
     apps: appUsageDays[0]?.apps || normalizeAppRows(plan?.apps),
-    expenses: Array.isArray(plan?.expenses) && plan.expenses.length ? plan.expenses : personalizedSummerPlan.expenses,
+    expenses: normalizeExpenseRows(plan?.expenses),
     meals: Array.isArray(plan?.meals) && plan.meals.length ? plan.meals : personalizedSummerPlan.meals,
     bodyMetrics: normalizeBodyRows(plan?.bodyMetrics),
     sleep: normalizeSleepRows(plan?.sleep)
@@ -6674,7 +6731,9 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
   const totalAppLimit = (selectedAppUsageDay.apps || []).reduce((sum, item) => sum + parseMinutes(item.limit), 0);
   const totalAppActual = (selectedAppUsageDay.apps || []).reduce((sum, item) => sum + parseMinutes(item.actual), 0);
-  const totalExpense = plan.expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+  const totalIncome = plan.expenses.reduce((sum, item) => sum + (item.type === '收入' ? parseMetricNumber(item.amount) : 0), 0);
+  const totalExpense = plan.expenses.reduce((sum, item) => sum + (item.type === '收入' ? 0 : parseMetricNumber(item.amount)), 0);
+  const financeBalance = totalIncome - totalExpense;
   const activePlanSection = PLAN_SECTION_PATHS[planSection] ? planSection : 'schedule';
 
   function navigatePlanSection(section) {
@@ -6836,14 +6895,35 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
       )}
 
       {activePlanSection === 'finance' && (
-        <PlanModule title="记账" count={`合计 ${totalExpense.toFixed(1)} 元`} wide>
-          <button className="ghost-button module-add-button" type="button" onClick={() => addRow('expenses', { date: '8月4日', item: '', amount: '', note: '' })} disabled={!canEdit}>
-            <PlusCircle size={16} />
-            <span>新增支出</span>
-          </button>
+        <PlanModule title="记账" count={`结余 ${financeBalance.toFixed(1)} 元`} wide>
+          <div className="completion-summary-grid finance-summary-grid">
+            <div>
+              <span>收入</span>
+              <strong>{totalIncome.toFixed(1)} 元</strong>
+            </div>
+            <div>
+              <span>支出</span>
+              <strong>{totalExpense.toFixed(1)} 元</strong>
+            </div>
+            <div>
+              <span>结余</span>
+              <strong>{financeBalance.toFixed(1)} 元</strong>
+            </div>
+          </div>
+          <div className="module-toolbar">
+            <button className="ghost-button module-add-button" type="button" onClick={() => addRow('expenses', { date: '8月4日', type: '支出', item: '', amount: '', note: '' })} disabled={!canEdit}>
+              <PlusCircle size={16} />
+              <span>新增支出</span>
+            </button>
+            <button className="ghost-button module-add-button" type="button" onClick={() => addRow('expenses', { date: '8月4日', type: '收入', item: '', amount: '', note: '' })} disabled={!canEdit}>
+              <PlusCircle size={16} />
+              <span>新增收入</span>
+            </button>
+          </div>
           <EditableTable
             columns={[
               ['date', '日期', 'input'],
+              ['type', '类型', 'select', ['支出', '收入']],
               ['item', '项目', 'input'],
               ['amount', '金额', 'input'],
               ['note', '备注', 'textarea']
@@ -7385,10 +7465,16 @@ function EditableTable({ columns, rows, section, disabled, updateRow, deleteRow,
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              {columns.map(([field, label, type]) => (
+              {columns.map(([field, label, type, options = []]) => (
                 <td data-label={label} key={field}>
                   {type === 'textarea' ? (
                     <textarea value={row[field] || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, field, event.target.value)} />
+                  ) : type === 'select' ? (
+                    <select value={row[field] || options[0] || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, field, event.target.value)}>
+                      {options.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
                   ) : (
                     <input value={row[field] || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, field, event.target.value)} />
                   )}
@@ -8579,10 +8665,12 @@ function MusicWorkspace({
           <button
             className="ghost-button"
             type="button"
-            onClick={() => setRepeatMode((current) => (current === 'list' ? 'one' : current === 'one' ? 'none' : 'list'))}
+            onClick={() => setRepeatMode((current) => (
+              current === 'list' ? 'one' : current === 'one' ? 'shuffle' : current === 'shuffle' ? 'none' : 'list'
+            ))}
           >
-            <RefreshCw size={16} />
-            <span>{repeatMode === 'list' ? '列表循环' : repeatMode === 'one' ? '单曲循环' : '播完停止'}</span>
+            {repeatMode === 'shuffle' ? <Shuffle size={16} /> : <RefreshCw size={16} />}
+            <span>{repeatMode === 'list' ? '列表循环' : repeatMode === 'one' ? '单曲循环' : repeatMode === 'shuffle' ? '随机播放' : '播完停止'}</span>
           </button>
           <label className="music-volume-control">
             <span>音量</span>
