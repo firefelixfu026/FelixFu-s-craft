@@ -1,4 +1,5 @@
 import os
+import os
 from collections.abc import Generator
 
 from sqlalchemy import create_engine, inspect, text
@@ -35,6 +36,7 @@ def _ensure_schema_updates() -> None:
     user_columns = {column["name"] for column in inspector.get_columns("users")}
     article_columns = {column["name"] for column in inspector.get_columns("articles")} if "articles" in table_names else set()
     comment_columns = {column["name"] for column in inspector.get_columns("comments")} if "comments" in table_names else set()
+    toolbox_columns = {column["name"] for column in inspector.get_columns("toolbox_links")} if "toolbox_links" in table_names else set()
     with engine.begin() as connection:
         if "password_hash" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)"))
@@ -46,14 +48,26 @@ def _ensure_schema_updates() -> None:
             connection.execute(text("ALTER TABLE articles ADD COLUMN cover_url TEXT"))
         if "articles" in table_names and "category" not in article_columns:
             connection.execute(text("ALTER TABLE articles ADD COLUMN category VARCHAR(80) DEFAULT '学习笔记' NOT NULL"))
+        if "articles" in table_names and "note_collection" not in article_columns:
+            connection.execute(text("ALTER TABLE articles ADD COLUMN note_collection VARCHAR(120) DEFAULT '' NOT NULL"))
+        if "articles" in table_names and "note_path" not in article_columns:
+            connection.execute(text("ALTER TABLE articles ADD COLUMN note_path TEXT DEFAULT '' NOT NULL"))
         if "articles" in table_names and "pinned" not in article_columns:
             connection.execute(text("ALTER TABLE articles ADD COLUMN pinned BOOLEAN DEFAULT FALSE NOT NULL"))
+        if "articles" in table_names and "sort_order" not in article_columns:
+            connection.execute(text("ALTER TABLE articles ADD COLUMN sort_order INTEGER DEFAULT 0 NOT NULL"))
+        if "articles" in table_names and "created_at" not in article_columns:
+            connection.execute(text("ALTER TABLE articles ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL"))
+        if "articles" in table_names and "updated_at" not in article_columns:
+            connection.execute(text("ALTER TABLE articles ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL"))
         if "comments" in table_names and "status" not in comment_columns:
             connection.execute(text("ALTER TABLE comments ADD COLUMN status VARCHAR(20) DEFAULT 'approved' NOT NULL"))
         if "comments" in table_names and "user_id" not in comment_columns:
             connection.execute(text("ALTER TABLE comments ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL"))
         if "comments" in table_names and "parent_id" not in comment_columns:
             connection.execute(text("ALTER TABLE comments ADD COLUMN parent_id INTEGER REFERENCES comments(id) ON DELETE SET NULL"))
+        if "toolbox_links" in table_names and "image_url" not in toolbox_columns:
+            connection.execute(text("ALTER TABLE toolbox_links ADD COLUMN image_url TEXT DEFAULT '' NOT NULL"))
 
         connection.execute(
             text(

@@ -7,16 +7,16 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any, Literal
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import (
@@ -31,7 +31,7 @@ from app.auth import (
 )
 from app.database import SessionLocal, get_db, init_db
 from app.github_oauth import fetch_github_identity, get_github_authorize_url
-from app.models import AdminAuditLog, AiGeneration, Article, Comment, ReactionCounter, SummerPlan, Tag, User, UserReaction
+from app.models import AdminAuditLog, AiGeneration, Article, Comment, ReactionCounter, SiteSetting, SummerPlan, Tag, ToolboxLink, User, UserReaction
 from app.seed import REACTION_TYPES, seed_database
 
 
@@ -55,7 +55,11 @@ ALLOW_READER_EMAIL_LOGIN = os.getenv("ALLOW_READER_EMAIL_LOGIN", "false").strip(
 LOGIN_FAILURE_LIMIT = int(os.getenv("LOGIN_FAILURE_LIMIT", "5") or "5")
 LOGIN_LOCK_SECONDS = int(os.getenv("LOGIN_LOCK_SECONDS", "60") or "60")
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "uploads"))
+MUSIC_DIR = UPLOAD_DIR / "music"
+MUSIC_CHUNK_DIR = UPLOAD_DIR / ".music-chunks"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+MUSIC_DIR.mkdir(parents=True, exist_ok=True)
+MUSIC_CHUNK_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -63,9 +67,35 @@ ALLOWED_IMAGE_TYPES = {
     "image/gif": ".gif",
     "image/svg+xml": ".svg",
 }
+ALLOWED_AUDIO_TYPES = {
+    "audio/mpeg": ".mp3",
+    "audio/mp3": ".mp3",
+    "audio/wav": ".wav",
+    "audio/x-wav": ".wav",
+    "audio/ogg": ".ogg",
+    "audio/flac": ".flac",
+    "audio/x-flac": ".flac",
+    "audio/mp4": ".m4a",
+    "audio/aac": ".aac",
+}
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+MAX_AUDIO_UPLOAD_BYTES = 50 * 1024 * 1024
+MAX_AUDIO_CHUNK_BYTES = 1024 * 1024
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
+AUDIO_SUFFIXES = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac"}
+MUSIC_COVER_SUFFIXES = [".jpg", ".jpeg", ".png", ".webp", ".gif"]
+MUSIC_LYRIC_SUFFIXES = [".lrc", ".txt"]
 LOGIN_FAILURES: dict[str, dict[str, Any]] = {}
+DEFAULT_SUMMER_PLAN_SECTION_VISIBILITY = {
+    "schedule": True,
+    "completion": True,
+    "courses": True,
+    "apps": True,
+    "finance": True,
+    "meals": True,
+    "body": True,
+    "sleep": True,
+}
 
 
 app = FastAPI(title="FelixFu Blog API", version="0.8.0")
@@ -81,12 +111,13 @@ app.add_middleware(
 
 
 PROFILE = {
-    "name": "付江樊",
+    "siteTitle": "FelixFu's Craft",
+    "name": "副将凡",
     "englishName": "Felix Fu",
     "school": "浙江大学",
     "role": "Web 前端 & Python",
-    "interests": ["Web 全栈", "AI 自动化", "安全与运维", "长跑", "游戏"],
-    "summary": "普通大学生，正在努力把“想做的事”变成“会做的事”。从一行代码开始，一路把课程笔记、AI 工具、小游戏和运维后台慢慢接到这个小站里。",
+    "interests": ["Web 全栈", "AI 自动化", "安全与运维", "音乐", "游戏"],
+    "summary": "这里是我慢慢搭起来的小站：放技术笔记、随笔、音乐、工具入口，也记录一点自己的学习和折腾。",
     "metrics": [
         {"label": "技能方向", "value": "3+"},
         {"label": "线上项目", "value": "1+"},
@@ -109,7 +140,7 @@ AI_NEWS = [
 
 DEFAULT_SUMMER_PLAN: dict[str, Any] = {
     "profile": {
-        "name": "付江樊",
+        "name": "副将凡",
         "identity": "浙江大学准大二",
         "range": "2026-08-04 至 2026-08-15",
         "theme": "期末冲刺式预习 + 规律生活记录",
@@ -145,7 +176,7 @@ DEFAULT_SUMMER_PLAN: dict[str, Any] = {
         {"id": "app-rednote", "name": "小红书", "limit": "20 分钟", "actual": ""},
     ],
     "expenses": [
-        {"id": "expense-1", "date": "8月4日", "item": "餐饮", "amount": "", "note": ""},
+        {"id": "expense-1", "date": "8月4日", "type": "支出", "item": "餐饮", "amount": "", "note": ""},
     ],
     "meals": [
         {"id": "meal-1", "date": "8月4日", "breakfast": "", "lunch": "", "dinner": "", "snack": ""},
@@ -344,12 +375,63 @@ class ArticleIn(BaseModel):
     date: str | None = None
     readTime: str = "3 min"
     status: Literal["published", "draft"] = "published"
+    noteCollection: str = ""
+    notePath: str = ""
     category: str = "学习笔记"
     pinned: bool = False
+    sortOrder: int | None = None
 
 
 class SummerPlanIn(BaseModel):
     payload: dict[str, Any]
+
+
+class SitePreferencesIn(BaseModel):
+    summerPlanVisible: bool = False
+    summerPlanSections: dict[str, bool] = {}
+
+
+class SiteProfileIn(BaseModel):
+    siteTitle: str | None = None
+    name: str | None = None
+    englishName: str | None = None
+    school: str | None = None
+    role: str | None = None
+    summary: str | None = None
+    interests: list[str] | None = None
+    avatarUrl: str | None = None
+
+
+class ToolboxLinkIn(BaseModel):
+    title: str
+    category: str = "自定义"
+    url: str
+    imageUrl: str = ""
+    description: str = ""
+    tags: list[str] = []
+    pinned: bool = False
+
+
+class ToolboxDefaultOverridesIn(BaseModel):
+    payload: dict[str, Any]
+
+
+class ArticleOrderIn(BaseModel):
+    articleIds: list[str]
+
+
+def _estimate_read_time(content: str) -> str:
+    plain_text = re.sub(r"```[\s\S]*?```", " ", content or "")
+    plain_text = re.sub(r"`[^`]*`", " ", plain_text)
+    plain_text = re.sub(r"!\[[^\]]*]\([^)]*\)", " ", plain_text)
+    plain_text = re.sub(r"\[[^\]]*]\([^)]*\)", " ", plain_text)
+    plain_text = re.sub(r"https?://\S+", " ", plain_text)
+    plain_text = re.sub(r"<[^>]+>", " ", plain_text)
+    plain_text = re.sub(r"[#>*_\-~=\[\]{}()|]", " ", plain_text)
+    cjk_count = len(re.findall(r"[\u3400-\u9fff]", plain_text))
+    latin_word_count = len(re.findall(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*", re.sub(r"[\u3400-\u9fff]", " ", plain_text)))
+    minutes = max(1, (cjk_count + latin_word_count + 499) // 500)
+    return f"{minutes} min"
 
 
 class RegisterIn(BaseModel):
@@ -413,12 +495,105 @@ def health(db: Session = Depends(get_db)) -> dict[str, str | int]:
 
 
 @app.get("/api/profile")
-def get_profile() -> dict:
-    return PROFILE
+def get_profile(db: Session = Depends(get_db)) -> dict:
+    return _get_site_profile(db)
+
+
+def _get_site_preferences(db: Session) -> dict[str, Any]:
+    setting = db.get(SiteSetting, "site-preferences")
+    payload = setting.payload if setting and isinstance(setting.payload, dict) else {}
+    raw_sections = payload.get("summerPlanSections") if isinstance(payload.get("summerPlanSections"), dict) else {}
+    summer_plan_sections = {
+        **DEFAULT_SUMMER_PLAN_SECTION_VISIBILITY,
+        **{
+            key: bool(value)
+            for key, value in raw_sections.items()
+            if key in DEFAULT_SUMMER_PLAN_SECTION_VISIBILITY
+        },
+    }
+    return {
+        "summerPlanVisible": bool(payload.get("summerPlanVisible", False)),
+        "summerPlanSections": summer_plan_sections,
+    }
+
+
+@app.get("/api/site-preferences")
+def get_site_preferences(db: Session = Depends(get_db)) -> dict[str, Any]:
+    return _get_site_preferences(db)
+
+
+@app.put("/api/admin/site-preferences")
+def update_site_preferences(
+    payload: SitePreferencesIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict[str, Any]:
+    next_payload = {
+        "summerPlanVisible": payload.summerPlanVisible,
+        "summerPlanSections": {
+            **DEFAULT_SUMMER_PLAN_SECTION_VISIBILITY,
+            **{
+                key: bool(value)
+                for key, value in payload.summerPlanSections.items()
+                if key in DEFAULT_SUMMER_PLAN_SECTION_VISIBILITY
+            },
+        },
+    }
+    setting = db.get(SiteSetting, "site-preferences")
+    if setting:
+        setting.payload = next_payload
+    else:
+        setting = SiteSetting(key="site-preferences", payload=next_payload)
+        db.add(setting)
+    db.commit()
+    _record_admin_event(db, current_user, "更新站点开关", "site-preferences", "summer-plan", json.dumps(next_payload, ensure_ascii=False))
+    return next_payload
+
+
+@app.put("/api/admin/profile")
+def update_profile(
+    payload: SiteProfileIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict:
+    avatar_url = (payload.avatarUrl or "").strip()
+    if avatar_url and not (
+        avatar_url.startswith("/uploads/")
+        or avatar_url == "/avatar.jpg"
+        or avatar_url.startswith("http://")
+        or avatar_url.startswith("https://")
+        or avatar_url.startswith("data:image/")
+    ):
+        raise HTTPException(status_code=400, detail="Avatar URL must be an uploaded image or a valid image URL")
+
+    setting = db.get(SiteSetting, "profile")
+    next_payload = dict(setting.payload) if setting else {}
+    for field in ["siteTitle", "name", "englishName", "school", "role", "summary"]:
+        value = getattr(payload, field)
+        if value is not None:
+            next_payload[field] = value.strip()
+    if payload.interests is not None:
+        next_payload["interests"] = [item.strip() for item in payload.interests if item.strip()][:12]
+    if payload.avatarUrl is not None:
+        next_payload["avatarUrl"] = avatar_url or "/avatar.jpg"
+    if setting:
+        setting.payload = next_payload
+    else:
+        setting = SiteSetting(key="profile", payload=next_payload)
+        db.add(setting)
+    db.commit()
+    _record_admin_event(db, current_user, "更新站点资料", "profile", "site profile", next_payload.get("siteTitle", PROFILE["siteTitle"]))
+    return _get_site_profile(db)
 
 
 @app.get("/api/summer-plan")
-def get_summer_plan(db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_summer_plan(
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+) -> dict[str, Any]:
+    preferences = _get_site_preferences(db)
+    if not preferences["summerPlanVisible"] and (not current_user or current_user.role != "admin"):
+        raise HTTPException(status_code=404, detail="Summer plan is private")
     plan = db.get(SummerPlan, "current")
     return plan.payload if plan else DEFAULT_SUMMER_PLAN
 
@@ -439,6 +614,86 @@ def update_summer_plan(
     db.refresh(plan)
     _record_admin_event(db, current_user, "更新学习计划", "summer-plan", "current", "保存暑假计划云端数据")
     return plan.payload
+
+
+@app.get("/api/toolbox-links")
+def list_toolbox_links(db: Session = Depends(get_db)) -> list[dict]:
+    links = db.scalars(select(ToolboxLink).order_by(ToolboxLink.pinned.desc(), ToolboxLink.created_at.desc())).all()
+    return [_toolbox_link_to_dict(link) for link in links]
+
+
+@app.get("/api/toolbox-overrides")
+def get_toolbox_overrides(db: Session = Depends(get_db)) -> dict[str, Any]:
+    setting = db.get(SiteSetting, "toolbox-overrides")
+    return setting.payload if setting and isinstance(setting.payload, dict) else {}
+
+
+@app.put("/api/admin/toolbox-overrides")
+def update_toolbox_overrides(
+    payload: ToolboxDefaultOverridesIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict[str, Any]:
+    cleaned = _clean_toolbox_overrides(payload.payload)
+    setting = db.get(SiteSetting, "toolbox-overrides")
+    if setting:
+        setting.payload = cleaned
+    else:
+        setting = SiteSetting(key="toolbox-overrides", payload=cleaned)
+        db.add(setting)
+    db.commit()
+    _record_admin_event(db, current_user, "更新工具箱预置链接", "toolbox", "overrides", f"{len(cleaned)} entries")
+    return cleaned
+
+
+@app.post("/api/admin/toolbox-links")
+def create_toolbox_link(
+    payload: ToolboxLinkIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict:
+    link = ToolboxLink(**_clean_toolbox_payload(payload))
+    db.add(link)
+    db.commit()
+    db.refresh(link)
+    _record_admin_event(db, current_user, "新增工具箱链接", "toolbox", link.title, link.url)
+    return _toolbox_link_to_dict(link)
+
+
+@app.put("/api/admin/toolbox-links/{link_id}")
+def update_toolbox_link(
+    link_id: int,
+    payload: ToolboxLinkIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict:
+    link = db.get(ToolboxLink, link_id)
+    if not link:
+        raise HTTPException(status_code=404, detail="Toolbox link not found")
+    values = _clean_toolbox_payload(payload)
+    for field, value in values.items():
+        setattr(link, field, value)
+    link.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(link)
+    _record_admin_event(db, current_user, "更新工具箱链接", "toolbox", link.title, link.url)
+    return _toolbox_link_to_dict(link)
+
+
+@app.delete("/api/admin/toolbox-links/{link_id}")
+def delete_toolbox_link(
+    link_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict[str, int]:
+    link = db.get(ToolboxLink, link_id)
+    if not link:
+        raise HTTPException(status_code=404, detail="Toolbox link not found")
+    title = link.title
+    db.delete(link)
+    db.commit()
+    _record_admin_event(db, current_user, "删除工具箱链接", "toolbox", title, str(link_id))
+    return {"deleted": link_id}
 
 
 @app.get("/api/articles")
@@ -514,7 +769,7 @@ def create_comment(
             raise HTTPException(status_code=400, detail="Reply target is invalid")
         parent_id = parent.id
 
-    comment_status = "pending" if current_user.role != "admin" or ADMIN_COMMENTS_REQUIRE_APPROVAL else "approved"
+    comment_status = "pending" if ADMIN_COMMENTS_REQUIRE_APPROVAL and current_user.role != "admin" else "approved"
     db.add(
         Comment(
             article_id=article.id,
@@ -531,7 +786,7 @@ def create_comment(
     return {
         "articleId": article_id,
         "comments": [_comment_to_dict(item) for item in _visible_comments(article, current_user)],
-        "message": "管理员评论已直接公开" if comment_status == "approved" else "评论已提交，审核通过后会公开显示",
+        "message": "评论已发布" if comment_status == "approved" else "评论已提交，审核通过后会公开显示",
     }
 
 
@@ -714,6 +969,7 @@ def create_admin_article(
     if not title:
         raise HTTPException(status_code=400, detail="Article title is required")
 
+    now = datetime.utcnow()
     article = Article(
         id=_generate_article_id(db, title),
         title=title,
@@ -721,10 +977,15 @@ def create_admin_article(
         content=_required_text(payload.content, "Article content is required"),
         cover_url=_optional_text(payload.coverUrl),
         date=(payload.date or datetime.utcnow().date().isoformat()).strip(),
-        read_time=(payload.readTime or "3 min").strip(),
+        read_time=_estimate_read_time(payload.content),
         status=payload.status,
         category=(_optional_text(payload.category) or "学习笔记")[:80],
+        note_collection=(_optional_text(payload.noteCollection) or "")[:120],
+        note_path=_optional_text(payload.notePath) or "",
         pinned=payload.pinned,
+        sort_order=payload.sortOrder if payload.sortOrder is not None else _next_article_sort_order(db),
+        created_at=now,
+        updated_at=now,
     )
     article.tags = [_get_or_create_tag(db, tag_name) for tag_name in _clean_tags(payload.tags)]
     article.reactions = [
@@ -750,14 +1011,42 @@ def update_admin_article(
     article.content = _required_text(payload.content, "Article content is required")
     article.cover_url = _optional_text(payload.coverUrl)
     article.date = (payload.date or article.date).strip()
-    article.read_time = (payload.readTime or article.read_time).strip()
+    article.read_time = _estimate_read_time(payload.content)
     article.status = payload.status
     article.category = (_optional_text(payload.category) or "学习笔记")[:80]
+    article.note_collection = (_optional_text(payload.noteCollection) or "")[:120]
+    article.note_path = _optional_text(payload.notePath) or ""
     article.pinned = payload.pinned
+    if payload.sortOrder is not None:
+        article.sort_order = payload.sortOrder
+    article.updated_at = datetime.utcnow()
     article.tags = [_get_or_create_tag(db, tag_name) for tag_name in _clean_tags(payload.tags)]
     db.commit()
     _record_admin_event(db, current_user, "更新文章", "article", article.title, f"状态：{article.status}")
     return _article_to_dict(_get_article_or_404(db, article.id), current_user)
+
+
+@app.put("/api/admin/article-order")
+def update_admin_article_order(
+    payload: ArticleOrderIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict[str, int]:
+    ordered_ids = [article_id for article_id in payload.articleIds if article_id]
+    if not ordered_ids:
+        raise HTTPException(status_code=400, detail="Article order is required")
+
+    articles = db.scalars(select(Article).where(Article.id.in_(ordered_ids))).all()
+    article_by_id = {article.id: article for article in articles}
+    for index, article_id in enumerate(ordered_ids):
+        article = article_by_id.get(article_id)
+        if article:
+            article.sort_order = index
+            article.updated_at = datetime.utcnow()
+
+    db.commit()
+    _record_admin_event(db, current_user, "更新文章顺序", "article", "内容库", f"{len(article_by_id)} 篇")
+    return {"updated": len(article_by_id)}
 
 
 @app.delete("/api/admin/articles/{article_id}")
@@ -834,6 +1123,197 @@ def delete_admin_image(
     target.unlink()
     _record_admin_event(db, current_user, "删除图片", "upload", filename, "")
     return {"status": "deleted", "filename": filename}
+
+
+@app.get("/api/music/tracks")
+def list_music_tracks() -> list[dict[str, str | int]]:
+    tracks = []
+    for path in MUSIC_DIR.iterdir():
+        if not path.is_file() or path.suffix.lower() not in AUDIO_SUFFIXES:
+            continue
+        stat = path.stat()
+        sidecar = _music_sidecar_metadata(path)
+        tracks.append({
+            "filename": path.name,
+            "title": _music_title_from_filename(path.name),
+            "artist": "Felix 的歌单",
+            "url": f"/uploads/music/{path.name}",
+            "coverUrl": sidecar["coverUrl"],
+            "lyrics": sidecar["lyrics"],
+            "lyricsUrl": sidecar["lyricsUrl"],
+            "size": stat.st_size,
+            "createdAt": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+        })
+    return sorted(tracks, key=lambda item: str(item["createdAt"]), reverse=True)
+
+
+@app.post("/api/admin/uploads/music")
+async def upload_admin_music(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, str | int]:
+    original_suffix = Path(file.filename or "").suffix.lower()
+    content_type = (file.content_type or "").lower()
+    suffix = original_suffix if original_suffix in AUDIO_SUFFIXES else ALLOWED_AUDIO_TYPES.get(content_type)
+    if not suffix:
+        raise HTTPException(status_code=400, detail="Only MP3, WAV, OGG, FLAC, M4A, or AAC audio files are supported")
+
+    content = await file.read(MAX_AUDIO_UPLOAD_BYTES + 1)
+    if len(content) > MAX_AUDIO_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="Audio must be 50 MB or smaller")
+    if not content:
+        raise HTTPException(status_code=400, detail="Audio file is empty")
+
+    original_stem = Path(file.filename or "track").stem.strip() or "track"
+    safe_stem = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff._-]+", "-", original_stem).strip(".-_") or "track"
+    filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{uuid4().hex[:8]}-{safe_stem[:60]}{suffix}"
+    destination = MUSIC_DIR / filename
+    destination.write_bytes(content)
+    _record_admin_event(db, current_user, "上传音乐", "upload", filename, f"{len(content)} bytes")
+    return {
+        "filename": filename,
+        "title": _music_title_from_filename(filename),
+        "artist": "Felix 的歌单",
+        "url": f"/uploads/music/{filename}",
+        "size": len(content),
+        "createdAt": datetime.utcnow().isoformat(),
+    }
+
+
+@app.post("/api/admin/uploads/music/chunk")
+async def upload_admin_music_chunk(
+    upload_id: str = Form(..., alias="uploadId"),
+    filename: str = Form(...),
+    chunk_index: int = Form(..., alias="chunkIndex"),
+    total_chunks: int = Form(..., alias="totalChunks"),
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, str | int]:
+    if not re.fullmatch(r"[0-9A-Za-z._-]{8,80}", upload_id):
+        raise HTTPException(status_code=400, detail="Invalid upload id")
+    if total_chunks < 1 or total_chunks > 64:
+        raise HTTPException(status_code=400, detail="Invalid chunk count")
+    if chunk_index < 0 or chunk_index >= total_chunks:
+        raise HTTPException(status_code=400, detail="Invalid chunk index")
+
+    original_suffix = Path(filename or "").suffix.lower()
+    if original_suffix not in AUDIO_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Only MP3, WAV, OGG, FLAC, M4A, or AAC audio files are supported")
+
+    content = await file.read(MAX_AUDIO_CHUNK_BYTES + 1)
+    if len(content) > MAX_AUDIO_CHUNK_BYTES:
+        raise HTTPException(status_code=400, detail="Audio chunk is too large")
+    if not content:
+        raise HTTPException(status_code=400, detail="Audio chunk is empty")
+
+    chunk_dir = MUSIC_CHUNK_DIR / upload_id
+    chunk_dir.mkdir(parents=True, exist_ok=True)
+    (chunk_dir / f"{chunk_index:04d}.part").write_bytes(content)
+
+    part_paths = [chunk_dir / f"{index:04d}.part" for index in range(total_chunks)]
+    if not all(path.exists() for path in part_paths):
+        return {"status": "partial", "received": chunk_index + 1, "total": total_chunks}
+
+    total_size = sum(path.stat().st_size for path in part_paths)
+    if total_size > MAX_AUDIO_UPLOAD_BYTES:
+        for path in part_paths:
+            path.unlink(missing_ok=True)
+        chunk_dir.rmdir()
+        raise HTTPException(status_code=400, detail="Audio must be 50 MB or smaller")
+
+    original_stem = Path(filename or "track").stem.strip() or "track"
+    safe_stem = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff._-]+", "-", original_stem).strip(".-_") or "track"
+    output_filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{uuid4().hex[:8]}-{safe_stem[:60]}{original_suffix}"
+    destination = MUSIC_DIR / output_filename
+    with destination.open("wb") as output:
+        for path in part_paths:
+            output.write(path.read_bytes())
+            path.unlink(missing_ok=True)
+    chunk_dir.rmdir()
+
+    _record_admin_event(db, current_user, "上传音乐", "upload", output_filename, f"{total_size} bytes")
+    return {
+        "status": "complete",
+        "filename": output_filename,
+        "title": _music_title_from_filename(output_filename),
+        "artist": "Felix 的歌单",
+        "url": f"/uploads/music/{output_filename}",
+        "size": total_size,
+        "createdAt": datetime.utcnow().isoformat(),
+    }
+
+
+@app.delete("/api/admin/uploads/music/{filename}")
+def delete_admin_music(
+    filename: str,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    if Path(filename).name != filename or Path(filename).suffix.lower() not in AUDIO_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Invalid audio filename")
+
+    target = MUSIC_DIR / filename
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="Audio not found")
+
+    target.unlink()
+    _delete_music_sidecars(target)
+    _record_admin_event(db, current_user, "删除音乐", "upload", filename, "")
+    return {"status": "deleted", "filename": filename}
+
+
+@app.post("/api/admin/uploads/music/{filename}/cover")
+async def upload_admin_music_cover(
+    filename: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, str | int]:
+    target = _resolve_music_audio_path(filename)
+    original_suffix = Path(file.filename or "").suffix.lower()
+    content_type = (file.content_type or "").lower()
+    suffix = original_suffix if original_suffix in MUSIC_COVER_SUFFIXES else ALLOWED_IMAGE_TYPES.get(content_type)
+    if suffix not in MUSIC_COVER_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Only JPG, PNG, WEBP, or GIF covers are supported")
+
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="Cover image must be 5 MB or smaller")
+    if not content:
+        raise HTTPException(status_code=400, detail="Cover image is empty")
+
+    _delete_music_sidecars(target, MUSIC_COVER_SUFFIXES)
+    cover_path = target.with_suffix(suffix)
+    cover_path.write_bytes(content)
+    _record_admin_event(db, current_user, "上传音乐封面", "upload", cover_path.name, f"{len(content)} bytes")
+    return _music_track_to_dict(target)
+
+
+@app.post("/api/admin/uploads/music/{filename}/lyrics")
+async def upload_admin_music_lyrics(
+    filename: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, str | int]:
+    target = _resolve_music_audio_path(filename)
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in MUSIC_LYRIC_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Only LRC or TXT lyrics are supported")
+
+    content = await file.read(512 * 1024 + 1)
+    if len(content) > 512 * 1024:
+        raise HTTPException(status_code=400, detail="Lyrics file must be 512 KB or smaller")
+    if not content:
+        raise HTTPException(status_code=400, detail="Lyrics file is empty")
+
+    _delete_music_sidecars(target, MUSIC_LYRIC_SUFFIXES)
+    lyric_path = target.with_suffix(suffix)
+    lyric_path.write_bytes(content)
+    _record_admin_event(db, current_user, "上传音乐歌词", "upload", lyric_path.name, f"{len(content)} bytes")
+    return _music_track_to_dict(target)
 
 
 @app.get("/api/admin/comments")
@@ -1874,9 +2354,23 @@ def _load_articles(db: Session) -> list[Article]:
             selectinload(Article.reactions),
             selectinload(Article.user_reactions),
         )
-        .order_by(Article.pinned.desc(), Article.created_at.desc())
+        .order_by(Article.pinned.desc(), Article.sort_order.asc(), Article.created_at.desc())
     )
     return list(db.scalars(statement).all())
+
+
+def _next_article_sort_order(db: Session) -> int:
+    current_max = db.scalar(select(func.max(Article.sort_order)))
+    return int(current_max or 0) + 1
+
+
+def _get_site_profile(db: Session) -> dict:
+    setting = db.get(SiteSetting, "profile")
+    profile = dict(PROFILE)
+    profile["avatarUrl"] = "/avatar.jpg"
+    if setting and isinstance(setting.payload, dict):
+        profile.update(setting.payload)
+    return profile
 
 
 def _get_article_or_404(db: Session, article_id: str) -> Article:
@@ -1896,6 +2390,140 @@ def _get_article_or_404(db: Session, article_id: str) -> Article:
     return article
 
 
+def _music_title_from_filename(filename: str) -> str:
+    stem = Path(filename).stem
+    title = re.sub(r"^\d{14}-[0-9a-f]{8}-", "", stem)
+    return title.replace("-", " ").strip() or "未命名音乐"
+
+
+def _resolve_music_audio_path(filename: str) -> Path:
+    if Path(filename).name != filename or Path(filename).suffix.lower() not in AUDIO_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Invalid audio filename")
+    target = MUSIC_DIR / filename
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="Audio not found")
+    return target
+
+
+def _delete_music_sidecars(path: Path, suffixes: list[str] | None = None) -> None:
+    for suffix in suffixes or [*MUSIC_COVER_SUFFIXES, *MUSIC_LYRIC_SUFFIXES]:
+        sidecar_path = path.with_suffix(suffix)
+        if sidecar_path.exists() and sidecar_path.is_file():
+            sidecar_path.unlink(missing_ok=True)
+
+
+def _music_sidecar_metadata(path: Path) -> dict[str, str]:
+    cover_url = ""
+    lyrics_url = ""
+    lyrics = ""
+    for suffix in MUSIC_COVER_SUFFIXES:
+        cover_path = path.with_suffix(suffix)
+        if cover_path.exists() and cover_path.is_file():
+            cover_url = f"/uploads/music/{cover_path.name}"
+            break
+
+    for suffix in MUSIC_LYRIC_SUFFIXES:
+        lyric_path = path.with_suffix(suffix)
+        if lyric_path.exists() and lyric_path.is_file():
+            lyrics_url = f"/uploads/music/{lyric_path.name}"
+            try:
+                lyrics = lyric_path.read_text(encoding="utf-8")[:6000]
+            except UnicodeDecodeError:
+                lyrics = lyric_path.read_text(encoding="gb18030", errors="ignore")[:6000]
+            break
+
+    return {"coverUrl": cover_url, "lyrics": lyrics, "lyricsUrl": lyrics_url}
+
+
+def _music_track_to_dict(path: Path) -> dict[str, str | int]:
+    stat = path.stat()
+    sidecar = _music_sidecar_metadata(path)
+    return {
+        "filename": path.name,
+        "title": _music_title_from_filename(path.name),
+        "artist": "Felix 的歌单",
+        "url": f"/uploads/music/{path.name}",
+        "coverUrl": sidecar["coverUrl"],
+        "lyrics": sidecar["lyrics"],
+        "lyricsUrl": sidecar["lyricsUrl"],
+        "size": stat.st_size,
+        "createdAt": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+    }
+
+
+def _clean_toolbox_payload(payload: ToolboxLinkIn) -> dict[str, Any]:
+    title = _required_text(payload.title, "Toolbox title is required")[:120]
+    url = _required_text(payload.url, "Toolbox URL is required")
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise HTTPException(status_code=400, detail="Toolbox URL must start with http:// or https://")
+    image_url = _optional_text(payload.imageUrl) or ""
+    if image_url:
+        parsed_image = urlparse(image_url)
+        if not (
+            image_url.startswith("/uploads/")
+            or image_url.startswith("data:image/")
+            or (parsed_image.scheme in {"http", "https"} and parsed_image.netloc)
+        ):
+            raise HTTPException(status_code=400, detail="Image URL must be an upload path or http(s) URL")
+    return {
+        "title": title,
+        "category": (_optional_text(payload.category) or "自定义")[:60],
+        "url": url[:1000],
+        "image_url": image_url[:1000],
+        "description": (_optional_text(payload.description) or "")[:500],
+        "tags": _clean_tags(payload.tags)[:8],
+        "pinned": bool(payload.pinned),
+    }
+
+
+def _clean_toolbox_overrides(payload: dict[str, Any]) -> dict[str, Any]:
+    cleaned: dict[str, Any] = {}
+    if not isinstance(payload, dict):
+        return cleaned
+    for raw_key, raw_value in payload.items():
+        key = str(raw_key).strip()[:80]
+        if not key or not isinstance(raw_value, dict):
+            continue
+        item: dict[str, Any] = {}
+        if raw_value.get("hidden") is True:
+            item["hidden"] = True
+        for field, limit in {
+            "title": 120,
+            "category": 60,
+            "url": 1000,
+            "imageUrl": 1000,
+            "description": 500,
+        }.items():
+            value = str(raw_value.get(field) or "").strip()
+            if value:
+                item[field] = value[:limit]
+        tags = raw_value.get("tags")
+        if isinstance(tags, list):
+            item["tags"] = _clean_tags([str(tag) for tag in tags])[:8]
+        if "pinned" in raw_value:
+            item["pinned"] = bool(raw_value.get("pinned"))
+        if item:
+            cleaned[key] = item
+    return cleaned
+
+
+def _toolbox_link_to_dict(link: ToolboxLink) -> dict[str, Any]:
+    return {
+        "id": link.id,
+        "title": link.title,
+        "category": link.category or "自定义",
+        "url": link.url,
+        "imageUrl": link.image_url or "",
+        "description": link.description or "",
+        "tags": link.tags or [],
+        "pinned": bool(link.pinned),
+        "createdAt": (link.created_at or datetime.utcnow()).isoformat(),
+        "updatedAt": (link.updated_at or link.created_at or datetime.utcnow()).isoformat(),
+        "custom": True,
+    }
+
+
 def _article_to_dict(article: Article, current_user: User | None = None) -> dict:
     return {
         "id": article.id,
@@ -1906,9 +2534,14 @@ def _article_to_dict(article: Article, current_user: User | None = None) -> dict
         "tags": [tag.name for tag in sorted(article.tags, key=lambda item: item.name)],
         "date": article.date,
         "readTime": article.read_time,
+        "createdAt": (article.created_at or datetime.utcnow()).isoformat(),
+        "updatedAt": (article.updated_at or article.created_at or datetime.utcnow()).isoformat(),
         "status": article.status,
         "category": article.category or "学习笔记",
+        "noteCollection": article.note_collection or "",
+        "notePath": article.note_path or "",
         "pinned": bool(article.pinned),
+        "sortOrder": article.sort_order or 0,
         "viewCount": article.view_count or 0,
         "comments": [_comment_to_dict(comment) for comment in _visible_comments(article, current_user)],
         "reactions": _reaction_counts(article),
