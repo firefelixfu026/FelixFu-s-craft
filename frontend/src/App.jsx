@@ -500,6 +500,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.4.1',
+    title: '侧边栏、续播和黍泡泡补丁',
+    date: '2026-08-12',
+    status: '已上线',
+    points: ['侧边栏站点名固定显示 FelixFu，避免标题被截断', '播放器恢复逻辑不再把保存进度覆盖为 0', '友链交换头像改为可公开访问的上传图片地址', '黍泡泡显示范围由全局状态统一控制，切换全站/仅首页会立即生效']
+  },
+  {
     version: 'v6.4.0',
     title: '阅读、计划和音乐续播体验增强',
     date: '2026-08-12',
@@ -1875,6 +1882,9 @@ function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [profileAvatarMessage, setProfileAvatarMessage] = useState('');
   const [isSavingProfileAvatar, setIsSavingProfileAvatar] = useState(false);
+  const [live2dScope, setLive2dScope] = useState(() => (
+    typeof localStorage !== 'undefined' && localStorage.getItem(LIVE2D_SCOPE_KEY) === 'home' ? 'home' : 'all'
+  ));
   const ThemeIcon = theme === 'dark' ? Moon : Sun;
   const nextThemeLabel = theme === 'dark' ? '日间模式' : '夜间模式';
   const SidebarToggleIcon = isSidebarCollapsed ? PanelLeftOpen : PanelLeftClose;
@@ -1938,15 +1948,17 @@ function App() {
     if (typeof localStorage === 'undefined') return;
     const audio = globalAudioRef.current;
     const stored = readStoredMusicSession();
+    const nextFilename = overrides.filename ?? currentMusicTrack?.filename ?? musicCurrentFilename;
     const hasProgressOverride = Object.prototype.hasOwnProperty.call(overrides, 'progress');
     const audioHasUsableTime = audio && audio.readyState > 0 && Number.isFinite(audio.currentTime) && audio.currentTime > 0;
+    const canReuseStoredProgress = stored.filename && stored.filename === nextFilename;
     const progressSource = hasProgressOverride
       ? overrides.progress
       : audioHasUsableTime
         ? audio.currentTime
-        : musicProgress || stored.progress || 0;
+        : musicProgress || (canReuseStoredProgress ? stored.progress : 0) || 0;
     const payload = {
-      filename: overrides.filename ?? currentMusicTrack?.filename ?? musicCurrentFilename,
+      filename: nextFilename,
       playlistId: overrides.playlistId ?? selectedMusicPlaylistId,
       progress: Math.max(0, Number(progressSource) || 0),
       duration: Math.max(0, Number(overrides.duration ?? audio?.duration ?? musicDuration) || 0),
@@ -1965,8 +1977,9 @@ function App() {
     if (musicRepeatMode === 'shuffle' && options.resetShuffle !== false) {
       setMusicShuffleQueue(shuffleMusicQueue(musicQueue, track.filename));
     }
-    pendingMusicResumeRef.current = 0;
-    persistMusicSession({ filename: track.filename, playlistId, progress: 0 });
+    const nextProgress = Number.isFinite(options.resumeAt) ? Math.max(0, options.resumeAt) : 0;
+    pendingMusicResumeRef.current = nextProgress;
+    persistMusicSession({ filename: track.filename, playlistId, progress: nextProgress });
     setMusicIsPlaying(true);
     window.setTimeout(() => {
       globalAudioRef.current?.play().catch(() => setMusicIsPlaying(false));
@@ -2167,12 +2180,22 @@ function App() {
   }, [isSidebarCollapsed]);
 
   useEffect(() => {
+    if (!currentMusicTrack?.filename) return;
     const saved = readStoredMusicSession();
     const shouldResume = saved.filename && saved.filename === currentMusicTrack?.filename;
-    const resumeAt = shouldResume ? Math.max(0, Number(saved.progress) || 0) : 0;
+    const resumeAt = shouldResume
+      ? Math.max(0, Number(saved.progress) || 0)
+      : Math.max(0, Number(musicProgress) || 0);
     pendingMusicResumeRef.current = resumeAt;
     setMusicProgress(resumeAt);
     setMusicDuration(0);
+    persistMusicSession({
+      filename: currentMusicTrack.filename,
+      playlistId: selectedMusicPlaylistId,
+      progress: resumeAt,
+      duration: shouldResume ? Number(saved.duration) || 0 : musicDuration,
+      repeatMode: saved.repeatMode || musicRepeatMode
+    });
     if (musicIsPlaying) {
       globalAudioRef.current?.play().catch(() => setMusicIsPlaying(false));
     }
@@ -2214,6 +2237,17 @@ function App() {
 
   function toggleTheme() {
     setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'));
+  }
+
+  function updateLive2DScope(nextScope) {
+    const normalizedScope = nextScope === 'home' ? 'home' : 'all';
+    setLive2dScope(normalizedScope);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LIVE2D_SCOPE_KEY, normalizedScope);
+      localStorage.setItem(LIVE2D_HIDDEN_KEY, 'false');
+    }
+    window.dispatchEvent(new CustomEvent(LIVE2D_SCOPE_EVENT, { detail: { scope: normalizedScope } }));
+    window.dispatchEvent(new Event(LIVE2D_SHOW_EVENT));
   }
 
   function toggleSidebar() {
@@ -4018,7 +4052,7 @@ function App() {
         <div className="brand">
           <img className="brand-mark" src={sidebarAvatarUrl} alt="站点头像" />
           <div className="brand-text">
-            <strong>{profile.siteTitle || "FelixFu's Craft"}</strong>
+            <strong title={profile.siteTitle || "FelixFu's Craft"}>FelixFu</strong>
             <span>{profile.name || '副将凡'}</span>
           </div>
           <button
@@ -4115,7 +4149,10 @@ function App() {
           onPlay={() => setMusicIsPlaying(true)}
           onPause={(event) => {
             setMusicIsPlaying(false);
-            persistMusicSession({ progress: event.currentTarget.currentTime || 0, duration: event.currentTarget.duration || musicDuration });
+            const pausedAt = Number.isFinite(event.currentTarget.currentTime) && event.currentTarget.currentTime > 0
+              ? event.currentTarget.currentTime
+              : musicProgress;
+            persistMusicSession({ progress: pausedAt, duration: event.currentTarget.duration || musicDuration });
           }}
           onEnded={handleMusicEnded}
         >
@@ -4252,7 +4289,7 @@ function App() {
           />
         )}
 
-        {activeView === 'toolbox' && <ToolboxWorkspace currentUser={currentUser} authToken={authToken} uploadImage={uploadAdminImage} />}
+        {activeView === 'toolbox' && <ToolboxWorkspace currentUser={currentUser} authToken={authToken} uploadImage={uploadAdminImage} profile={profile} />}
 
         {activeView === 'account' && currentUser && (
           <AccountWorkspace
@@ -4265,6 +4302,8 @@ function App() {
             profileAvatarMessage={profileAvatarMessage}
             isSavingProfileAvatar={isSavingProfileAvatar || isUploadingImage}
             logout={logout}
+            mascotScope={live2dScope}
+            updateMascotScope={updateLive2DScope}
             openArticle={(articleId) => {
               openArticle(articleId);
             }}
@@ -4373,7 +4412,7 @@ function App() {
           />
         )}
       </main>
-      {activeView !== 'admin' && activeView !== 'login' && <Live2DMascot activeView={activeView} />}
+      {activeView !== 'admin' && activeView !== 'login' && <Live2DMascot activeView={activeView} scopePreference={live2dScope} />}
     </div>
   );
 }
@@ -7659,7 +7698,7 @@ const defaultFriendLinks = [
   }
 ];
 
-function ToolboxWorkspace({ currentUser, authToken, uploadImage, manageOnly = false }) {
+function ToolboxWorkspace({ currentUser, authToken, uploadImage, profile = fallbackProfile, manageOnly = false }) {
   const [selectedCategory, setSelectedCategory] = useState('全部');
   const [toolboxQuery, setToolboxQuery] = useState('');
   const [customLinks, setCustomLinks] = useState([]);
@@ -7741,6 +7780,13 @@ function ToolboxWorkspace({ currentUser, authToken, uploadImage, manageOnly = fa
   const featuredLinks = allToolboxLinks
     .filter((link) => link.pinned || ['OI Wiki', 'MDN Web Docs', 'ChatGPT', 'Excalidraw'].includes(link.title))
     .slice(0, 6);
+  const siteOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://felixfu.xyz';
+  const publicAvatarPath = profile.avatarUrl && profile.avatarUrl !== '/avatar.jpg'
+    ? profile.avatarUrl
+    : '/uploads/20260811-171404-1ee88d65-codex-clipboard-547c3336-77be-4793-b488-7da542ac2aa9.png';
+  const friendAvatarUrl = publicAvatarPath.startsWith('http')
+    ? publicAvatarPath
+    : `${siteOrigin}${publicAvatarPath}`;
   const toolboxAdminLinks = allToolboxLinks.filter((link) => {
     const query = toolboxAdminQuery.trim().toLowerCase();
     const source = link.custom ? '自定义' : link.category === '友链' ? '友链' : '内置';
@@ -8091,10 +8137,10 @@ function ToolboxWorkspace({ currentUser, authToken, uploadImage, manageOnly = fa
           <h2>常用资源入口</h2>
           <div className="friend-apply-card">
             <strong>友链交换信息</strong>
-            <p>Name: FelixFu's Craft</p>
-            <p>Avatar: https://felixfu.xyz/avatar.jpg</p>
-            <p>Link: https://felixfu.xyz</p>
-            <p>Desc: 课程笔记、随笔、音乐和小工具堆在一起的个人小站。</p>
+            <p>Name: {profile.siteTitle || "FelixFu's Craft"}</p>
+            <p>Avatar: {friendAvatarUrl}</p>
+            <p>Link: {siteOrigin}</p>
+            <p>Desc: {profile.summary || '课程笔记、随笔、音乐和小工具堆在一起的个人小站。'}</p>
           </div>
         </div>
         <div className="toolbox-featured-grid" aria-label="高频工具">
@@ -8232,7 +8278,7 @@ function DecorativeStickerLayer({ activeView }) {
   );
 }
 
-function Live2DMascot({ activeView = 'overview' }) {
+function Live2DMascot({ activeView = 'overview', scopePreference = 'all' }) {
   const canvasRef = useRef(null);
   const appRef = useRef(null);
   const mascotRef = useRef(null);
@@ -8248,10 +8294,7 @@ function Live2DMascot({ activeView = 'overview' }) {
     if (typeof localStorage === 'undefined') return 'pet';
     return localStorage.getItem(LIVE2D_MODE_KEY) === 'window' ? 'window' : 'pet';
   });
-  const [scope, setScope] = useState(() => {
-    if (typeof localStorage === 'undefined') return 'all';
-    return localStorage.getItem(LIVE2D_SCOPE_KEY) === 'home' ? 'home' : 'all';
-  });
+  const [scope, setScope] = useState(scopePreference === 'home' ? 'home' : 'all');
   const [isQuiet, setIsQuiet] = useState(() => (
     typeof localStorage !== 'undefined' && localStorage.getItem(LIVE2D_QUIET_KEY) === 'true'
   ));
@@ -8388,6 +8431,10 @@ function Live2DMascot({ activeView = 'overview' }) {
     speechTimerRef.current = window.setTimeout(() => setSpeechVisible(false), 4200);
     return undefined;
   }, [activeView, isHidden, isQuiet]);
+
+  useEffect(() => {
+    setScope(scopePreference === 'home' ? 'home' : 'all');
+  }, [scopePreference]);
 
   useEffect(() => {
     function showMascotFromAccount() {
@@ -9122,25 +9169,15 @@ function AccountWorkspace({
   updateSidebarAvatar,
   profileAvatarMessage,
   isSavingProfileAvatar,
-  logout
+  logout,
+  mascotScope = 'all',
+  updateMascotScope
 }) {
   const summary = accountActivity?.summary || {};
   const comments = accountActivity?.comments || [];
   const reactions = accountActivity?.reactions || [];
   const favoriteArticles = accountActivity?.favoriteArticles || [];
   const sidebarAvatarUrl = profile?.avatarUrl || '/avatar.jpg';
-  const [mascotScope, setMascotScope] = useState(() => (
-    typeof localStorage !== 'undefined' && localStorage.getItem(LIVE2D_SCOPE_KEY) === 'home' ? 'home' : 'all'
-  ));
-
-  function updateMascotScope(nextScope) {
-    const normalizedScope = nextScope === 'home' ? 'home' : 'all';
-    setMascotScope(normalizedScope);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(LIVE2D_SCOPE_KEY, normalizedScope);
-    }
-    window.dispatchEvent(new CustomEvent(LIVE2D_SCOPE_EVENT, { detail: { scope: normalizedScope } }));
-  }
 
   return (
     <section className="workspace account-workspace">
