@@ -451,6 +451,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.3.1',
+    title: '友链图片上传补丁',
+    date: '2026-08-12',
+    status: '已上线',
+    points: ['工具箱管理的图片链接旁新增上传图片按钮', '上传成功后自动回填 /uploads 图片地址', '友链头像和工具封面不再需要手动找公网链接']
+  },
+  {
     version: 'v6.3.0',
     title: '站点设置、友链和音乐体验增强',
     date: '2026-08-12',
@@ -4072,7 +4079,7 @@ function App() {
           />
         )}
 
-        {activeView === 'toolbox' && <ToolboxWorkspace currentUser={currentUser} authToken={authToken} />}
+        {activeView === 'toolbox' && <ToolboxWorkspace currentUser={currentUser} authToken={authToken} uploadImage={uploadAdminImage} />}
 
         {activeView === 'account' && currentUser && (
           <AccountWorkspace
@@ -7403,7 +7410,7 @@ const defaultFriendLinks = [
   }
 ];
 
-function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
+function ToolboxWorkspace({ currentUser, authToken, uploadImage, manageOnly = false }) {
   const [selectedCategory, setSelectedCategory] = useState('全部');
   const [toolboxQuery, setToolboxQuery] = useState('');
   const [customLinks, setCustomLinks] = useState([]);
@@ -7415,6 +7422,7 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
   const [toolboxAdminQuery, setToolboxAdminQuery] = useState('');
   const [isLoadingToolboxLinks, setIsLoadingToolboxLinks] = useState(false);
   const [isSavingToolboxLink, setIsSavingToolboxLink] = useState(false);
+  const [isUploadingToolboxImage, setIsUploadingToolboxImage] = useState(false);
   const canManageToolbox = currentUser?.role === 'admin';
   async function persistToolboxDefaultOverrides(nextOverrides) {
     setToolboxDefaultOverrides(nextOverrides);
@@ -7647,6 +7655,27 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
     }
   }
 
+  async function uploadToolboxImage(file) {
+    if (!file) return;
+    if (!uploadImage) {
+      setToolboxMessage('图片上传入口暂时不可用');
+      return;
+    }
+    setIsUploadingToolboxImage(true);
+    setToolboxMessage('正在上传友链图片...');
+    try {
+      const image = await uploadImage(file);
+      if (!image?.url) {
+        setToolboxMessage('图片上传失败，请换一张图片试试');
+        return;
+      }
+      updateToolboxForm('imageUrl', image.url);
+      setToolboxMessage('图片已上传，链接已自动填入');
+    } finally {
+      setIsUploadingToolboxImage(false);
+    }
+  }
+
   const toolboxEditor = canManageToolbox ? (
     <form className="toolbox-editor" onSubmit={submitToolboxLink}>
       <div className="admin-panel-heading compact-heading">
@@ -7676,7 +7705,22 @@ function ToolboxWorkspace({ currentUser, authToken, manageOnly = false }) {
         </label>
         <label className="wide">
           <span>图片链接</span>
-          <input value={toolboxForm.imageUrl} onChange={(event) => updateToolboxForm('imageUrl', event.target.value)} placeholder="头像或封面图片 URL，可留空" />
+          <div className="toolbox-image-input-row">
+            <input value={toolboxForm.imageUrl} onChange={(event) => updateToolboxForm('imageUrl', event.target.value)} placeholder="头像或封面图片 URL，可留空" />
+            <label className="ghost-button file-upload-control compact-upload">
+              <ImageIcon size={15} />
+              <span>{isUploadingToolboxImage ? '上传中' : '上传图片'}</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                disabled={isUploadingToolboxImage}
+                onChange={(event) => {
+                  uploadToolboxImage(event.target.files?.[0]);
+                  event.target.value = '';
+                }}
+              />
+            </label>
+          </div>
         </label>
         <label className="wide">
           <span>说明</span>
@@ -11253,7 +11297,7 @@ function AdminWorkspace({
         )}
 
         {activeAdminPage === 'toolbox' && (
-          <ToolboxWorkspace currentUser={currentUser} authToken={authToken} manageOnly />
+          <ToolboxWorkspace currentUser={currentUser} authToken={authToken} uploadImage={uploadAdminImage} manageOnly />
         )}
 
         {activeAdminPage === 'music' && (

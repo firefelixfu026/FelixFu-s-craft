@@ -4224,6 +4224,18 @@ h3 {
   line-height: 1.55;
 }
 
+.toolbox-image-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.toolbox-image-input-row .file-upload-control {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
 .toolbox-card {
   display: grid;
   gap: 10px;
