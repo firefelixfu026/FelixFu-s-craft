@@ -358,29 +358,27 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-width: 112px;
-  padding: 9px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.64);
+  min-width: 96px;
+  padding: 8px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 8px;
   color: #334155;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow:
-    0 14px 30px rgba(100, 78, 72, 0.13),
-    inset 0 -8px 18px rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: 0 8px 20px rgba(100, 78, 72, 0.08);
   font-family: var(--cute-display-font);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
   letter-spacing: 0;
-  opacity: 0.72;
-  backdrop-filter: blur(10px);
-  animation: stickerFloat 7.5s ease-in-out infinite;
+  opacity: 0.58;
+  animation: stickerFloat 14s ease-in-out infinite;
+  contain: layout paint;
 }
 
 .frontstage-shell .sticker-icon {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 8px;
   color: #ffffff;
   background: #2f8f83;
@@ -388,10 +386,10 @@ textarea {
 }
 
 .frontstage-shell .sticker-terminal {
-  top: 112px;
-  right: clamp(18px, 5vw, 76px);
+  top: clamp(92px, 12vh, 132px);
+  right: clamp(18px, 5vw, 72px);
   transform: rotate(4deg);
-  background: linear-gradient(135deg, rgba(232, 245, 241, 0.8), rgba(255, 255, 255, 0.7));
+  background: linear-gradient(135deg, rgba(232, 245, 241, 0.66), rgba(255, 255, 255, 0.56));
 }
 
 .frontstage-shell .sticker-terminal .sticker-icon {
@@ -399,11 +397,11 @@ textarea {
 }
 
 .frontstage-shell .sticker-guitar {
-  top: 330px;
-  right: clamp(34px, 9vw, 148px);
+  top: clamp(280px, 36vh, 360px);
+  right: clamp(34px, 9vw, 144px);
   transform: rotate(-7deg);
-  background: linear-gradient(135deg, rgba(253, 232, 238, 0.82), rgba(255, 255, 255, 0.68));
-  animation-delay: -2.2s;
+  background: linear-gradient(135deg, rgba(253, 232, 238, 0.66), rgba(255, 255, 255, 0.54));
+  animation-delay: -4.2s;
 }
 
 .frontstage-shell .sticker-guitar .sticker-icon {
@@ -412,10 +410,10 @@ textarea {
 
 .frontstage-shell .sticker-memo {
   right: clamp(16px, 4vw, 58px);
-  bottom: 120px;
+  bottom: clamp(96px, 14vh, 150px);
   transform: rotate(6deg);
-  background: linear-gradient(135deg, rgba(242, 237, 247, 0.84), rgba(255, 255, 255, 0.7));
-  animation-delay: -4.6s;
+  background: linear-gradient(135deg, rgba(242, 237, 247, 0.68), rgba(255, 255, 255, 0.56));
+  animation-delay: -8.6s;
 }
 
 .frontstage-shell .sticker-memo .sticker-icon {
@@ -425,7 +423,7 @@ textarea {
 .frontstage-shell .sticker-layer-music .sticker-guitar,
 .frontstage-shell .sticker-layer-plan .sticker-terminal,
 .frontstage-shell .sticker-layer-articles .sticker-memo {
-  opacity: 0.86;
+  opacity: 0.68;
 }
 
 @keyframes stickerFloat {

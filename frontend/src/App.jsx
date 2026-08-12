@@ -498,6 +498,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.4.3',
+    title: '页面贴纸轻量回归',
+    date: '2026-08-12',
+    status: '已上线',
+    points: ['各前台页面重新显示装饰贴纸，避免页面过于单调', '贴纸文案按首页、文章、计划、音乐、工具箱、游戏、账号和登录页分别适配', '贴纸动画与样式改为更轻量的低频浮动，减少滚动和切换压力']
+  },
+  {
     version: 'v6.4.2',
     title: '黍泡泡和播放器稳定补丁',
     date: '2026-08-12',
@@ -4132,7 +4139,7 @@ function App() {
       </aside>
 
       <main className="main-content">
-        {activeView === 'overview' && <DecorativeStickerLayer activeView={activeView} />}
+        {activeView !== 'admin' && <DecorativeStickerLayer activeView={activeView} />}
 
         <audio
           ref={globalAudioRef}
@@ -8244,29 +8251,39 @@ const stickerSets = {
     { variant: 'memo', label: 'ZJU NOTE', icon: '✦' }
   ],
   articles: [
-    { variant: 'memo', label: 'TECH NOTE', icon: '⌁' },
-    { variant: 'terminal', label: 'DOCS 02', icon: '◇' },
-    { variant: 'guitar', label: 'REST', icon: '♪' }
+    { variant: 'memo', label: 'INDEX', icon: '⌁' },
+    { variant: 'terminal', label: 'DOCS', icon: '◇' },
+    { variant: 'guitar', label: 'READ', icon: '♪' }
   ],
   plan: [
-    { variant: 'terminal', label: 'MISSION', icon: '◇' },
-    { variant: 'memo', label: 'PLAN 8/15', icon: '✦' },
-    { variant: 'guitar', label: 'AFTER CLASS', icon: '♪' }
+    { variant: 'terminal', label: 'TODAY', icon: '◇' },
+    { variant: 'memo', label: 'CHECK', icon: '✦' },
+    { variant: 'guitar', label: 'BREAK', icon: '♪' }
   ],
   music: [
-    { variant: 'guitar', label: 'PLAYLIST', icon: '♪' },
-    { variant: 'terminal', label: 'AUDIO LOG', icon: '◇' },
-    { variant: 'memo', label: 'LOOP ON', icon: '✦' }
+    { variant: 'guitar', label: 'NOW', icon: '♪' },
+    { variant: 'terminal', label: 'QUEUE', icon: '◇' },
+    { variant: 'memo', label: 'LYRIC', icon: '✦' }
   ],
   toolbox: [
     { variant: 'terminal', label: 'PORTAL', icon: '◇' },
     { variant: 'memo', label: 'LINKS', icon: '✦' },
-    { variant: 'guitar', label: 'TOOLS', icon: '♪' }
+    { variant: 'guitar', label: 'FAVS', icon: '♪' }
   ],
   game: [
-    { variant: 'terminal', label: 'STAGE READY', icon: '◇' },
-    { variant: 'guitar', label: 'BREAK', icon: '♪' },
+    { variant: 'terminal', label: 'READY', icon: '◇' },
+    { variant: 'guitar', label: 'PLAY', icon: '♪' },
     { variant: 'memo', label: 'SAVE', icon: '✦' }
+  ],
+  account: [
+    { variant: 'terminal', label: 'PROFILE', icon: '◇' },
+    { variant: 'memo', label: 'FELIX LOG', icon: '✦' },
+    { variant: 'guitar', label: 'ME', icon: '♪' }
+  ],
+  login: [
+    { variant: 'terminal', label: 'KEY', icon: '◇' },
+    { variant: 'memo', label: 'GATE', icon: '✦' },
+    { variant: 'guitar', label: 'HELLO', icon: '♪' }
   ],
   default: [
     { variant: 'terminal', label: 'FELIX LOG', icon: '◇' },
