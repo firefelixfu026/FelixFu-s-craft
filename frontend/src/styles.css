@@ -1765,6 +1765,15 @@ mark {
   font-weight: 800;
 }
 
+.site-owner-line {
+  position: relative;
+  z-index: 1;
+  margin: -4px 0 10px;
+  color: #657184;
+  font-size: 15px;
+  font-weight: 850;
+}
+
 .homepage-workspace {
   gap: 20px;
 }
@@ -4972,6 +4981,72 @@ h3 {
   accent-color: #1f8a7a;
 }
 
+.admin-profile-editor {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.admin-panel-heading.compact {
+  margin-bottom: 0;
+}
+
+.admin-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-profile-editor label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-profile-editor label span {
+  color: #5b6878;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.admin-profile-editor input,
+.admin-profile-editor textarea {
+  width: 100%;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  color: #102033;
+  background: #ffffff;
+  font: inherit;
+}
+
+.admin-profile-editor input {
+  min-height: 42px;
+  padding: 0 12px;
+}
+
+.admin-profile-editor textarea {
+  min-height: 104px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.admin-profile-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding-top: 2px;
+  color: #5b6878;
+  font-size: 13px;
+}
+
+.admin-profile-preview strong {
+  color: #102033;
+}
+
 .admin-task-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -7814,6 +7889,7 @@ h3 {
 :root[data-theme='dark'] .admin-panel,
 :root[data-theme='dark'] .admin-pulse-card,
 :root[data-theme='dark'] .admin-site-switch-card,
+:root[data-theme='dark'] .admin-profile-editor,
 :root[data-theme='dark'] .admin-task-card,
 :root[data-theme='dark'] .admin-insight-grid > div,
 :root[data-theme='dark'] .security-rule-grid article,
@@ -8221,6 +8297,8 @@ h3 {
 :root[data-theme='dark'] .corpus-textarea,
 :root[data-theme='dark'] .admin-form input,
 :root[data-theme='dark'] .admin-form textarea,
+:root[data-theme='dark'] .admin-profile-editor input,
+:root[data-theme='dark'] .admin-profile-editor textarea,
 :root[data-theme='dark'] .comment-filter-row select,
 :root[data-theme='dark'] .summer-goal-card textarea,
 :root[data-theme='dark'] .weekly-plan-row input[type='text'],
@@ -8299,6 +8377,9 @@ h3 {
 :root[data-theme='dark'] .admin-pulse-card span,
 :root[data-theme='dark'] .admin-pulse-card small,
 :root[data-theme='dark'] .admin-site-switch-card span,
+:root[data-theme='dark'] .admin-profile-editor label span,
+:root[data-theme='dark'] .admin-profile-preview,
+:root[data-theme='dark'] .site-owner-line,
 :root[data-theme='dark'] .admin-task-card em,
 :root[data-theme='dark'] .admin-task-card small,
 :root[data-theme='dark'] .admin-form label > span,
@@ -8329,6 +8410,7 @@ h3 {
 :root[data-theme='dark'] .project-showcase-card strong,
 :root[data-theme='dark'] .admin-page-card strong,
 :root[data-theme='dark'] .admin-site-switch-card strong,
+:root[data-theme='dark'] .admin-profile-preview strong,
 :root[data-theme='dark'] .article-section-card span,
 :root[data-theme='dark'] .article-neighbor-nav strong,
 :root[data-theme='dark'] .note-tree-group strong,

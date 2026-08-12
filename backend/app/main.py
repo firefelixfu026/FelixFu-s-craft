@@ -101,12 +101,13 @@ app.add_middleware(
 
 
 PROFILE = {
-    "name": "付江樊",
+    "siteTitle": "FelixFu's Craft",
+    "name": "副将凡",
     "englishName": "Felix Fu",
     "school": "浙江大学",
     "role": "Web 前端 & Python",
-    "interests": ["Web 全栈", "AI 自动化", "安全与运维", "长跑", "游戏"],
-    "summary": "普通大学生，正在努力把“想做的事”变成“会做的事”。从一行代码开始，一路把课程笔记、AI 工具、小游戏和运维后台慢慢接到这个小站里。",
+    "interests": ["Web 全栈", "AI 自动化", "安全与运维", "音乐", "游戏"],
+    "summary": "这里是我慢慢搭起来的小站：放技术笔记、随笔、音乐、工具入口，也记录一点自己的学习和折腾。",
     "metrics": [
         {"label": "技能方向", "value": "3+"},
         {"label": "线上项目", "value": "1+"},
@@ -129,7 +130,7 @@ AI_NEWS = [
 
 DEFAULT_SUMMER_PLAN: dict[str, Any] = {
     "profile": {
-        "name": "付江樊",
+        "name": "副将凡",
         "identity": "浙江大学准大二",
         "range": "2026-08-04 至 2026-08-15",
         "theme": "期末冲刺式预习 + 规律生活记录",
@@ -380,7 +381,14 @@ class SitePreferencesIn(BaseModel):
 
 
 class SiteProfileIn(BaseModel):
-    avatarUrl: str = ""
+    siteTitle: str | None = None
+    name: str | None = None
+    englishName: str | None = None
+    school: str | None = None
+    role: str | None = None
+    summary: str | None = None
+    interests: list[str] | None = None
+    avatarUrl: str | None = None
 
 
 class ToolboxLinkIn(BaseModel):
@@ -502,7 +510,7 @@ def update_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ) -> dict:
-    avatar_url = payload.avatarUrl.strip()
+    avatar_url = (payload.avatarUrl or "").strip()
     if avatar_url and not (
         avatar_url.startswith("/uploads/")
         or avatar_url == "/avatar.jpg"
@@ -514,14 +522,21 @@ def update_profile(
 
     setting = db.get(SiteSetting, "profile")
     next_payload = dict(setting.payload) if setting else {}
-    next_payload["avatarUrl"] = avatar_url or "/avatar.jpg"
+    for field in ["siteTitle", "name", "englishName", "school", "role", "summary"]:
+        value = getattr(payload, field)
+        if value is not None:
+            next_payload[field] = value.strip()
+    if payload.interests is not None:
+        next_payload["interests"] = [item.strip() for item in payload.interests if item.strip()][:12]
+    if payload.avatarUrl is not None:
+        next_payload["avatarUrl"] = avatar_url or "/avatar.jpg"
     if setting:
         setting.payload = next_payload
     else:
         setting = SiteSetting(key="profile", payload=next_payload)
         db.add(setting)
     db.commit()
-    _record_admin_event(db, current_user, "更新侧边栏头像", "profile", "site avatar", next_payload["avatarUrl"])
+    _record_admin_event(db, current_user, "更新站点资料", "profile", "site profile", next_payload.get("siteTitle", PROFILE["siteTitle"]))
     return _get_site_profile(db)
 
 

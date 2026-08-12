@@ -438,6 +438,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.0.3',
+    title: '站点名称和公开资料后台可编辑',
+    date: '2026-08-12',
+    status: '已上线',
+    points: ["公开站点名称改为 FelixFu's Craft，首页不再用真实姓名做主标题", '公开展示名改为副将凡，侧边栏显示站点名和展示名', '后台总览新增公开资料编辑，可保存自我介绍、身份标签、兴趣标签和站点名称']
+  },
+  {
     version: 'v6.0.2',
     title: '页面留白、黍泡泡浮层与暑期计划隐私开关',
     date: '2026-08-12',
@@ -1007,7 +1014,7 @@ const defaultSummerPlan = {
 
 const personalizedSummerPlan = {
   profile: {
-    name: '付江樊',
+    name: '副将凡',
     identity: '浙江大学准大二',
     range: '2026-08-04 至 2026-08-15',
     theme: '期末冲刺式预习 + 规律生活记录'
@@ -1615,6 +1622,16 @@ function App() {
   const [sitePreferences, setSitePreferences] = useState(DEFAULT_SITE_PREFERENCES);
   const [hasLoadedSitePreferences, setHasLoadedSitePreferences] = useState(false);
   const [isSavingSitePreferences, setIsSavingSitePreferences] = useState(false);
+  const [profileForm, setProfileForm] = useState(() => ({
+    siteTitle: fallbackProfile.siteTitle || "FelixFu's Craft",
+    name: fallbackProfile.name || '副将凡',
+    englishName: fallbackProfile.englishName || 'Felix Fu',
+    school: fallbackProfile.school || '',
+    role: fallbackProfile.role || '',
+    summary: fallbackProfile.summary || '',
+    interests: (fallbackProfile.interests || []).join('、')
+  }));
+  const [isSavingSiteProfile, setIsSavingSiteProfile] = useState(false);
   const [articles, setArticles] = useState(fallbackArticles);
   const [aiNews, setAiNews] = useState(fallbackNews);
   const [reactions, setReactions] = useState({});
@@ -1957,7 +1974,17 @@ function App() {
         ]);
 
         if (profileRes.ok) {
-          setProfile(await profileRes.json());
+          const profilePayload = await profileRes.json();
+          setProfile(profilePayload);
+          setProfileForm({
+            siteTitle: profilePayload.siteTitle || "FelixFu's Craft",
+            name: profilePayload.name || '副将凡',
+            englishName: profilePayload.englishName || 'Felix Fu',
+            school: profilePayload.school || '',
+            role: profilePayload.role || '',
+            summary: profilePayload.summary || '',
+            interests: (profilePayload.interests || []).join('、')
+          });
         }
         if (preferencesRes.ok) {
           setSitePreferences({
@@ -2189,6 +2216,59 @@ function App() {
       setAdminMessage('站点开关保存失败，请确认后端连接');
     } finally {
       setIsSavingSitePreferences(false);
+    }
+  }
+
+  function updateProfileForm(field, value) {
+    setProfileForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function normalizeProfilePayload(extra = {}) {
+    return {
+      siteTitle: profileForm.siteTitle.trim() || "FelixFu's Craft",
+      name: profileForm.name.trim() || '副将凡',
+      englishName: profileForm.englishName.trim() || 'Felix Fu',
+      school: profileForm.school.trim(),
+      role: profileForm.role.trim(),
+      summary: profileForm.summary.trim(),
+      interests: profileForm.interests
+        .split(/[、,，\n]+/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+      avatarUrl: profile.avatarUrl || '/avatar.jpg',
+      ...extra
+    };
+  }
+
+  async function saveSiteProfile(extra = {}) {
+    if (currentUser?.role !== 'admin') return null;
+    setIsSavingSiteProfile(true);
+    try {
+      const response = await fetch('/api/admin/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify(normalizeProfilePayload(extra))
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.detail || `HTTP ${response.status}`);
+      setProfile(result);
+      setProfileForm({
+        siteTitle: result.siteTitle || "FelixFu's Craft",
+        name: result.name || '副将凡',
+        englishName: result.englishName || 'Felix Fu',
+        school: result.school || '',
+        role: result.role || '',
+        summary: result.summary || '',
+        interests: (result.interests || []).join('、')
+      });
+      setAdminMessage('公开资料已保存');
+      refreshAdminAuditLogs();
+      return result;
+    } catch {
+      setAdminMessage('公开资料保存失败，请确认后端连接');
+      return null;
+    } finally {
+      setIsSavingSiteProfile(false);
     }
   }
 
@@ -2935,19 +3015,12 @@ function App() {
     setIsSavingProfileAvatar(true);
     setProfileAvatarMessage('头像已上传，正在保存到网站...');
     try {
-      const response = await fetch('/api/admin/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ avatarUrl: image.url })
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setProfileAvatarMessage(result.detail || `头像保存失败：HTTP ${response.status}`);
+      const result = await saveSiteProfile({ avatarUrl: image.url });
+      if (!result) {
+        setProfileAvatarMessage('头像保存失败，请稍后再试');
         return;
       }
-      setProfile(result);
       setProfileAvatarMessage('侧边栏头像已更新');
-      refreshAdminAuditLogs();
     } catch {
       setProfileAvatarMessage('后端服务不可用，头像暂时没保存成功');
     } finally {
@@ -3671,10 +3744,10 @@ function App() {
     <div className={shellClassName}>
       <aside className="sidebar" aria-label="博客导航" aria-expanded={!isSidebarCollapsed}>
         <div className="brand">
-          <img className="brand-mark" src={sidebarAvatarUrl} alt="付江樊头像" />
+          <img className="brand-mark" src={sidebarAvatarUrl} alt="站点头像" />
           <div className="brand-text">
-            <strong>{profile.name}</strong>
-            <span>{profile.englishName}</span>
+            <strong>{profile.siteTitle || "FelixFu's Craft"}</strong>
+            <span>{profile.name || '副将凡'}</span>
           </div>
           <button
             className="sidebar-toggle-button"
@@ -3794,7 +3867,7 @@ function App() {
           </section>
         )}
 
-        {activeView === 'overview' && <Overview profile={profile} articles={articles} setActiveView={navigateToView} currentUser={currentUser} />}
+        {activeView === 'overview' && <Overview profile={profile} articles={articles} setActiveView={navigateToView} currentUser={currentUser} canViewSummerPlan={canViewSummerPlan} />}
 
         {activeView === 'articles' && (
           <ArticleWorkspace
@@ -3988,6 +4061,11 @@ function App() {
             deleteAdminComment={deleteAdminComment}
             currentUser={currentUser}
             authToken={authToken}
+            profile={profile}
+            profileForm={profileForm}
+            updateProfileForm={updateProfileForm}
+            saveSiteProfile={saveSiteProfile}
+            isSavingSiteProfile={isSavingSiteProfile}
             sitePreferences={sitePreferences}
             isSavingSitePreferences={isSavingSitePreferences}
             saveSitePreferences={saveSitePreferences}
@@ -4000,7 +4078,7 @@ function App() {
   );
 }
 
-function Overview({ profile, articles, setActiveView, currentUser }) {
+function Overview({ profile, articles, setActiveView, currentUser, canViewSummerPlan }) {
   const identityPhrases = useMemo(
     () => ['爱折腾的计算机学生', 'Web 全栈学习者', 'AI 工具搭建者', '安全与运维探索者', '长跑中的长期主义者'],
     []
@@ -4082,9 +4160,9 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
           </div>
           <p className="terminal-path">~/whoami</p>
           <h1 id="home-title" className="geek-title">
-            你好，我是
-            <span className="gradient-text">{profile.name}</span>
+            <span className="gradient-text">{profile.siteTitle || "FelixFu's Craft"}</span>
           </h1>
+          <p className="site-owner-line">by {profile.name || '副将凡'} · {profile.englishName || 'Felix Fu'}</p>
           <p className="typewriter-line" aria-label={`一名${typedIdentity}`}>
             <span>一名</span>
             <strong>{typedIdentity || identityPhrases[0].slice(0, 1)}</strong>
@@ -4114,10 +4192,17 @@ function Overview({ profile, articles, setActiveView, currentUser }) {
               <BookOpen size={17} />
               <span>看看我的文章</span>
             </button>
-            <button className="ghost-button" type="button" onClick={() => setActiveView('plan')}>
-              <List size={17} />
-              <span>看学习计划</span>
-            </button>
+            {canViewSummerPlan ? (
+              <button className="ghost-button" type="button" onClick={() => setActiveView('plan')}>
+                <List size={17} />
+                <span>看学习计划</span>
+              </button>
+            ) : (
+              <button className="ghost-button" type="button" onClick={() => setActiveView('toolbox')}>
+                <Wrench size={17} />
+                <span>打开工具箱</span>
+              </button>
+            )}
           </div>
           <div className="interest-row geek-interest-row">
             {profile.interests.map((interest) => (
@@ -6112,7 +6197,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
     setSelectedPlanDate(personalizedDailyPlans[0].date);
     setSelectedAppDate(personalizedAppUsageDays[0].date);
     setSelectedCompletionDate(personalizedCompletionDays[0].date);
-    setSaveMessage('已恢复付江樊版模板');
+    setSaveMessage('已恢复副将凡版模板');
   }
 
   async function copyPlanMarkdown() {
@@ -8632,7 +8717,7 @@ function ReleaseWorkspace() {
       <section className="release-story-hero">
         <div>
           <p className="eyebrow">Website Maintenance Log</p>
-          <h3>从可运行，到像付江樊自己的站</h3>
+          <h3>从可运行，到像副将凡自己的站</h3>
           <span>版本清单按大版本收纳，既能查改动，也能看出这个网站是怎么一点点长出来的。</span>
         </div>
         <div className="release-next-order" aria-label="后续优化顺序">
@@ -8828,6 +8913,11 @@ function AdminWorkspace({
   deleteAdminComment,
   currentUser,
   authToken,
+  profile,
+  profileForm,
+  updateProfileForm,
+  saveSiteProfile,
+  isSavingSiteProfile,
   sitePreferences,
   isSavingSitePreferences,
   saveSitePreferences,
@@ -9414,6 +9504,62 @@ function AdminWorkspace({
                 <span>{sitePreferences?.summerPlanVisible ? '公开' : '隐藏'}</span>
               </label>
             </div>
+            <form
+              className="admin-profile-editor"
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveSiteProfile();
+              }}
+            >
+              <div className="admin-panel-heading compact">
+                <div>
+                  <h3>公开资料</h3>
+                  <span>这里会同步到首页和侧边栏。</span>
+                </div>
+                <button className="primary-action" type="submit" disabled={isSavingSiteProfile}>
+                  <Save size={16} />
+                  <span>{isSavingSiteProfile ? '保存中' : '保存资料'}</span>
+                </button>
+              </div>
+              <div className="admin-profile-grid">
+                <label>
+                  <span>网站名称</span>
+                  <input value={profileForm.siteTitle} onChange={(event) => updateProfileForm('siteTitle', event.target.value)} />
+                </label>
+                <label>
+                  <span>展示名</span>
+                  <input value={profileForm.name} onChange={(event) => updateProfileForm('name', event.target.value)} />
+                </label>
+                <label>
+                  <span>英文名 / 签名</span>
+                  <input value={profileForm.englishName} onChange={(event) => updateProfileForm('englishName', event.target.value)} />
+                </label>
+                <label>
+                  <span>身份标签</span>
+                  <input value={profileForm.role} onChange={(event) => updateProfileForm('role', event.target.value)} />
+                </label>
+                <label>
+                  <span>学校 / 归属</span>
+                  <input value={profileForm.school} onChange={(event) => updateProfileForm('school', event.target.value)} />
+                </label>
+                <label>
+                  <span>兴趣标签</span>
+                  <input value={profileForm.interests} onChange={(event) => updateProfileForm('interests', event.target.value)} placeholder="用顿号或逗号分隔" />
+                </label>
+              </div>
+              <label className="admin-profile-summary">
+                <span>自我介绍</span>
+                <textarea
+                  value={profileForm.summary}
+                  onChange={(event) => updateProfileForm('summary', event.target.value)}
+                  rows={4}
+                />
+              </label>
+              <div className="admin-profile-preview">
+                <strong>{profile.siteTitle || "FelixFu's Craft"}</strong>
+                <span>{profile.name || '副将凡'} · {profile.role || '未设置身份标签'}</span>
+              </div>
+            </form>
             <div className="admin-task-grid">
               {adminTaskItems.map((task) => {
                 const Icon = task.icon;
