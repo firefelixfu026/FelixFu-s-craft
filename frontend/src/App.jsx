@@ -128,9 +128,7 @@ const LIVE2D_HIDDEN_KEY = 'felix_blog_live2d_hidden';
 const LIVE2D_POSITION_KEY = 'felix_blog_live2d_position_v2';
 const LIVE2D_MODE_KEY = 'felix_blog_live2d_mode';
 const LIVE2D_QUIET_KEY = 'felix_blog_live2d_quiet';
-const LIVE2D_SCOPE_KEY = 'felix_blog_live2d_scope';
 const LIVE2D_SHOW_EVENT = 'felix-live2d-show';
-const LIVE2D_SCOPE_EVENT = 'felix-live2d-scope';
 const LIVE2D_SCRIPT_SOURCES = [
   'https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js',
   'https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js',
@@ -499,6 +497,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.4.2',
+    title: '黍泡泡和播放器稳定补丁',
+    date: '2026-08-12',
+    status: '已上线',
+    points: ['移除黍泡泡“仅首页”显示分支，统一改成显示 / 关闭，减少消失和状态不同步问题', 'Live2D 加载前会直接显示静态黍泡泡，不再只剩文本框', '播放器初始化和音频元数据加载时不再把有效续播进度覆盖成 0', '非首页页面减少装饰贴纸动画层，降低切换和滚动压力']
+  },
   {
     version: 'v6.4.1',
     title: '侧边栏、续播和黍泡泡补丁',
@@ -1882,9 +1887,6 @@ function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [profileAvatarMessage, setProfileAvatarMessage] = useState('');
   const [isSavingProfileAvatar, setIsSavingProfileAvatar] = useState(false);
-  const [live2dScope, setLive2dScope] = useState(() => (
-    typeof localStorage !== 'undefined' && localStorage.getItem(LIVE2D_SCOPE_KEY) === 'home' ? 'home' : 'all'
-  ));
   const ThemeIcon = theme === 'dark' ? Moon : Sun;
   const nextThemeLabel = theme === 'dark' ? '日间模式' : '夜间模式';
   const SidebarToggleIcon = isSidebarCollapsed ? PanelLeftOpen : PanelLeftClose;
@@ -1922,6 +1924,7 @@ function App() {
   const activeMusicQueue = musicRepeatMode === 'shuffle' && musicShuffleQueue.length ? musicShuffleQueue : musicQueue;
   const currentMusicTrack = useMemo(() => {
     if (!musicQueue.length) return null;
+    if (!musicCurrentFilename) return null;
     const saved = musicQueue.find((track) => track.filename === musicCurrentFilename);
     return saved || musicQueue[0];
   }, [musicCurrentFilename, musicQueue]);
@@ -1929,6 +1932,18 @@ function App() {
     const trackMap = new Map(musicTracks.map((track) => [track.filename, track]));
     return recentMusicFilenames.map((filename) => trackMap.get(filename)).filter(Boolean);
   }, [musicTracks, recentMusicFilenames]);
+
+  useEffect(() => {
+    if (!musicTracks.length || musicCurrentFilename) return;
+    const saved = readStoredMusicSession();
+    const savedTrack = musicTracks.find((track) => track.filename === saved.filename);
+    const nextTrack = savedTrack || musicTracks[0];
+    if (!nextTrack?.filename) return;
+    const resumeAt = savedTrack ? Math.max(0, Number(saved.progress) || 0) : 0;
+    setMusicCurrentFilename(nextTrack.filename);
+    pendingMusicResumeRef.current = resumeAt;
+    setMusicProgress(resumeAt);
+  }, [musicCurrentFilename, musicTracks]);
 
   function persistMusicPlaylists(nextPlaylists) {
     setMusicPlaylists(nextPlaylists);
@@ -1952,11 +1967,13 @@ function App() {
     const hasProgressOverride = Object.prototype.hasOwnProperty.call(overrides, 'progress');
     const audioHasUsableTime = audio && audio.readyState > 0 && Number.isFinite(audio.currentTime) && audio.currentTime > 0;
     const canReuseStoredProgress = stored.filename && stored.filename === nextFilename;
+    const overrideProgress = Math.max(0, Number(overrides.progress) || 0);
+    const storedProgress = canReuseStoredProgress ? Math.max(0, Number(stored.progress) || 0) : 0;
     const progressSource = hasProgressOverride
-      ? overrides.progress
+      ? (overrideProgress > 0 || overrides.allowZeroProgress ? overrideProgress : storedProgress)
       : audioHasUsableTime
         ? audio.currentTime
-        : musicProgress || (canReuseStoredProgress ? stored.progress : 0) || 0;
+        : Math.max(0, Number(musicProgress) || 0) || storedProgress || 0;
     const payload = {
       filename: nextFilename,
       playlistId: overrides.playlistId ?? selectedMusicPlaylistId,
@@ -1969,6 +1986,20 @@ function App() {
     writeStoredJson(MUSIC_SESSION_KEY, payload);
   }
 
+  function persistCurrentAudioSession(overrides = {}) {
+    const audio = globalAudioRef.current;
+    const audioProgress = Number.isFinite(audio?.currentTime) && audio.currentTime > 0
+      ? audio.currentTime
+      : musicProgress;
+    persistMusicSession({
+      filename: currentMusicTrack?.filename,
+      playlistId: selectedMusicPlaylistId,
+      progress: audioProgress,
+      duration: Number.isFinite(audio?.duration) ? audio.duration : musicDuration,
+      ...overrides
+    });
+  }
+
   function playMusicTrack(track, playlistId = selectedMusicPlaylistId, options = {}) {
     if (!track) return;
     rememberMusicTrack(track);
@@ -1979,7 +2010,7 @@ function App() {
     }
     const nextProgress = Number.isFinite(options.resumeAt) ? Math.max(0, options.resumeAt) : 0;
     pendingMusicResumeRef.current = nextProgress;
-    persistMusicSession({ filename: track.filename, playlistId, progress: nextProgress });
+    persistMusicSession({ filename: track.filename, playlistId, progress: nextProgress, allowZeroProgress: true });
     setMusicIsPlaying(true);
     window.setTimeout(() => {
       globalAudioRef.current?.play().catch(() => setMusicIsPlaying(false));
@@ -2189,13 +2220,6 @@ function App() {
     pendingMusicResumeRef.current = resumeAt;
     setMusicProgress(resumeAt);
     setMusicDuration(0);
-    persistMusicSession({
-      filename: currentMusicTrack.filename,
-      playlistId: selectedMusicPlaylistId,
-      progress: resumeAt,
-      duration: shouldResume ? Number(saved.duration) || 0 : musicDuration,
-      repeatMode: saved.repeatMode || musicRepeatMode
-    });
     if (musicIsPlaying) {
       globalAudioRef.current?.play().catch(() => setMusicIsPlaying(false));
     }
@@ -2223,8 +2247,10 @@ function App() {
   useEffect(() => {
     function saveMusicBeforeUnload() {
       const audio = globalAudioRef.current;
+      const currentTime = Number.isFinite(audio?.currentTime) ? audio.currentTime : musicProgress;
+      if (!currentMusicTrack?.filename && !musicCurrentFilename) return;
       persistMusicSession({
-        progress: Number.isFinite(audio?.currentTime) ? audio.currentTime : musicProgress,
+        progress: currentTime,
         duration: Number.isFinite(audio?.duration) ? audio.duration : musicDuration
       });
     }
@@ -2233,21 +2259,10 @@ function App() {
       saveMusicBeforeUnload();
       window.removeEventListener('beforeunload', saveMusicBeforeUnload);
     };
-  }, [currentMusicTrack?.filename, selectedMusicPlaylistId, musicRepeatMode, musicDuration, musicProgress]);
+  }, [currentMusicTrack?.filename, musicCurrentFilename, selectedMusicPlaylistId, musicRepeatMode, musicDuration, musicProgress]);
 
   function toggleTheme() {
     setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'));
-  }
-
-  function updateLive2DScope(nextScope) {
-    const normalizedScope = nextScope === 'home' ? 'home' : 'all';
-    setLive2dScope(normalizedScope);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(LIVE2D_SCOPE_KEY, normalizedScope);
-      localStorage.setItem(LIVE2D_HIDDEN_KEY, 'false');
-    }
-    window.dispatchEvent(new CustomEvent(LIVE2D_SCOPE_EVENT, { detail: { scope: normalizedScope } }));
-    window.dispatchEvent(new Event(LIVE2D_SHOW_EVENT));
   }
 
   function toggleSidebar() {
@@ -4117,7 +4132,7 @@ function App() {
       </aside>
 
       <main className="main-content">
-        {activeView !== 'admin' && <DecorativeStickerLayer activeView={activeView} />}
+        {activeView === 'overview' && <DecorativeStickerLayer activeView={activeView} />}
 
         <audio
           ref={globalAudioRef}
@@ -4132,10 +4147,9 @@ function App() {
               audio.currentTime = resumeAt;
               setMusicProgress(resumeAt);
             }
-            persistMusicSession({
-              progress: resumeAt || (Number.isFinite(audio.currentTime) ? audio.currentTime : musicProgress),
-              duration
-            });
+            if (resumeAt > 0) {
+              persistCurrentAudioSession({ progress: resumeAt, duration });
+            }
           }}
           onTimeUpdate={(event) => {
             const currentTime = event.currentTarget.currentTime || 0;
@@ -4143,7 +4157,7 @@ function App() {
             const now = Date.now();
             if (now - lastMusicSessionWriteRef.current > 2000) {
               lastMusicSessionWriteRef.current = now;
-              persistMusicSession({ progress: currentTime, duration: event.currentTarget.duration || musicDuration });
+              persistCurrentAudioSession({ progress: currentTime, duration: event.currentTarget.duration || musicDuration });
             }
           }}
           onPlay={() => setMusicIsPlaying(true)}
@@ -4152,7 +4166,7 @@ function App() {
             const pausedAt = Number.isFinite(event.currentTarget.currentTime) && event.currentTarget.currentTime > 0
               ? event.currentTarget.currentTime
               : musicProgress;
-            persistMusicSession({ progress: pausedAt, duration: event.currentTarget.duration || musicDuration });
+            persistCurrentAudioSession({ progress: pausedAt, duration: event.currentTarget.duration || musicDuration });
           }}
           onEnded={handleMusicEnded}
         >
@@ -4302,8 +4316,6 @@ function App() {
             profileAvatarMessage={profileAvatarMessage}
             isSavingProfileAvatar={isSavingProfileAvatar || isUploadingImage}
             logout={logout}
-            mascotScope={live2dScope}
-            updateMascotScope={updateLive2DScope}
             openArticle={(articleId) => {
               openArticle(articleId);
             }}
@@ -4412,7 +4424,7 @@ function App() {
           />
         )}
       </main>
-      {activeView !== 'admin' && activeView !== 'login' && <Live2DMascot activeView={activeView} scopePreference={live2dScope} />}
+      {activeView !== 'admin' && activeView !== 'login' && <Live2DMascot activeView={activeView} />}
     </div>
   );
 }
@@ -8278,7 +8290,7 @@ function DecorativeStickerLayer({ activeView }) {
   );
 }
 
-function Live2DMascot({ activeView = 'overview', scopePreference = 'all' }) {
+function Live2DMascot({ activeView = 'overview' }) {
   const canvasRef = useRef(null);
   const appRef = useRef(null);
   const mascotRef = useRef(null);
@@ -8294,7 +8306,6 @@ function Live2DMascot({ activeView = 'overview', scopePreference = 'all' }) {
     if (typeof localStorage === 'undefined') return 'pet';
     return localStorage.getItem(LIVE2D_MODE_KEY) === 'window' ? 'window' : 'pet';
   });
-  const [scope, setScope] = useState(scopePreference === 'home' ? 'home' : 'all');
   const [isQuiet, setIsQuiet] = useState(() => (
     typeof localStorage !== 'undefined' && localStorage.getItem(LIVE2D_QUIET_KEY) === 'true'
   ));
@@ -8433,10 +8444,6 @@ function Live2DMascot({ activeView = 'overview', scopePreference = 'all' }) {
   }, [activeView, isHidden, isQuiet]);
 
   useEffect(() => {
-    setScope(scopePreference === 'home' ? 'home' : 'all');
-  }, [scopePreference]);
-
-  useEffect(() => {
     function showMascotFromAccount() {
       setIsHidden(false);
       setClosedNotice(false);
@@ -8445,19 +8452,8 @@ function Live2DMascot({ activeView = 'overview', scopePreference = 'all' }) {
         localStorage.setItem(LIVE2D_HIDDEN_KEY, 'false');
       }
     }
-    function updateMascotScope(event) {
-      const nextScope = event.detail?.scope === 'home' ? 'home' : 'all';
-      setScope(nextScope);
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(LIVE2D_SCOPE_KEY, nextScope);
-      }
-    }
     window.addEventListener(LIVE2D_SHOW_EVENT, showMascotFromAccount);
-    window.addEventListener(LIVE2D_SCOPE_EVENT, updateMascotScope);
-    return () => {
-      window.removeEventListener(LIVE2D_SHOW_EVENT, showMascotFromAccount);
-      window.removeEventListener(LIVE2D_SCOPE_EVENT, updateMascotScope);
-    };
+    return () => window.removeEventListener(LIVE2D_SHOW_EVENT, showMascotFromAccount);
   }, []);
 
   useEffect(() => {
@@ -8561,10 +8557,6 @@ function Live2DMascot({ activeView = 'overview', scopePreference = 'all' }) {
     );
   }
 
-  if (scope === 'home' && activeView !== 'overview') {
-    return null;
-  }
-
   return (
     <aside
       ref={mascotRef}
@@ -8591,12 +8583,12 @@ function Live2DMascot({ activeView = 'overview', scopePreference = 'all' }) {
         }}
       >
         <canvas ref={canvasRef} width="260" height="340" />
-        {status === 'loading' && <span className="live2d-loading">加载中</span>}
-        {status === 'error' && (
+        {status !== 'ready' && (
           <span className="live2d-fallback">
             <img src={LIVE2D_TEXTURE_FALLBACK_URL} alt="" loading="lazy" decoding="async" />
           </span>
         )}
+        {status === 'loading' && <span className="live2d-loading">加载中</span>}
       </div>
       {menuPosition && (
         <div
@@ -9169,9 +9161,7 @@ function AccountWorkspace({
   updateSidebarAvatar,
   profileAvatarMessage,
   isSavingProfileAvatar,
-  logout,
-  mascotScope = 'all',
-  updateMascotScope
+  logout
 }) {
   const summary = accountActivity?.summary || {};
   const comments = accountActivity?.comments || [];
@@ -9255,22 +9245,6 @@ function AccountWorkspace({
             <Bot size={16} />
             <span>显示黍泡泡</span>
           </button>
-          <div className="segmented-inline mascot-scope-control" role="group" aria-label="黍泡泡显示范围">
-            <button
-              className={mascotScope === 'all' ? 'active' : ''}
-              type="button"
-              onClick={() => updateMascotScope('all')}
-            >
-              全站
-            </button>
-            <button
-              className={mascotScope === 'home' ? 'active' : ''}
-              type="button"
-              onClick={() => updateMascotScope('home')}
-            >
-              仅首页
-            </button>
-          </div>
         </div>
 
         <div className="release-metric-grid">

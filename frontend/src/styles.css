@@ -525,6 +525,7 @@ textarea {
   margin-top: 52px;
   cursor: grab;
   filter: drop-shadow(0 18px 26px rgba(47, 143, 131, 0.18));
+  isolation: isolate;
 }
 
 .live2d-mascot.windowed .live2d-stage {
@@ -541,6 +542,7 @@ textarea {
   width: 100%;
   height: 212px;
   pointer-events: none;
+  z-index: 2;
 }
 
 .live2d-mascot.windowed .live2d-stage canvas {
@@ -561,23 +563,26 @@ textarea {
 }
 
 .live2d-loading {
-  inset: auto 38px 16px;
+  inset: auto 44px 12px;
+  z-index: 4;
   min-height: 36px;
+  font-size: 12px;
 }
 
 .live2d-fallback {
-  inset: 38px;
+  inset: -14px -10px -18px;
+  z-index: 1;
   color: #ffffff;
-  background:
-    radial-gradient(circle at 70% 20%, rgba(255, 139, 167, 0.55), transparent 30%),
-    linear-gradient(135deg, #1f7a6d, #637ed8);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .live2d-fallback img {
-  width: 132%;
-  height: 132%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-  transform: translateY(10px);
+  transform: translateY(4px);
   filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.16));
 }
 
@@ -6480,11 +6485,6 @@ h3 {
 
 .mascot-setting-row {
   margin-top: 10px;
-}
-
-.mascot-scope-control {
-  grid-column: 2 / -1;
-  justify-self: start;
 }
 
 .segmented-inline {
