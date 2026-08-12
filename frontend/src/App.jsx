@@ -175,6 +175,7 @@ const ADMIN_PAGE_KEY = 'felix_blog_admin_page';
 const MUSIC_PLAYLISTS_KEY = 'felix_blog_music_playlists';
 const MUSIC_RECENT_KEY = 'felix_blog_music_recent';
 const MUSIC_VOLUME_KEY = 'felix_blog_music_volume';
+const MUSIC_SESSION_KEY = 'felix_blog_music_session';
 const TOOLBOX_DEFAULT_OVERRIDES_KEY = 'felix_blog_toolbox_default_overrides';
 const THEME_KEY = 'felix_blog_theme';
 const SIDEBAR_COLLAPSED_KEY = 'felix_blog_sidebar_collapsed';
@@ -335,6 +336,11 @@ function readStoredRecentMusic() {
   return Array.isArray(stored) ? stored.map((filename) => String(filename)).filter(Boolean).slice(0, 8) : [];
 }
 
+function readStoredMusicSession() {
+  const stored = readStoredJson(MUSIC_SESSION_KEY, {});
+  return stored && typeof stored === 'object' ? stored : {};
+}
+
 function readDraftHistory() {
   const stored = readStoredJson(ARTICLE_DRAFT_HISTORY_KEY, []);
   return Array.isArray(stored) ? stored.slice(0, 12) : [];
@@ -450,6 +456,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.3.2',
+    title: '音乐播放位置记忆',
+    date: '2026-08-12',
+    status: '已上线',
+    points: ['记录上次播放的歌曲、歌单和进度', '再次进入网站时从离开前的位置继续', '暂停、拖动进度条和关闭页面时都会保存播放状态']
+  },
   {
     version: 'v6.3.1',
     title: '友链图片上传补丁',
@@ -1755,10 +1768,11 @@ function App() {
   const [isUploadingMusic, setIsUploadingMusic] = useState(false);
   const [musicPlaylists, setMusicPlaylists] = useState(readStoredMusicPlaylists);
   const [recentMusicFilenames, setRecentMusicFilenames] = useState(readStoredRecentMusic);
-  const [selectedMusicPlaylistId, setSelectedMusicPlaylistId] = useState('all');
-  const [musicCurrentFilename, setMusicCurrentFilename] = useState('');
+  const initialMusicSession = readStoredMusicSession();
+  const [selectedMusicPlaylistId, setSelectedMusicPlaylistId] = useState(initialMusicSession.playlistId || 'all');
+  const [musicCurrentFilename, setMusicCurrentFilename] = useState(initialMusicSession.filename || '');
   const [musicIsPlaying, setMusicIsPlaying] = useState(false);
-  const [musicProgress, setMusicProgress] = useState(0);
+  const [musicProgress, setMusicProgress] = useState(Number(initialMusicSession.progress) || 0);
   const [musicDuration, setMusicDuration] = useState(0);
   const [musicRepeatMode, setMusicRepeatMode] = useState('list');
   const [musicVolume, setMusicVolume] = useState(() => {
@@ -1807,6 +1821,8 @@ function App() {
   const nextThemeLabel = theme === 'dark' ? '日间模式' : '夜间模式';
   const SidebarToggleIcon = isSidebarCollapsed ? PanelLeftOpen : PanelLeftClose;
   const globalAudioRef = useRef(null);
+  const pendingMusicResumeRef = useRef(Number(initialMusicSession.progress) || 0);
+  const lastMusicSessionWriteRef = useRef(0);
   const sidebarAvatarUrl = profile.avatarUrl || '/avatar.jpg';
   const canViewSummerPlan = sitePreferences.summerPlanVisible || currentUser?.role === 'admin';
   const canKeepPlanRoute = canViewSummerPlan || !hasLoadedSitePreferences;
@@ -1837,7 +1853,8 @@ function App() {
   }, [musicTracks, selectedMusicPlaylist]);
   const currentMusicTrack = useMemo(() => {
     if (!musicQueue.length) return null;
-    return musicQueue.find((track) => track.filename === musicCurrentFilename) || musicQueue[0];
+    const saved = musicQueue.find((track) => track.filename === musicCurrentFilename);
+    return saved || musicQueue[0];
   }, [musicCurrentFilename, musicQueue]);
   const recentMusicTracks = useMemo(() => {
     const trackMap = new Map(musicTracks.map((track) => [track.filename, track]));
@@ -1858,11 +1875,28 @@ function App() {
     });
   }
 
+  function persistMusicSession(overrides = {}) {
+    if (typeof localStorage === 'undefined') return;
+    const audio = globalAudioRef.current;
+    const payload = {
+      filename: overrides.filename ?? currentMusicTrack?.filename ?? musicCurrentFilename,
+      playlistId: overrides.playlistId ?? selectedMusicPlaylistId,
+      progress: Math.max(0, Number(overrides.progress ?? audio?.currentTime ?? musicProgress) || 0),
+      duration: Math.max(0, Number(overrides.duration ?? audio?.duration ?? musicDuration) || 0),
+      repeatMode: overrides.repeatMode ?? musicRepeatMode,
+      updatedAt: new Date().toISOString()
+    };
+    if (!payload.filename) return;
+    writeStoredJson(MUSIC_SESSION_KEY, payload);
+  }
+
   function playMusicTrack(track, playlistId = selectedMusicPlaylistId) {
     if (!track) return;
     rememberMusicTrack(track);
     setSelectedMusicPlaylistId(playlistId);
     setMusicCurrentFilename(track.filename);
+    pendingMusicResumeRef.current = 0;
+    persistMusicSession({ filename: track.filename, playlistId, progress: 0 });
     setMusicIsPlaying(true);
     window.setTimeout(() => {
       globalAudioRef.current?.play().catch(() => setMusicIsPlaying(false));
@@ -1893,6 +1927,7 @@ function App() {
       globalAudioRef.current.currentTime = nextTime;
     }
     setMusicProgress(nextTime);
+    persistMusicSession({ progress: nextTime });
   }
 
   function handleMusicEnded() {
@@ -2048,7 +2083,11 @@ function App() {
   }, [isSidebarCollapsed]);
 
   useEffect(() => {
-    setMusicProgress(0);
+    const saved = readStoredMusicSession();
+    const shouldResume = saved.filename && saved.filename === currentMusicTrack?.filename;
+    const resumeAt = shouldResume ? Math.max(0, Number(saved.progress) || 0) : 0;
+    pendingMusicResumeRef.current = resumeAt;
+    setMusicProgress(resumeAt);
     setMusicDuration(0);
     if (musicIsPlaying) {
       globalAudioRef.current?.play().catch(() => setMusicIsPlaying(false));
@@ -2061,6 +2100,21 @@ function App() {
     }
     localStorage.setItem(MUSIC_VOLUME_KEY, String(musicVolume));
   }, [musicVolume]);
+
+  useEffect(() => {
+    persistMusicSession({ repeatMode: musicRepeatMode });
+  }, [musicRepeatMode]);
+
+  useEffect(() => {
+    function saveMusicBeforeUnload() {
+      persistMusicSession();
+    }
+    window.addEventListener('beforeunload', saveMusicBeforeUnload);
+    return () => {
+      saveMusicBeforeUnload();
+      window.removeEventListener('beforeunload', saveMusicBeforeUnload);
+    };
+  }, [currentMusicTrack?.filename, selectedMusicPlaylistId, musicRepeatMode, musicProgress]);
 
   function toggleTheme() {
     setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'));
@@ -3942,10 +3996,31 @@ function App() {
           ref={globalAudioRef}
           src={currentMusicTrack?.url || undefined}
           preload="metadata"
-          onLoadedMetadata={(event) => setMusicDuration(event.currentTarget.duration || 0)}
-          onTimeUpdate={(event) => setMusicProgress(event.currentTarget.currentTime || 0)}
+          onLoadedMetadata={(event) => {
+            const audio = event.currentTarget;
+            const duration = audio.duration || 0;
+            const resumeAt = Math.min(Math.max(0, pendingMusicResumeRef.current || 0), Math.max(0, duration - 1));
+            setMusicDuration(duration);
+            if (resumeAt > 0 && Math.abs(audio.currentTime - resumeAt) > 0.5) {
+              audio.currentTime = resumeAt;
+              setMusicProgress(resumeAt);
+            }
+            persistMusicSession({ progress: resumeAt || audio.currentTime || 0, duration });
+          }}
+          onTimeUpdate={(event) => {
+            const currentTime = event.currentTarget.currentTime || 0;
+            setMusicProgress(currentTime);
+            const now = Date.now();
+            if (now - lastMusicSessionWriteRef.current > 2000) {
+              lastMusicSessionWriteRef.current = now;
+              persistMusicSession({ progress: currentTime, duration: event.currentTarget.duration || musicDuration });
+            }
+          }}
           onPlay={() => setMusicIsPlaying(true)}
-          onPause={() => setMusicIsPlaying(false)}
+          onPause={(event) => {
+            setMusicIsPlaying(false);
+            persistMusicSession({ progress: event.currentTarget.currentTime || 0, duration: event.currentTarget.duration || musicDuration });
+          }}
           onEnded={handleMusicEnded}
         >
           当前浏览器不支持音频播放。
