@@ -438,6 +438,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.0.6',
+    title: '移除黍泡泡重置位置入口',
+    date: '2026-08-12',
+    status: '已上线',
+    points: ['右键菜单移除重置位置，避免触发 Live2D 重新挂载后加载失败', '保留说句话、贴边/悬浮窗切换和关闭入口', '版本说明同步删除误导性的重置位置描述']
+  },
+  {
     version: 'v6.0.5',
     title: 'Markdown 预览向 Obsidian 体验靠拢',
     date: '2026-08-12',
@@ -463,7 +470,7 @@ const releaseRoadmap = [
     title: '页面留白、黍泡泡浮层与暑期计划隐私开关',
     date: '2026-08-12',
     status: '已上线',
-    points: ['前台普通页面收紧顶部留白，并在桌面端给右侧浮层留出空间', '黍泡泡移出正文层级，固定在右侧视口并支持重置到安全位置', '暑期计划入口默认隐藏，后台总览新增公开开关，公开接口同步保护']
+    points: ['前台普通页面收紧顶部留白，并在桌面端给右侧浮层留出空间', '黍泡泡移出正文层级，固定在右侧视口，避免被正文内容遮挡', '暑期计划入口默认隐藏，后台总览新增公开开关，公开接口同步保护']
   },
   {
     version: 'v6.0.1',
@@ -7857,13 +7864,6 @@ function Live2DMascot() {
     setMenuPosition(null);
   }
 
-  function resetMascotPosition() {
-    savePosition(clampPosition(getDefaultPosition(mode)));
-    setReloadKey((current) => current + 1);
-    setSpeechVisible(true);
-    setMenuPosition(null);
-  }
-
   function openMascotMenu(event) {
     event.preventDefault();
     event.stopPropagation();
@@ -7950,7 +7950,6 @@ function Live2DMascot() {
         >
           <button type="button" onClick={() => speak()}>说句话</button>
           <button type="button" onClick={toggleMode}>{mode === 'window' ? '切回贴边模式' : '变成悬浮窗'}</button>
-          <button type="button" onClick={resetMascotPosition}>重置位置</button>
           <button className="danger" type="button" onClick={hideMascot}>关闭</button>
         </div>
       )}
