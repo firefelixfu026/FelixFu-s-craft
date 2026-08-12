@@ -10,15 +10,15 @@ body {
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    align-items: center;
-    padding: 20px;
+    align-items: flex-start;
+    padding: 18px;
 }
 
 .container {
     background: white;
-    border-radius: 20px;
-    padding: 30px;
-    max-width: 900px;
+    border-radius: 18px;
+    padding: 24px;
+    max-width: 1180px;
     width: 100%;
     box-shadow: 0 20px 60px rgba(0,0,0,0.3);
 }
@@ -26,8 +26,8 @@ body {
 h1 {
     text-align: center;
     color: #667eea;
-    font-size: 3em;
-    margin-bottom: 30px;
+    font-size: 2.6em;
+    margin-bottom: 20px;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
 }
 
@@ -35,8 +35,8 @@ h1 {
     display: flex;
     justify-content: space-around;
     align-items: center;
-    margin-bottom: 30px;
-    padding: 20px;
+    margin-bottom: 18px;
+    padding: 18px;
     background: #f8f9fa;
     border-radius: 15px;
 }
@@ -87,17 +87,15 @@ h1 {
 
 .round-info {
     text-align: center;
-    margin: 20px 0;
+    margin: 16px 0;
     font-size: 1.3em;
     color: #667eea;
     font-weight: bold;
 }
 
 .skills {
-    display: flex;
-    justify-content: space-around;
-    gap: 20px;
-    margin-bottom: 30px;
+    display: block;
+    margin-bottom: 18px;
 }
 
 .player-skills {
@@ -112,12 +110,13 @@ h1 {
 
 .skill-buttons {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
 }
 
 .skill {
-    padding: 15px 10px;
+    min-height: 92px;
+    padding: 14px 10px;
     border: none;
     border-radius: 10px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -151,17 +150,18 @@ h1 {
 }
 
 .battle-log-container {
-    display: flex;
-    gap: 20px;
-    margin-bottom: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
 }
 
 .battle-log {
-    flex: 1;
     background: #f8f9fa;
     border-radius: 15px;
-    padding: 20px;
-    max-height: 300px;
+    padding: 16px;
+    min-height: 220px;
+    max-height: 320px;
     overflow-y: auto;
 }
 
@@ -237,4 +237,47 @@ h1 {
 #restart:hover {
     transform: scale(1.05);
     box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+}
+
+@media (max-width: 900px) {
+    body {
+        padding: 12px;
+    }
+
+    .container {
+        padding: 18px;
+    }
+
+    .game-info,
+    .battle-log-container {
+        grid-template-columns: 1fr;
+    }
+
+    .game-info {
+        display: grid;
+        gap: 12px;
+    }
+
+    .vs {
+        font-size: 2em;
+    }
+
+    .skill-buttons {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 520px) {
+    h1 {
+        font-size: 2.1em;
+    }
+
+    .player h2 {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .skill-buttons {
+        grid-template-columns: 1fr;
+    }
 }

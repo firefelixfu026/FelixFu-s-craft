@@ -9106,6 +9106,26 @@ function GameWorkspace() {
         <h1>游戏库</h1>
       </div>
 
+      <div className="game-picker-bar">
+        <label className="game-picker">
+          <Gamepad2 size={18} />
+          <span>选择游戏</span>
+          <select
+            value={selectedGameId}
+            onChange={(event) => {
+              setSelectedGameId(event.target.value);
+              setFrameKey((current) => current + 1);
+            }}
+            aria-label="选择游戏"
+          >
+            {gameCatalog.map((game) => (
+              <option key={game.id} value={game.id}>{game.title} - {game.subtitle}</option>
+            ))}
+          </select>
+        </label>
+        <span>{selectedGame.playUrl ? '当前可试玩' : '当前为计划项'}</span>
+      </div>
+
       <div className="game-selector-grid" aria-label="选择游戏">
         {gameCatalog.map((game) => (
           <button
