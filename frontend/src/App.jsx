@@ -128,7 +128,9 @@ const LIVE2D_HIDDEN_KEY = 'felix_blog_live2d_hidden';
 const LIVE2D_POSITION_KEY = 'felix_blog_live2d_position_v2';
 const LIVE2D_MODE_KEY = 'felix_blog_live2d_mode';
 const LIVE2D_QUIET_KEY = 'felix_blog_live2d_quiet';
+const LIVE2D_SCOPE_KEY = 'felix_blog_live2d_scope';
 const LIVE2D_SHOW_EVENT = 'felix-live2d-show';
+const LIVE2D_SCOPE_EVENT = 'felix-live2d-scope';
 const LIVE2D_SCRIPT_SOURCES = [
   'https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js',
   'https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js',
@@ -181,7 +183,20 @@ const TOOLBOX_DEFAULT_OVERRIDES_KEY = 'felix_blog_toolbox_default_overrides';
 const THEME_KEY = 'felix_blog_theme';
 const SIDEBAR_COLLAPSED_KEY = 'felix_blog_sidebar_collapsed';
 const AUTH_FAIL_STATE_KEY = 'felix_blog_auth_fail_state';
-const DEFAULT_SITE_PREFERENCES = { summerPlanVisible: false };
+const DEFAULT_SUMMER_PLAN_SECTION_VISIBILITY = {
+  schedule: true,
+  completion: true,
+  courses: true,
+  apps: true,
+  finance: true,
+  meals: true,
+  body: true,
+  sleep: true
+};
+const DEFAULT_SITE_PREFERENCES = {
+  summerPlanVisible: false,
+  summerPlanSections: DEFAULT_SUMMER_PLAN_SECTION_VISIBILITY
+};
 const SITE_LAUNCH_DATE = '2026-07-22T00:00:00+08:00';
 const MARKDOWN_CACHE_LIMIT = 60;
 const markdownBlockCache = new Map();
@@ -342,6 +357,17 @@ function readStoredMusicSession() {
   return stored && typeof stored === 'object' ? stored : {};
 }
 
+function normalizeSitePreferences(preferences = {}) {
+  return {
+    ...DEFAULT_SITE_PREFERENCES,
+    ...(preferences || {}),
+    summerPlanSections: {
+      ...DEFAULT_SUMMER_PLAN_SECTION_VISIBILITY,
+      ...(preferences?.summerPlanSections || {})
+    }
+  };
+}
+
 function shuffleMusicQueue(tracks, currentFilename = '') {
   const nextQueue = [...tracks];
   for (let index = nextQueue.length - 1; index > 0; index -= 1) {
@@ -473,6 +499,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.4.0',
+    title: '阅读、计划和音乐续播体验增强',
+    date: '2026-08-12',
+    status: '已上线',
+    points: ['播放器修复离站后只能记住歌曲、不能稳定记住进度的问题', '音乐页新增重洗随机队列按钮', '计划页支持按模块控制公开范围', '文章目录新增当前阅读位置高亮，并降低滚动计算压力', '工具箱补充友链交换信息', '账号页可设置黍泡泡全站显示或仅首页显示']
+  },
   {
     version: 'v6.3.3',
     title: '随机播放与收入记账',
@@ -1904,10 +1937,18 @@ function App() {
   function persistMusicSession(overrides = {}) {
     if (typeof localStorage === 'undefined') return;
     const audio = globalAudioRef.current;
+    const stored = readStoredMusicSession();
+    const hasProgressOverride = Object.prototype.hasOwnProperty.call(overrides, 'progress');
+    const audioHasUsableTime = audio && audio.readyState > 0 && Number.isFinite(audio.currentTime) && audio.currentTime > 0;
+    const progressSource = hasProgressOverride
+      ? overrides.progress
+      : audioHasUsableTime
+        ? audio.currentTime
+        : musicProgress || stored.progress || 0;
     const payload = {
       filename: overrides.filename ?? currentMusicTrack?.filename ?? musicCurrentFilename,
       playlistId: overrides.playlistId ?? selectedMusicPlaylistId,
-      progress: Math.max(0, Number(overrides.progress ?? audio?.currentTime ?? musicProgress) || 0),
+      progress: Math.max(0, Number(progressSource) || 0),
       duration: Math.max(0, Number(overrides.duration ?? audio?.duration ?? musicDuration) || 0),
       repeatMode: overrides.repeatMode ?? musicRepeatMode,
       updatedAt: new Date().toISOString()
@@ -1979,6 +2020,12 @@ function App() {
       return;
     }
     setMusicIsPlaying(false);
+  }
+
+  function reshuffleMusicQueue() {
+    if (!musicQueue.length) return;
+    setMusicRepeatMode('shuffle');
+    setMusicShuffleQueue(shuffleMusicQueue(musicQueue, currentMusicTrack?.filename));
   }
 
   function writeBrowserRoute(path, { replace = false } = {}) {
@@ -2152,14 +2199,18 @@ function App() {
 
   useEffect(() => {
     function saveMusicBeforeUnload() {
-      persistMusicSession();
+      const audio = globalAudioRef.current;
+      persistMusicSession({
+        progress: Number.isFinite(audio?.currentTime) ? audio.currentTime : musicProgress,
+        duration: Number.isFinite(audio?.duration) ? audio.duration : musicDuration
+      });
     }
     window.addEventListener('beforeunload', saveMusicBeforeUnload);
     return () => {
       saveMusicBeforeUnload();
       window.removeEventListener('beforeunload', saveMusicBeforeUnload);
     };
-  }, [currentMusicTrack?.filename, selectedMusicPlaylistId, musicRepeatMode, musicProgress]);
+  }, [currentMusicTrack?.filename, selectedMusicPlaylistId, musicRepeatMode, musicDuration, musicProgress]);
 
   function toggleTheme() {
     setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'));
@@ -2192,10 +2243,7 @@ function App() {
           });
         }
         if (preferencesRes.ok) {
-          setSitePreferences({
-            ...DEFAULT_SITE_PREFERENCES,
-            ...(await preferencesRes.json())
-          });
+          setSitePreferences(normalizeSitePreferences(await preferencesRes.json()));
         }
         if (newsRes.ok) {
           setAiNews(await newsRes.json());
@@ -2412,11 +2460,14 @@ function App() {
 
   async function saveSitePreferences(nextPreferences) {
     if (currentUser?.role !== 'admin') return;
-    const nextPayload = {
-      ...DEFAULT_SITE_PREFERENCES,
+    const nextPayload = normalizeSitePreferences({
       ...sitePreferences,
-      ...nextPreferences
-    };
+      ...nextPreferences,
+      summerPlanSections: {
+        ...(sitePreferences?.summerPlanSections || {}),
+        ...(nextPreferences?.summerPlanSections || {})
+      }
+    });
     setIsSavingSitePreferences(true);
     try {
       const response = await fetch('/api/admin/site-preferences', {
@@ -2425,10 +2476,7 @@ function App() {
         body: JSON.stringify(nextPayload)
       });
       if (!response.ok) throw new Error('save preferences failed');
-      setSitePreferences({
-        ...DEFAULT_SITE_PREFERENCES,
-        ...(await response.json())
-      });
+      setSitePreferences(normalizeSitePreferences(await response.json()));
       setAdminMessage('站点开关已保存');
     } catch {
       setAdminMessage('站点开关保存失败，请确认后端连接');
@@ -3506,7 +3554,7 @@ function App() {
       }
       await refreshArticles();
       await refreshAdminAuditLogs();
-      setAdminMessage('文章顺序已保存');
+      setAdminMessage(`文章顺序已保存：${movedArticle.title} 已移动到第 ${targetIndex + 1} 位附近`);
     } catch {
       await refreshArticles();
       setAdminMessage('后端服务不可用，文章顺序保存失败');
@@ -4050,7 +4098,10 @@ function App() {
               audio.currentTime = resumeAt;
               setMusicProgress(resumeAt);
             }
-            persistMusicSession({ progress: resumeAt || audio.currentTime || 0, duration });
+            persistMusicSession({
+              progress: resumeAt || (Number.isFinite(audio.currentTime) ? audio.currentTime : musicProgress),
+              duration
+            });
           }}
           onTimeUpdate={(event) => {
             const currentTime = event.currentTarget.currentTime || 0;
@@ -4187,6 +4238,7 @@ function App() {
             togglePlayback={toggleMusicPlayback}
             stepTrack={stepMusicTrack}
             seekTrack={seekMusicTrack}
+            reshuffleQueue={reshuffleMusicQueue}
           />
         )}
 
@@ -4196,6 +4248,7 @@ function App() {
             currentUser={currentUser}
             planSection={planSection}
             setPlanSection={setPlanSection}
+            sitePreferences={sitePreferences}
           />
         )}
 
@@ -4835,7 +4888,9 @@ function ArticleDetail({
   const draftLength = (commentDrafts[article.id] || '').length;
   const replyTarget = commentReplyTargets?.[article.id] || null;
   const articleRef = useRef(null);
+  const readingFrameRef = useRef(null);
   const [readingProgress, setReadingProgress] = useState(0);
+  const [activeHeadingId, setActiveHeadingId] = useState('');
   const headings = useMemo(() => getMarkdownHeadings(article.content || ''), [article.content]);
   const isNoteArticle = isTechnicalArticle(article);
   const noteArticles = siblingArticles.filter((item) => isTechnicalArticle(item));
@@ -4860,16 +4915,36 @@ function ArticleDetail({
       const total = Math.max(1, end - start);
       const nextProgress = Math.min(1, Math.max(0, (window.scrollY - start) / total));
       setReadingProgress(nextProgress);
+      let nextHeadingId = '';
+      headings.forEach((heading) => {
+        const headingElement = document.getElementById(heading.id);
+        if (headingElement && headingElement.getBoundingClientRect().top <= 126) {
+          nextHeadingId = heading.id;
+        }
+      });
+      setActiveHeadingId(nextHeadingId || headings[0]?.id || '');
+    }
+
+    function scheduleReadingProgress() {
+      if (readingFrameRef.current !== null) return;
+      readingFrameRef.current = window.requestAnimationFrame(() => {
+        readingFrameRef.current = null;
+        updateReadingProgress();
+      });
     }
 
     updateReadingProgress();
-    window.addEventListener('scroll', updateReadingProgress, { passive: true });
-    window.addEventListener('resize', updateReadingProgress);
+    window.addEventListener('scroll', scheduleReadingProgress, { passive: true });
+    window.addEventListener('resize', scheduleReadingProgress);
     return () => {
-      window.removeEventListener('scroll', updateReadingProgress);
-      window.removeEventListener('resize', updateReadingProgress);
+      if (readingFrameRef.current !== null) {
+        window.cancelAnimationFrame(readingFrameRef.current);
+        readingFrameRef.current = null;
+      }
+      window.removeEventListener('scroll', scheduleReadingProgress);
+      window.removeEventListener('resize', scheduleReadingProgress);
     };
-  }, [article.id]);
+  }, [article.id, headings]);
 
   return (
     <section className={isNoteArticle ? 'workspace article-detail-workspace note-detail-workspace' : 'workspace article-detail-workspace'}>
@@ -4916,7 +4991,7 @@ function ArticleDetail({
         </div>
         )}
 
-        {!isNoteArticle && headings.length > 0 && <ArticleToc headings={headings} />}
+        {!isNoteArticle && headings.length > 0 && <ArticleToc activeHeadingId={activeHeadingId} headings={headings} />}
 
         {article.content && (
           <MarkdownContent content={article.content} title={article.title} />
@@ -5106,7 +5181,7 @@ function ArticleDetail({
               <span style={{ transform: `scaleX(${readingProgress})` }} />
             </div>
           </div>
-          {headings.length > 0 ? <ArticleToc headings={headings} /> : <p className="empty-state">这篇笔记还没有标题目录</p>}
+          {headings.length > 0 ? <ArticleToc activeHeadingId={activeHeadingId} headings={headings} /> : <p className="empty-state">这篇笔记还没有标题目录</p>}
         </aside>
       )}
       </div>
@@ -5205,7 +5280,7 @@ function getMarkdownHeadings(content) {
     }));
 }
 
-function ArticleToc({ headings }) {
+function ArticleToc({ headings, activeHeadingId = '' }) {
   function jumpToHeading(event, headingId) {
     event.preventDefault();
     const target = document.getElementById(headingId);
@@ -5220,7 +5295,7 @@ function ArticleToc({ headings }) {
       <div className="article-toc-list">
         {headings.map((heading) => (
           <a
-            className={`toc-level-${heading.level}`}
+            className={`toc-level-${heading.level}${heading.id === activeHeadingId ? ' active' : ''}`}
             href={`#${heading.id}`}
             key={heading.id}
             onClick={(event) => jumpToHeading(event, heading.id)}
@@ -6476,7 +6551,7 @@ const summerPlanSections = [
   { id: 'sleep', label: '睡眠', detail: '作息记录' }
 ];
 
-function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSection }) {
+function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSection, sitePreferences }) {
   const canEdit = currentUser?.role === 'admin';
   const [plan, setPlan] = useState(() => normalizeSummerPlan(personalizedSummerPlan));
   const [selectedPlanDate, setSelectedPlanDate] = useState(personalizedDailyPlans[0].date);
@@ -6734,10 +6809,19 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
   const totalIncome = plan.expenses.reduce((sum, item) => sum + (item.type === '收入' ? parseMetricNumber(item.amount) : 0), 0);
   const totalExpense = plan.expenses.reduce((sum, item) => sum + (item.type === '收入' ? 0 : parseMetricNumber(item.amount)), 0);
   const financeBalance = totalIncome - totalExpense;
-  const activePlanSection = PLAN_SECTION_PATHS[planSection] ? planSection : 'schedule';
+  const visiblePlanSections = canEdit
+    ? summerPlanSections
+    : summerPlanSections.filter((section) => sitePreferences?.summerPlanSections?.[section.id] !== false);
+  const firstVisiblePlanSection = visiblePlanSections[0]?.id || 'schedule';
+  const hasVisiblePlanSections = visiblePlanSections.length > 0;
+  const activePlanSection = hasVisiblePlanSections && PLAN_SECTION_PATHS[planSection] && visiblePlanSections.some((section) => section.id === planSection)
+    ? planSection
+    : hasVisiblePlanSections ? firstVisiblePlanSection : '';
 
   function navigatePlanSection(section) {
-    const nextSection = PLAN_SECTION_PATHS[section] ? section : 'schedule';
+    const nextSection = PLAN_SECTION_PATHS[section] && visiblePlanSections.some((item) => item.id === section)
+      ? section
+      : firstVisiblePlanSection;
     setPlanSection(nextSection);
     writeBrowserRoute(getPlanPath(nextSection));
   }
@@ -6771,7 +6855,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
       )}
 
       <nav className="plan-section-tabs" aria-label="计划模块">
-        {summerPlanSections.map((section) => (
+        {visiblePlanSections.map((section) => (
           <button
             className={activePlanSection === section.id ? 'active' : ''}
             key={section.id}
@@ -6783,6 +6867,10 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
           </button>
         ))}
       </nav>
+
+      {!visiblePlanSections.length && (
+        <p className="empty-state">计划模块暂时没有公开内容。</p>
+      )}
 
       {activePlanSection === 'schedule' && (
       <section className="content-band summer-plan-panel">
@@ -8001,6 +8089,13 @@ function ToolboxWorkspace({ currentUser, authToken, uploadImage, manageOnly = fa
         <div>
           <span>Felix Links</span>
           <h2>常用资源入口</h2>
+          <div className="friend-apply-card">
+            <strong>友链交换信息</strong>
+            <p>Name: FelixFu's Craft</p>
+            <p>Avatar: https://felixfu.xyz/avatar.jpg</p>
+            <p>Link: https://felixfu.xyz</p>
+            <p>Desc: 课程笔记、随笔、音乐和小工具堆在一起的个人小站。</p>
+          </div>
         </div>
         <div className="toolbox-featured-grid" aria-label="高频工具">
           {featuredLinks.map((link) => (
@@ -8153,6 +8248,10 @@ function Live2DMascot({ activeView = 'overview' }) {
     if (typeof localStorage === 'undefined') return 'pet';
     return localStorage.getItem(LIVE2D_MODE_KEY) === 'window' ? 'window' : 'pet';
   });
+  const [scope, setScope] = useState(() => {
+    if (typeof localStorage === 'undefined') return 'all';
+    return localStorage.getItem(LIVE2D_SCOPE_KEY) === 'home' ? 'home' : 'all';
+  });
   const [isQuiet, setIsQuiet] = useState(() => (
     typeof localStorage !== 'undefined' && localStorage.getItem(LIVE2D_QUIET_KEY) === 'true'
   ));
@@ -8299,8 +8398,19 @@ function Live2DMascot({ activeView = 'overview' }) {
         localStorage.setItem(LIVE2D_HIDDEN_KEY, 'false');
       }
     }
+    function updateMascotScope(event) {
+      const nextScope = event.detail?.scope === 'home' ? 'home' : 'all';
+      setScope(nextScope);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(LIVE2D_SCOPE_KEY, nextScope);
+      }
+    }
     window.addEventListener(LIVE2D_SHOW_EVENT, showMascotFromAccount);
-    return () => window.removeEventListener(LIVE2D_SHOW_EVENT, showMascotFromAccount);
+    window.addEventListener(LIVE2D_SCOPE_EVENT, updateMascotScope);
+    return () => {
+      window.removeEventListener(LIVE2D_SHOW_EVENT, showMascotFromAccount);
+      window.removeEventListener(LIVE2D_SCOPE_EVENT, updateMascotScope);
+    };
   }, []);
 
   useEffect(() => {
@@ -8402,6 +8512,10 @@ function Live2DMascot({ activeView = 'overview' }) {
         </div>
       )
     );
+  }
+
+  if (scope === 'home' && activeView !== 'overview') {
+    return null;
   }
 
   return (
@@ -8551,7 +8665,8 @@ function MusicWorkspace({
   playTrack,
   togglePlayback,
   stepTrack,
-  seekTrack
+  seekTrack,
+  reshuffleQueue
 }) {
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [draggingTrackFilename, setDraggingTrackFilename] = useState(null);
@@ -8688,6 +8803,10 @@ function MusicWorkspace({
           <button className="ghost-button" type="button" onClick={() => setIsQueueOpen((current) => !current)}>
             <List size={16} />
             <span>{isQueueOpen ? '收起队列' : '播放队列'}</span>
+          </button>
+          <button className="ghost-button" type="button" onClick={reshuffleQueue} disabled={!queue.length}>
+            <Shuffle size={16} />
+            <span>重洗队列</span>
           </button>
         </div>
 
@@ -9010,6 +9129,18 @@ function AccountWorkspace({
   const reactions = accountActivity?.reactions || [];
   const favoriteArticles = accountActivity?.favoriteArticles || [];
   const sidebarAvatarUrl = profile?.avatarUrl || '/avatar.jpg';
+  const [mascotScope, setMascotScope] = useState(() => (
+    typeof localStorage !== 'undefined' && localStorage.getItem(LIVE2D_SCOPE_KEY) === 'home' ? 'home' : 'all'
+  ));
+
+  function updateMascotScope(nextScope) {
+    const normalizedScope = nextScope === 'home' ? 'home' : 'all';
+    setMascotScope(normalizedScope);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LIVE2D_SCOPE_KEY, normalizedScope);
+    }
+    window.dispatchEvent(new CustomEvent(LIVE2D_SCOPE_EVENT, { detail: { scope: normalizedScope } }));
+  }
 
   return (
     <section className="workspace account-workspace">
@@ -9087,6 +9218,22 @@ function AccountWorkspace({
             <Bot size={16} />
             <span>显示黍泡泡</span>
           </button>
+          <div className="segmented-inline mascot-scope-control" role="group" aria-label="黍泡泡显示范围">
+            <button
+              className={mascotScope === 'all' ? 'active' : ''}
+              type="button"
+              onClick={() => updateMascotScope('all')}
+            >
+              全站
+            </button>
+            <button
+              className={mascotScope === 'home' ? 'active' : ''}
+              type="button"
+              onClick={() => updateMascotScope('home')}
+            >
+              仅首页
+            </button>
+          </div>
         </div>
 
         <div className="release-metric-grid">
@@ -9729,11 +9876,13 @@ function AdminWorkspace({
   ).sort((first, second) => first.localeCompare(second, 'zh-CN'));
   const filteredManagerArticles = articles.filter((article) => {
     const query = articleManagerQuery.trim().toLowerCase();
+    const isUncollectedNoteQuery = query === '未收纳笔记';
+    const isUncollectedNote = isTechnicalArticle(article) && !article.noteCollection && !article.notePath;
     const searchable = [article.title, article.summary, article.category, article.noteCollection, article.notePath, ...(article.tags || [])]
       .join(' ')
       .toLowerCase();
     return (
-      (!query || searchable.includes(query)) &&
+      (!query || (isUncollectedNoteQuery ? isUncollectedNote : searchable.includes(query))) &&
       (articleManagerStatus === 'all' || (article.status || 'published') === articleManagerStatus) &&
       (articleManagerCategory === 'all' || (article.category || '未分类') === articleManagerCategory)
     );
@@ -10229,6 +10378,25 @@ function AdminWorkspace({
                 />
                 <span>{sitePreferences?.summerPlanVisible ? '公开' : '隐藏'}</span>
               </label>
+            </div>
+            <div className="admin-site-switch-card vertical">
+              <div>
+                <strong>计划模块公开范围</strong>
+                <span>总入口打开后，访客只会看到这里勾选的模块；管理员始终能看到全部。</span>
+              </div>
+              <div className="summer-section-switch-grid">
+                {summerPlanSections.map((section) => (
+                  <label className="switch-control compact" key={section.id}>
+                    <input
+                      type="checkbox"
+                      checked={sitePreferences?.summerPlanSections?.[section.id] !== false}
+                      disabled={isSavingSitePreferences}
+                      onChange={(event) => saveSitePreferences({ summerPlanSections: { [section.id]: event.target.checked } })}
+                    />
+                    <span>{section.label}</span>
+                  </label>
+                ))}
+              </div>
             </div>
             <form
               className="admin-profile-editor"
@@ -11255,6 +11423,18 @@ function AdminWorkspace({
                 <option key={category} value={category}>{category}</option>
               ))}
             </select>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => {
+                setArticleManagerQuery('未收纳笔记');
+                setArticleManagerCategory('all');
+                setArticleManagerStatus('all');
+              }}
+            >
+              <BookOpen size={16} />
+              <span>未收纳笔记</span>
+            </button>
           </div>
 
           <div className="manager-bulk-bar">

@@ -86,6 +86,16 @@ AUDIO_SUFFIXES = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac"}
 MUSIC_COVER_SUFFIXES = [".jpg", ".jpeg", ".png", ".webp", ".gif"]
 MUSIC_LYRIC_SUFFIXES = [".lrc", ".txt"]
 LOGIN_FAILURES: dict[str, dict[str, Any]] = {}
+DEFAULT_SUMMER_PLAN_SECTION_VISIBILITY = {
+    "schedule": True,
+    "completion": True,
+    "courses": True,
+    "apps": True,
+    "finance": True,
+    "meals": True,
+    "body": True,
+    "sleep": True,
+}
 
 
 app = FastAPI(title="FelixFu Blog API", version="0.8.0")
@@ -378,6 +388,7 @@ class SummerPlanIn(BaseModel):
 
 class SitePreferencesIn(BaseModel):
     summerPlanVisible: bool = False
+    summerPlanSections: dict[str, bool] = {}
 
 
 class SiteProfileIn(BaseModel):
@@ -491,8 +502,18 @@ def get_profile(db: Session = Depends(get_db)) -> dict:
 def _get_site_preferences(db: Session) -> dict[str, Any]:
     setting = db.get(SiteSetting, "site-preferences")
     payload = setting.payload if setting and isinstance(setting.payload, dict) else {}
+    raw_sections = payload.get("summerPlanSections") if isinstance(payload.get("summerPlanSections"), dict) else {}
+    summer_plan_sections = {
+        **DEFAULT_SUMMER_PLAN_SECTION_VISIBILITY,
+        **{
+            key: bool(value)
+            for key, value in raw_sections.items()
+            if key in DEFAULT_SUMMER_PLAN_SECTION_VISIBILITY
+        },
+    }
     return {
         "summerPlanVisible": bool(payload.get("summerPlanVisible", False)),
+        "summerPlanSections": summer_plan_sections,
     }
 
 
@@ -507,7 +528,17 @@ def update_site_preferences(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ) -> dict[str, Any]:
-    next_payload = {"summerPlanVisible": payload.summerPlanVisible}
+    next_payload = {
+        "summerPlanVisible": payload.summerPlanVisible,
+        "summerPlanSections": {
+            **DEFAULT_SUMMER_PLAN_SECTION_VISIBILITY,
+            **{
+                key: bool(value)
+                for key, value in payload.summerPlanSections.items()
+                if key in DEFAULT_SUMMER_PLAN_SECTION_VISIBILITY
+            },
+        },
+    }
     setting = db.get(SiteSetting, "site-preferences")
     if setting:
         setting.payload = next_payload

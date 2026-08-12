@@ -3103,11 +3103,27 @@ h3 {
   color: #1f7a6d;
 }
 
+.article-toc-list a.active {
+  color: #1f7a6d;
+  background: rgba(45, 212, 191, 0.12);
+  border: 1px solid rgba(31, 122, 109, 0.22);
+  border-radius: 6px;
+  padding: 5px 7px;
+}
+
 .article-toc-list .toc-level-2 {
   padding-left: 14px;
 }
 
 .article-toc-list .toc-level-3 {
+  padding-left: 28px;
+}
+
+.article-toc-list .toc-level-2.active {
+  padding-left: 14px;
+}
+
+.article-toc-list .toc-level-3.active {
   padding-left: 28px;
 }
 
@@ -4078,6 +4094,28 @@ h3 {
   margin: 0;
   color: var(--text-soft);
   line-height: 1.7;
+}
+
+.friend-apply-card {
+  display: grid;
+  gap: 5px;
+  max-width: 560px;
+  padding: 12px 14px;
+  border: 1px solid rgba(31, 122, 109, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.friend-apply-card strong {
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.friend-apply-card p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .toolbox-featured-grid {
@@ -5298,6 +5336,17 @@ h3 {
   background: #f8fafc;
 }
 
+.admin-site-switch-card.vertical {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.admin-site-switch-card .summer-section-switch-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .admin-site-switch-card div {
   display: grid;
   gap: 4px;
@@ -5326,6 +5375,13 @@ h3 {
   background: rgba(47, 143, 131, 0.08);
   font-weight: 900;
   cursor: pointer;
+}
+
+.switch-control.compact {
+  min-width: auto;
+  padding: 7px 9px;
+  border-radius: 8px;
+  font-size: 13px;
 }
 
 .switch-control input {
@@ -6424,6 +6480,35 @@ h3 {
 
 .mascot-setting-row {
   margin-top: 10px;
+}
+
+.mascot-scope-control {
+  grid-column: 2 / -1;
+  justify-self: start;
+}
+
+.segmented-inline {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.segmented-inline button {
+  border: 0;
+  border-radius: 7px;
+  padding: 6px 10px;
+  color: var(--text-soft);
+  background: transparent;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.segmented-inline button.active {
+  color: #0f766e;
+  background: rgba(45, 212, 191, 0.18);
 }
 
 .mascot-setting-icon {
@@ -9213,10 +9298,22 @@ h3 {
 
 :root[data-theme='dark'] .toolbox-card p,
 :root[data-theme='dark'] .toolbox-hero p,
+:root[data-theme='dark'] .friend-apply-card p,
 :root[data-theme='dark'] .toolbox-featured-grid span,
 :root[data-theme='dark'] .toolbox-url,
 :root[data-theme='dark'] .toolbox-tags span {
   color: var(--text-soft);
+}
+
+:root[data-theme='dark'] .friend-apply-card,
+:root[data-theme='dark'] .segmented-inline {
+  border-color: var(--border);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+:root[data-theme='dark'] .friend-apply-card strong,
+:root[data-theme='dark'] .segmented-inline button.active {
+  color: #6ee7c8;
 }
 
 :root[data-theme='dark'] .toolbox-card-category,
