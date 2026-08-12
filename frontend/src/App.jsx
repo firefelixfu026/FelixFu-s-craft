@@ -9067,12 +9067,12 @@ function MusicWorkspace({
 
 function GameWorkspace() {
   const [frameKey, setFrameKey] = useState(0);
-  const [selectedGameId, setSelectedGameId] = useState('card-war');
+  const [selectedGameId, setSelectedGameId] = useState('yuan-qi');
   const gameCatalog = [
     {
-      id: 'card-war',
-      title: '决斗小游戏',
-      subtitle: 'Card War',
+      id: 'yuan-qi',
+      title: '元气',
+      subtitle: '策略对战',
       status: gameModule.status || '已嵌入',
       plan: gameModule.plan,
       repository: gameModule.repository,
