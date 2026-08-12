@@ -1,4 +1,4 @@
-﻿import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { Suspense, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowDown,
@@ -139,6 +139,15 @@ const mascotLines = [
   '学习累了可以切到音乐页听一首。',
   '记得给计划表留一点弹性时间。'
 ];
+const mascotPageLines = {
+  overview: ['主页只留关键入口，其他内容都藏进路由里了。'],
+  articles: ['笔记页我会让开右侧，不挡你看正文。'],
+  music: ['现在音乐有队列和歌词了，可以慢慢听。'],
+  toolbox: ['工具箱适合放常用入口，别把主页塞满。'],
+  game: ['休息也要有边界，打一局就回来。'],
+  account: ['账号页可以控制我是否出现。'],
+  plan: ['计划页先默认藏起来，需要公开再去后台开。']
+};
 
 const COMMENT_MAX_LENGTH = 300;
 const COMMENT_PAGE_UNITS = 5;
@@ -164,6 +173,7 @@ const ACTIVE_VIEW_KEY = 'felix_blog_active_view';
 const ADMIN_PAGE_KEY = 'felix_blog_admin_page';
 const MUSIC_PLAYLISTS_KEY = 'felix_blog_music_playlists';
 const MUSIC_RECENT_KEY = 'felix_blog_music_recent';
+const MUSIC_VOLUME_KEY = 'felix_blog_music_volume';
 const TOOLBOX_DEFAULT_OVERRIDES_KEY = 'felix_blog_toolbox_default_overrides';
 const THEME_KEY = 'felix_blog_theme';
 const SIDEBAR_COLLAPSED_KEY = 'felix_blog_sidebar_collapsed';
@@ -437,6 +447,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.1.0',
+    title: '体验细化与内容系统迭代',
+    date: '2026-08-12',
+    status: '已上线',
+    points: ['Markdown 预览补充 Wiki 链接、标签、Callout 和 Mermaid 代码块展示', '首页入口继续瘦身，内容库更接近文件管理器视图', '黍泡泡会根据当前页面说不同的话', '音乐页新增歌词滚动、播放队列、音量记忆和封面氛围背景', '写作台预览改为延迟渲染，输入更顺滑']
+  },
   {
     version: 'v6.0.6',
     title: '移除黍泡泡重置位置入口',
@@ -1710,6 +1727,11 @@ function App() {
   const [musicProgress, setMusicProgress] = useState(0);
   const [musicDuration, setMusicDuration] = useState(0);
   const [musicRepeatMode, setMusicRepeatMode] = useState('list');
+  const [musicVolume, setMusicVolume] = useState(() => {
+    if (typeof localStorage === 'undefined') return 0.82;
+    const saved = Number(localStorage.getItem(MUSIC_VOLUME_KEY));
+    return Number.isFinite(saved) ? Math.min(1, Math.max(0, saved)) : 0.82;
+  });
   const [articleDraftNotice, setArticleDraftNotice] = useState('');
   const [aiGenerationHistory, setAiGenerationHistory] = useState([]);
   const [accountActivity, setAccountActivity] = useState(null);
@@ -1998,6 +2020,13 @@ function App() {
       globalAudioRef.current?.play().catch(() => setMusicIsPlaying(false));
     }
   }, [currentMusicTrack?.url]);
+
+  useEffect(() => {
+    if (globalAudioRef.current) {
+      globalAudioRef.current.volume = musicVolume;
+    }
+    localStorage.setItem(MUSIC_VOLUME_KEY, String(musicVolume));
+  }, [musicVolume]);
 
   function toggleTheme() {
     setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'));
@@ -3974,6 +4003,8 @@ function App() {
             duration={musicDuration}
             repeatMode={musicRepeatMode}
             setRepeatMode={setMusicRepeatMode}
+            volume={musicVolume}
+            setVolume={setMusicVolume}
             isLoading={isLoadingMusicTracks}
             refreshMusicTracks={refreshMusicTracks}
             selectedPlaylistId={selectedMusicPlaylistId}
@@ -4122,7 +4153,7 @@ function App() {
           />
         )}
       </main>
-      {activeView !== 'admin' && activeView !== 'login' && <Live2DMascot />}
+      {activeView !== 'admin' && activeView !== 'login' && <Live2DMascot activeView={activeView} />}
     </div>
   );
 }
@@ -4175,7 +4206,7 @@ function Overview({ profile, articles, setActiveView, currentUser, canViewSummer
   const clockTime = homeNow.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const clockDate = homeNow.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
   const clockZone = Intl.DateTimeFormat().resolvedOptions().timeZone || '本地时间';
-  const latestUpdates = releaseArchive.slice(0, 5);
+  const latestUpdates = releaseArchive.slice(0, 3);
   const liveStats = [
     { label: '上线时间', value: formatLaunchDuration(homeNow), detail: '精准到秒' },
     { label: '公开文章', value: `${publishedArticles.length} 篇`, detail: currentMonthCount ? `本月 ${currentMonthCount} 篇` : '等待新内容' },
@@ -4186,10 +4217,8 @@ function Overview({ profile, articles, setActiveView, currentUser, canViewSummer
   const homeEntryCards = [
     { title: '随笔和文章', detail: '生活、游戏、番剧、读书和普通文章。', view: 'articles', icon: BookOpen, meta: `${publishedArticles.length} 篇` },
     { title: '技术笔记', detail: '课程笔记、项目文档和代码学习记录。', view: 'articles', section: 'notes', icon: Code2, meta: '/notes' },
-    { title: '暑期计划', detail: '时间段计划、完成度、睡眠、体重和应用使用。', view: 'plan', icon: List, meta: '8/4 - 8/15' },
     { title: '音乐', detail: '私人歌单、最近播放和站内迷你播放器。', view: 'music', icon: Music, meta: 'Felix Music' },
-    { title: '工具箱', detail: '常用网站、学习资源和维护入口。', view: 'toolbox', icon: Wrench, meta: 'Links' },
-    { title: '小游戏', detail: '休息时打开的小项目和试玩入口。', view: 'game', icon: Gamepad2, meta: 'Break' }
+    { title: '工具箱', detail: '常用网站、友链和维护入口。', view: 'toolbox', icon: Wrench, meta: 'Links' }
   ];
   const terminalLines = [
     ['boot', 'personal site online'],
@@ -5254,6 +5283,11 @@ function parseMarkdownBlocks(content) {
         quotes.push(lines[index].trim().replace(/^>\s?/, ''));
         index += 1;
       }
+      const callout = parseMarkdownCallout(quotes);
+      if (callout) {
+        blocks.push(callout);
+        continue;
+      }
       blocks.push({ type: 'quote', lines: quotes });
       continue;
     }
@@ -5339,6 +5373,29 @@ function parseMarkdownImage(text) {
   return { alt, src: source, title };
 }
 
+function parseMarkdownCallout(lines) {
+  if (!lines.length) return null;
+  const marker = lines[0].trim().match(/^\[!(NOTE|TIP|INFO|WARNING|IMPORTANT|ERROR|DANGER|QUOTE)\]\s*(.*)$/i);
+  if (!marker) return null;
+  const tone = marker[1].toLowerCase();
+  const fallbackTitle = {
+    note: 'Note',
+    tip: 'Tip',
+    info: 'Info',
+    warning: 'Warning',
+    important: 'Important',
+    error: 'Error',
+    danger: 'Danger',
+    quote: 'Quote'
+  };
+  return {
+    type: 'callout',
+    tone,
+    title: marker[2].trim() || fallbackTitle[tone] || 'Note',
+    lines: lines.slice(1).filter((line) => line.trim())
+  };
+}
+
 function isMarkdownTableRow(line) {
   const trimmed = line.trim();
   return trimmed.includes('|') && !trimmed.startsWith('```');
@@ -5380,6 +5437,17 @@ function renderMarkdownBlock(block, index) {
     return <hr className="markdown-divider" key={index} />;
   }
   if (block.type === 'code') {
+    if ((block.language || '').trim().toLowerCase() === 'mermaid') {
+      return (
+        <div className="markdown-mermaid" key={index}>
+          <div className="markdown-mermaid-toolbar">
+            <span>Mermaid</span>
+            <em>图表源码</em>
+          </div>
+          <pre>{block.text}</pre>
+        </div>
+      );
+    }
     return <MarkdownCodeBlock language={block.language} text={block.text} key={index} />;
   }
   if (block.type === 'math') {
@@ -5445,6 +5513,14 @@ function renderMarkdownBlock(block, index) {
   if (block.type === 'quote') {
     return <blockquote key={index}>{renderInlineLines(block.lines)}</blockquote>;
   }
+  if (block.type === 'callout') {
+    return (
+      <aside className={`markdown-callout ${block.tone}`} key={index}>
+        <strong>{block.title}</strong>
+        {block.lines.length > 0 && <div>{renderInlineLines(block.lines)}</div>}
+      </aside>
+    );
+  }
   return <p key={index}>{renderInlineLines(block.lines || [block.text])}</p>;
 }
 
@@ -5476,7 +5552,7 @@ function renderMathExpression(source, displayMode = false, key) {
 
 function renderInlineMarkdown(text = '') {
   const parts = [];
-  const pattern = /(!\[[^\]]*\]\([^)]+\)|\\\([^\n]+?\\\)|\$[^$\n]+\$|`[^`]+`|==[^=\n]+==|~~[^~\n]+~~|\*\*[^*]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_)/g;
+  const pattern = /(!\[[^\]]*\]\([^)]+\)|\[\[[^\]\n]+\]\]|(?:^|[\s([{，。；：])#[\u3400-\u9fffA-Za-z0-9_-]+|\\\([^\n]+?\\\)|\$[^$\n]+\$|`[^`]+`|==[^=\n]+==|~~[^~\n]+~~|\*\*[^*]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_)/g;
   let lastIndex = 0;
   let match;
 
@@ -5503,6 +5579,16 @@ function renderInlineMarkdown(text = '') {
       parts.push(renderMathExpression(value.slice(2, -2), false, parts.length));
     } else if (value.startsWith('`')) {
       parts.push(<code key={parts.length}>{value.slice(1, -1)}</code>);
+    } else if (value.startsWith('[[')) {
+      const inner = value.slice(2, -2);
+      const [target, alias] = inner.split('|').map((part) => part.trim());
+      parts.push(<span className="markdown-wikilink" title={target} key={parts.length}>{alias || target}</span>);
+    } else if (value.includes('#') && /#[\u3400-\u9fffA-Za-z0-9_-]+$/.test(value)) {
+      const tagIndex = value.lastIndexOf('#');
+      const prefix = value.slice(0, tagIndex);
+      const tag = value.slice(tagIndex);
+      if (prefix) parts.push(prefix);
+      parts.push(<span className="markdown-hashtag" key={parts.length}>{tag}</span>);
     } else if (value.startsWith('==')) {
       parts.push(<mark key={parts.length}>{value.slice(2, -2)}</mark>);
     } else if (value.startsWith('~~')) {
@@ -7670,7 +7756,7 @@ function DecorativeStickerLayer({ activeView }) {
   );
 }
 
-function Live2DMascot() {
+function Live2DMascot({ activeView = 'overview' }) {
   const canvasRef = useRef(null);
   const appRef = useRef(null);
   const mascotRef = useRef(null);
@@ -7704,6 +7790,10 @@ function Live2DMascot() {
   const [isHidden, setIsHidden] = useState(() => (
     typeof localStorage !== 'undefined' && localStorage.getItem(LIVE2D_HIDDEN_KEY) === 'true'
   ));
+  const activeMascotLines = useMemo(() => {
+    const pageLines = mascotPageLines[activeView] || [];
+    return [...pageLines, ...mascotLines];
+  }, [activeView]);
 
   function getDefaultPosition(nextMode = mode) {
     if (typeof window === 'undefined') return { x: 0, y: 0 };
@@ -7733,7 +7823,7 @@ function Live2DMascot() {
   }
 
   function speak(nextIndex = null) {
-    setLineIndex((current) => (nextIndex === null ? (current + 1) % mascotLines.length : nextIndex));
+    setLineIndex((current) => (nextIndex === null ? (current + 1) % activeMascotLines.length : nextIndex));
     setSpeechVisible(true);
     if (speechTimerRef.current) window.clearTimeout(speechTimerRef.current);
     speechTimerRef.current = window.setTimeout(() => setSpeechVisible(false), 5200);
@@ -7773,7 +7863,7 @@ function Live2DMascot() {
         model.x = Math.max(0, (260 - model.width) / 2);
         model.y = Math.max(0, 332 - model.height);
         model.on?.('hit', () => {
-          setLineIndex((current) => (current + 1) % mascotLines.length);
+          setLineIndex((current) => (current + 1) % activeMascotLines.length);
         });
         app.stage.addChild(model);
         setStatus('ready');
@@ -7805,7 +7895,16 @@ function Live2DMascot() {
         appRef.current = null;
       }
     };
-  }, [isHidden, reloadKey]);
+  }, [activeMascotLines.length, isHidden, reloadKey]);
+
+  useEffect(() => {
+    if (isHidden) return undefined;
+    setLineIndex(0);
+    setSpeechVisible(true);
+    if (speechTimerRef.current) window.clearTimeout(speechTimerRef.current);
+    speechTimerRef.current = window.setTimeout(() => setSpeechVisible(false), 4200);
+    return undefined;
+  }, [activeView, isHidden]);
 
   useEffect(() => {
     function showMascotFromAccount() {
@@ -7920,7 +8019,7 @@ function Live2DMascot() {
       {speechVisible && (
         <div className="live2d-speech">
           <strong>黍泡泡</strong>
-          <p>{status === 'error' ? 'Live2D 加载失败，右键可以重试。' : mascotLines[lineIndex]}</p>
+          <p>{status === 'error' ? 'Live2D 加载失败，右键可以重试。' : activeMascotLines[lineIndex % activeMascotLines.length]}</p>
           <span>模型来源：切丁鱼片</span>
         </div>
       )}
@@ -8014,6 +8113,8 @@ function MusicWorkspace({
   duration,
   repeatMode,
   setRepeatMode,
+  volume,
+  setVolume,
   isLoading,
   refreshMusicTracks,
   selectedPlaylistId,
@@ -8033,6 +8134,7 @@ function MusicWorkspace({
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [draggingTrackFilename, setDraggingTrackFilename] = useState(null);
   const [dragOverTrackFilename, setDragOverTrackFilename] = useState(null);
+  const [isQueueOpen, setIsQueueOpen] = useState(false);
   const selectedTrackNames = new Set(selectedPlaylist?.trackFilenames || []);
   const displayTracks = selectedPlaylist ? queue : tracks;
   const currentLyrics = useMemo(() => (
@@ -8040,7 +8142,7 @@ function MusicWorkspace({
       .split(/\r?\n/)
       .map((line) => line.replace(/^\[[^\]]+\]\s*/, '').trim())
       .filter(Boolean)
-      .slice(0, 12)
+      .slice(0, 80)
   ), [currentTrack?.lyrics]);
 
   return (
@@ -8050,7 +8152,10 @@ function MusicWorkspace({
         <h1>个人音乐台</h1>
       </div>
 
-      <section className="music-player-panel">
+      <section
+        className="music-player-panel"
+        style={currentTrack?.coverUrl ? { '--music-cover-bg': `url(${currentTrack.coverUrl})` } : undefined}
+      >
         <div className="music-now">
           <div className="music-cover" aria-hidden="true">
             {currentTrack?.coverUrl ? (
@@ -8126,7 +8231,47 @@ function MusicWorkspace({
             <RefreshCw size={16} />
             <span>{repeatMode === 'list' ? '列表循环' : repeatMode === 'one' ? '单曲循环' : '播完停止'}</span>
           </button>
+          <label className="music-volume-control">
+            <span>音量</span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={volume}
+              onChange={(event) => setVolume(Number(event.target.value))}
+              aria-label="音量"
+            />
+            <em>{Math.round(volume * 100)}%</em>
+          </label>
+          <button className="ghost-button" type="button" onClick={() => setIsQueueOpen((current) => !current)}>
+            <List size={16} />
+            <span>{isQueueOpen ? '收起队列' : '播放队列'}</span>
+          </button>
         </div>
+
+        {isQueueOpen && (
+          <div className="music-queue-panel">
+            <div className="admin-panel-heading compact-heading">
+              <h3>播放队列</h3>
+              <span>{queue.length} 首</span>
+            </div>
+            <div className="music-queue-list">
+              {queue.map((track, index) => (
+                <button
+                  className={track.filename === currentTrack?.filename ? 'active' : ''}
+                  type="button"
+                  key={track.filename}
+                  onClick={() => playTrack(track, selectedPlaylistId)}
+                >
+                  <span>{String(index + 1).padStart(2, '0')}</span>
+                  <strong>{track.title}</strong>
+                  <em>{track.artist || formatFileSize(track.size)}</em>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {recentTracks.length > 0 && (
@@ -9131,6 +9276,7 @@ function AdminWorkspace({
   const [studyState, setStudyState] = useState(readStudyState);
   const [studyInput, setStudyInput] = useState('');
   const shouldShowAdminLayout = ['editor', 'notes', 'articles', 'music', 'comments', 'toolbox'].includes(activeAdminPage);
+  const deferredArticleContent = useDeferredValue(articleForm.content);
 
   useEffect(() => {
     localStorage.setItem(ADMIN_PAGE_KEY, activeAdminPage);
@@ -10376,6 +10522,15 @@ function AdminWorkspace({
                   <button type="button" title="公式" onClick={() => insertIntoContent('\n$$\n', '\n$$\n', 'E = mc^2')}>
                     <Sigma size={16} />
                   </button>
+                  <button type="button" title="Callout" onClick={() => insertIntoContent('\n> [!NOTE] 提醒\n> ', '', '这里写提示内容')}>
+                    <CircleHelp size={16} />
+                  </button>
+                  <button type="button" title="Wiki 双链" onClick={() => insertIntoContent('[[', ']]', '相关笔记')}>
+                    <BookOpen size={16} />
+                  </button>
+                  <button type="button" title="Mermaid 图表" onClick={() => insertIntoContent('```mermaid\ngraph TD\n  A[开始] --> B[结束]', '\n```', '')}>
+                    <Code2 size={16} />
+                  </button>
                 </div>
                 <textarea
                   ref={contentTextareaRef}
@@ -10393,8 +10548,8 @@ function AdminWorkspace({
                   <span>跟随正文</span>
                 </div>
                 <div className="editor-preview-scroll" ref={previewScrollRef}>
-                  {articleForm.content.trim() ? (
-                    <MarkdownContent content={articleForm.content} title={articleForm.title || '文章预览'} />
+                  {deferredArticleContent.trim() ? (
+                    <MarkdownContent content={deferredArticleContent} title={articleForm.title || '文章预览'} />
                   ) : (
                     <p className="empty-state">左侧开始写正文后，这里会实时预览。</p>
                   )}
@@ -10693,6 +10848,22 @@ function AdminWorkspace({
                         <strong>{group.folder}</strong>
                         <em>{group.articles.length}</em>
                       </button>
+                      <div className="content-library-tree-items">
+                        {group.articles.slice(0, 5).map((article) => (
+                          <button
+                            type="button"
+                            key={article.id}
+                            onClick={() => {
+                              setArticleManagerQuery(article.title);
+                              setSelectedManagerArticleIds([article.id]);
+                            }}
+                          >
+                            <FilePenLine size={13} />
+                            <span>{article.title}</span>
+                          </button>
+                        ))}
+                        {group.articles.length > 5 && <small>还有 {group.articles.length - 5} 篇</small>}
+                      </div>
                     </div>
                   ))}
                 </aside>
