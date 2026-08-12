@@ -168,6 +168,7 @@ const TOOLBOX_DEFAULT_OVERRIDES_KEY = 'felix_blog_toolbox_default_overrides';
 const THEME_KEY = 'felix_blog_theme';
 const SIDEBAR_COLLAPSED_KEY = 'felix_blog_sidebar_collapsed';
 const AUTH_FAIL_STATE_KEY = 'felix_blog_auth_fail_state';
+const DEFAULT_SITE_PREFERENCES = { summerPlanVisible: false };
 const SITE_LAUNCH_DATE = '2026-07-22T00:00:00+08:00';
 const LOGIN_LOCK_MS = 60 * 1000;
 const emptyReactionState = { like: false, favorite: false, downvote: false, question: false };
@@ -436,6 +437,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.0.2',
+    title: '页面留白、黍泡泡浮层与暑期计划隐私开关',
+    date: '2026-08-12',
+    status: '已上线',
+    points: ['前台普通页面收紧顶部留白，并在桌面端给右侧浮层留出空间', '黍泡泡移出正文层级，固定在右侧视口并支持重置到安全位置', '暑期计划入口默认隐藏，后台总览新增公开开关，公开接口同步保护']
+  },
   {
     version: 'v6.0.1',
     title: '工具箱编辑、笔记收纳与悬浮吉祥物手感修复',
@@ -1604,6 +1612,9 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState(ALL_FILTER);
   const [selectedArchive, setSelectedArchive] = useState(ALL_ARCHIVE);
   const [profile, setProfile] = useState(fallbackProfile);
+  const [sitePreferences, setSitePreferences] = useState(DEFAULT_SITE_PREFERENCES);
+  const [hasLoadedSitePreferences, setHasLoadedSitePreferences] = useState(false);
+  const [isSavingSitePreferences, setIsSavingSitePreferences] = useState(false);
   const [articles, setArticles] = useState(fallbackArticles);
   const [aiNews, setAiNews] = useState(fallbackNews);
   const [reactions, setReactions] = useState({});
@@ -1681,18 +1692,21 @@ function App() {
   const SidebarToggleIcon = isSidebarCollapsed ? PanelLeftOpen : PanelLeftClose;
   const globalAudioRef = useRef(null);
   const sidebarAvatarUrl = profile.avatarUrl || '/avatar.jpg';
+  const canViewSummerPlan = sitePreferences.summerPlanVisible || currentUser?.role === 'admin';
+  const canKeepPlanRoute = canViewSummerPlan || !hasLoadedSitePreferences;
 
   const visibleNavItems = useMemo(() => {
+    const filterPlanEntry = (items) => items.filter((item) => item.id !== 'plan' || canViewSummerPlan);
     if (!currentUser) {
-      return visitorNavItems;
+      return filterPlanEntry(visitorNavItems);
     }
 
     if (currentUser.role === 'admin') {
-      return [...readerNavItems, accountNavItem, adminNavItem];
+      return [...filterPlanEntry(readerNavItems), accountNavItem, adminNavItem];
     }
 
-    return [...readerNavItems, accountNavItem];
-  }, [currentUser?.role]);
+    return [...filterPlanEntry(readerNavItems), accountNavItem];
+  }, [canViewSummerPlan, currentUser?.role]);
 
   const selectedMusicPlaylist = useMemo(
     () => musicPlaylists.find((playlist) => playlist.id === selectedMusicPlaylistId) || null,
@@ -1936,13 +1950,20 @@ function App() {
   useEffect(() => {
     async function loadInitialData() {
       try {
-        const [profileRes, newsRes] = await Promise.all([
+        const [profileRes, preferencesRes, newsRes] = await Promise.all([
           fetch('/api/profile'),
+          fetch('/api/site-preferences'),
           fetch('/api/ai/news')
         ]);
 
         if (profileRes.ok) {
           setProfile(await profileRes.json());
+        }
+        if (preferencesRes.ok) {
+          setSitePreferences({
+            ...DEFAULT_SITE_PREFERENCES,
+            ...(await preferencesRes.json())
+          });
         }
         if (newsRes.ok) {
           setAiNews(await newsRes.json());
@@ -1951,6 +1972,8 @@ function App() {
         await refreshMusicTracks();
       } catch {
         // The MVP can run as a standalone frontend before the API is started.
+      } finally {
+        setHasLoadedSitePreferences(true);
       }
     }
 
@@ -2059,9 +2082,17 @@ function App() {
   useEffect(() => {
     if (!currentUser) {
       if (authToken) return;
-      if (!['overview', 'articles', 'plan', 'music', 'toolbox', 'game', 'login'].includes(activeView)) {
+      const publicViews = canKeepPlanRoute
+        ? ['overview', 'articles', 'plan', 'music', 'toolbox', 'game', 'login']
+        : ['overview', 'articles', 'music', 'toolbox', 'game', 'login'];
+      if (!publicViews.includes(activeView)) {
         navigateToView('overview', { replace: true });
       }
+      return;
+    }
+
+    if (activeView === 'plan' && !canKeepPlanRoute) {
+      navigateToView('overview', { replace: true });
       return;
     }
 
@@ -2073,7 +2104,7 @@ function App() {
     if (activeView === 'ai') {
       navigateToView('overview', { replace: true });
     }
-  }, [activeView, authToken, currentUser?.role]);
+  }, [activeView, authToken, canKeepPlanRoute, currentUser?.role]);
 
   async function refreshArticles(token = authToken) {
     const headers = token ? { Authorization: 'Bearer ' + token } : {};
@@ -2132,6 +2163,33 @@ function App() {
 
   function getAuthHeaders() {
     return authToken ? { Authorization: `Bearer ${authToken}` } : {};
+  }
+
+  async function saveSitePreferences(nextPreferences) {
+    if (currentUser?.role !== 'admin') return;
+    const nextPayload = {
+      ...DEFAULT_SITE_PREFERENCES,
+      ...sitePreferences,
+      ...nextPreferences
+    };
+    setIsSavingSitePreferences(true);
+    try {
+      const response = await fetch('/api/admin/site-preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify(nextPayload)
+      });
+      if (!response.ok) throw new Error('save preferences failed');
+      setSitePreferences({
+        ...DEFAULT_SITE_PREFERENCES,
+        ...(await response.json())
+      });
+      setAdminMessage('站点开关已保存');
+    } catch {
+      setAdminMessage('站点开关保存失败，请确认后端连接');
+    } finally {
+      setIsSavingSitePreferences(false);
+    }
   }
 
   async function refreshAccountActivity() {
@@ -3725,8 +3783,6 @@ function App() {
           </div>
         </header>
 
-        {activeView !== 'admin' && activeView !== 'login' && <Live2DMascot />}
-
         {isRestoringSession && activeView !== 'login' && (
           <section className="admin-panel auth-restore-panel">
             <div className="admin-panel-heading">
@@ -3932,10 +3988,14 @@ function App() {
             deleteAdminComment={deleteAdminComment}
             currentUser={currentUser}
             authToken={authToken}
+            sitePreferences={sitePreferences}
+            isSavingSitePreferences={isSavingSitePreferences}
+            saveSitePreferences={saveSitePreferences}
             logout={logout}
           />
         )}
       </main>
+      {activeView !== 'admin' && activeView !== 'login' && <Live2DMascot />}
     </div>
   );
 }
@@ -5855,7 +5915,9 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
     let cancelled = false;
     async function loadPlan() {
       try {
-        const response = await fetch('/api/summer-plan');
+        const response = await fetch('/api/summer-plan', {
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
+        });
         if (!response.ok) throw new Error('load failed');
         const payload = await response.json();
         if (!cancelled) {
@@ -5876,7 +5938,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
     return () => {
       cancelled = true;
     };
-  }, [canEdit]);
+  }, [authToken, canEdit]);
 
   useEffect(() => {
     if (!hasLoadedPlan) return undefined;
@@ -7433,8 +7495,8 @@ function Live2DMascot() {
       localStorage.removeItem(LIVE2D_POSITION_KEY);
     }
     return {
-      x: Math.max(24, window.innerWidth - 310),
-      y: Math.max(92, window.innerHeight - 300)
+      x: Math.max(24, window.innerWidth - 292),
+      y: Math.max(96, window.innerHeight - 286)
     };
   });
   const [isHidden, setIsHidden] = useState(() => (
@@ -7443,9 +7505,11 @@ function Live2DMascot() {
 
   function getDefaultPosition(nextMode = mode) {
     if (typeof window === 'undefined') return { x: 0, y: 0 };
+    const width = nextMode === 'window' ? 244 : 214;
+    const height = nextMode === 'window' ? 282 : 224;
     return {
-      x: Math.max(24, window.innerWidth - (nextMode === 'window' ? 282 : 246)),
-      y: Math.max(88, window.innerHeight - (nextMode === 'window' ? 320 : 278))
+      x: Math.max(20, window.innerWidth - width - 28),
+      y: Math.max(96, window.innerHeight - height - 36)
     };
   }
 
@@ -7598,6 +7662,13 @@ function Live2DMascot() {
     setMenuPosition(null);
   }
 
+  function resetMascotPosition() {
+    savePosition(clampPosition(getDefaultPosition(mode)));
+    setReloadKey((current) => current + 1);
+    setSpeechVisible(true);
+    setMenuPosition(null);
+  }
+
   function openMascotMenu(event) {
     event.preventDefault();
     event.stopPropagation();
@@ -7684,7 +7755,7 @@ function Live2DMascot() {
         >
           <button type="button" onClick={() => speak()}>说句话</button>
           <button type="button" onClick={toggleMode}>{mode === 'window' ? '切回贴边模式' : '变成悬浮窗'}</button>
-          <button type="button" onClick={() => { setReloadKey((current) => current + 1); setMenuPosition(null); }}>重新加载</button>
+          <button type="button" onClick={resetMascotPosition}>重置位置</button>
           <button className="danger" type="button" onClick={hideMascot}>关闭</button>
         </div>
       )}
@@ -8757,6 +8828,9 @@ function AdminWorkspace({
   deleteAdminComment,
   currentUser,
   authToken,
+  sitePreferences,
+  isSavingSitePreferences,
+  saveSitePreferences,
   logout
 }) {
   const adminCommentArticleOptions = uniqueCommentOptions(adminComments, 'articleTitle', 'articleId');
@@ -9324,6 +9398,21 @@ function AdminWorkspace({
                 <CheckCircle2 size={17} />
                 <span>学习助手</span>
               </button>
+            </div>
+            <div className="admin-site-switch-card">
+              <div>
+                <strong>暑期计划入口</strong>
+                <span>{sitePreferences?.summerPlanVisible ? '当前公开，访客可以从侧边栏进入。' : '当前隐藏，只有管理员能看到和编辑。'}</span>
+              </div>
+              <label className="switch-control">
+                <input
+                  type="checkbox"
+                  checked={Boolean(sitePreferences?.summerPlanVisible)}
+                  disabled={isSavingSitePreferences}
+                  onChange={(event) => saveSitePreferences({ summerPlanVisible: event.target.checked })}
+                />
+                <span>{sitePreferences?.summerPlanVisible ? '公开' : '隐藏'}</span>
+              </label>
             </div>
             <div className="admin-task-grid">
               {adminTaskItems.map((task) => {

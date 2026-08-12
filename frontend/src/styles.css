@@ -440,10 +440,10 @@ textarea {
 
 .live2d-mascot {
   position: fixed;
-  z-index: 9999;
+  z-index: 2147483000;
   display: grid;
   width: 208px;
-  min-height: 210px;
+  min-height: 196px;
   user-select: none;
   touch-action: none;
   will-change: transform;
@@ -456,7 +456,7 @@ textarea {
 
 .live2d-mascot.windowed {
   width: 236px;
-  min-height: 258px;
+  min-height: 246px;
   padding: 12px;
   border: 1px solid rgba(216, 95, 118, 0.2);
   border-radius: 8px;
@@ -520,17 +520,17 @@ textarea {
 .live2d-stage {
   position: relative;
   justify-self: center;
-  width: 200px;
-  height: 148px;
-  margin-top: 64px;
+  width: 186px;
+  height: 136px;
+  margin-top: 52px;
   cursor: grab;
   filter: drop-shadow(0 18px 26px rgba(47, 143, 131, 0.18));
 }
 
 .live2d-mascot.windowed .live2d-stage {
-  width: 212px;
-  height: 166px;
-  margin-top: 58px;
+  width: 206px;
+  height: 156px;
+  margin-top: 50px;
 }
 
 .live2d-stage canvas {
@@ -583,9 +583,9 @@ textarea {
 
 .live2d-context-menu {
   position: absolute;
-  left: 12px;
-  bottom: 12px;
-  z-index: 4;
+  right: 8px;
+  bottom: 4px;
+  z-index: 2147483001;
   display: grid;
   min-width: 136px;
   overflow: hidden;
@@ -625,7 +625,7 @@ textarea {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  z-index: 9998;
+  z-index: 2147482999;
   max-width: 280px;
   padding: 12px 14px;
   border: 1px solid rgba(47, 143, 131, 0.22);
@@ -1059,7 +1059,7 @@ textarea {
   isolation: isolate;
   min-width: 0;
   overflow: visible;
-  padding: 10px clamp(20px, 3vw, 42px) 48px;
+  padding: 8px clamp(18px, 2.6vw, 34px) 48px;
   background: var(--page-bg);
 }
 
@@ -1644,9 +1644,17 @@ mark {
 
 .workspace {
   display: grid;
-  gap: 24px;
-  width: min(100%, 1400px);
+  gap: 22px;
+  width: min(100%, 1320px);
   margin-inline: auto;
+}
+
+@media (min-width: 1280px) {
+  .frontstage-shell .workspace:not(.article-detail-workspace) {
+    width: min(100%, calc(100vw - 390px));
+    margin-left: clamp(16px, 2vw, 42px);
+    margin-right: auto;
+  }
 }
 
 .workspace > *,
@@ -1680,8 +1688,8 @@ mark {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 340px;
-  padding: clamp(20px, 4vw, 42px);
+  min-height: 280px;
+  padding: clamp(18px, 3vw, 34px);
   border: 1px solid #d8e0e9;
   border-radius: 8px;
   background: #ffffff;
@@ -1758,16 +1766,16 @@ mark {
 }
 
 .homepage-workspace {
-  gap: 24px;
+  gap: 20px;
 }
 
 .geek-hero {
   position: relative;
   display: grid;
   place-items: center;
-  min-height: clamp(560px, calc(100vh - 110px), 760px);
+  min-height: clamp(360px, calc(100vh - 260px), 520px);
   overflow: hidden;
-  padding: clamp(38px, 7vw, 78px) clamp(18px, 5vw, 58px) 34px;
+  padding: clamp(26px, 4.5vw, 52px) clamp(18px, 5vw, 52px) 28px;
   border: 1px solid #202b45;
   border-radius: 8px;
   color: #eef3ff;
@@ -4917,6 +4925,53 @@ h3 {
   gap: 10px;
 }
 
+.admin-site-switch-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.admin-site-switch-card div {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-site-switch-card strong {
+  color: #102033;
+  font-size: 16px;
+}
+
+.admin-site-switch-card span {
+  color: #5b6878;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.switch-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 88px;
+  padding: 8px 10px;
+  border: 1px solid rgba(47, 143, 131, 0.22);
+  border-radius: 999px;
+  color: #1f7a6d;
+  background: rgba(47, 143, 131, 0.08);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.switch-control input {
+  width: 16px;
+  height: 16px;
+  accent-color: #1f8a7a;
+}
+
 .admin-task-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -7758,6 +7813,7 @@ h3 {
 :root[data-theme='dark'] .admin-page-card,
 :root[data-theme='dark'] .admin-panel,
 :root[data-theme='dark'] .admin-pulse-card,
+:root[data-theme='dark'] .admin-site-switch-card,
 :root[data-theme='dark'] .admin-task-card,
 :root[data-theme='dark'] .admin-insight-grid > div,
 :root[data-theme='dark'] .security-rule-grid article,
@@ -8242,6 +8298,7 @@ h3 {
 :root[data-theme='dark'] .comment-filter-row label,
 :root[data-theme='dark'] .admin-pulse-card span,
 :root[data-theme='dark'] .admin-pulse-card small,
+:root[data-theme='dark'] .admin-site-switch-card span,
 :root[data-theme='dark'] .admin-task-card em,
 :root[data-theme='dark'] .admin-task-card small,
 :root[data-theme='dark'] .admin-form label > span,
@@ -8271,6 +8328,7 @@ h3 {
 :root[data-theme='dark'] .story-step h3,
 :root[data-theme='dark'] .project-showcase-card strong,
 :root[data-theme='dark'] .admin-page-card strong,
+:root[data-theme='dark'] .admin-site-switch-card strong,
 :root[data-theme='dark'] .article-section-card span,
 :root[data-theme='dark'] .article-neighbor-nav strong,
 :root[data-theme='dark'] .note-tree-group strong,

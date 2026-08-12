@@ -375,6 +375,10 @@ class SummerPlanIn(BaseModel):
     payload: dict[str, Any]
 
 
+class SitePreferencesIn(BaseModel):
+    summerPlanVisible: bool = False
+
+
 class SiteProfileIn(BaseModel):
     avatarUrl: str = ""
 
@@ -461,6 +465,37 @@ def get_profile(db: Session = Depends(get_db)) -> dict:
     return _get_site_profile(db)
 
 
+def _get_site_preferences(db: Session) -> dict[str, Any]:
+    setting = db.get(SiteSetting, "site-preferences")
+    payload = setting.payload if setting and isinstance(setting.payload, dict) else {}
+    return {
+        "summerPlanVisible": bool(payload.get("summerPlanVisible", False)),
+    }
+
+
+@app.get("/api/site-preferences")
+def get_site_preferences(db: Session = Depends(get_db)) -> dict[str, Any]:
+    return _get_site_preferences(db)
+
+
+@app.put("/api/admin/site-preferences")
+def update_site_preferences(
+    payload: SitePreferencesIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict[str, Any]:
+    next_payload = {"summerPlanVisible": payload.summerPlanVisible}
+    setting = db.get(SiteSetting, "site-preferences")
+    if setting:
+        setting.payload = next_payload
+    else:
+        setting = SiteSetting(key="site-preferences", payload=next_payload)
+        db.add(setting)
+    db.commit()
+    _record_admin_event(db, current_user, "更新站点开关", "site-preferences", "summer-plan", json.dumps(next_payload, ensure_ascii=False))
+    return next_payload
+
+
 @app.put("/api/admin/profile")
 def update_profile(
     payload: SiteProfileIn,
@@ -491,7 +526,13 @@ def update_profile(
 
 
 @app.get("/api/summer-plan")
-def get_summer_plan(db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_summer_plan(
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+) -> dict[str, Any]:
+    preferences = _get_site_preferences(db)
+    if not preferences["summerPlanVisible"] and (not current_user or current_user.role != "admin"):
+        raise HTTPException(status_code=404, detail="Summer plan is private")
     plan = db.get(SummerPlan, "current")
     return plan.payload if plan else DEFAULT_SUMMER_PLAN
 
