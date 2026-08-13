@@ -521,6 +521,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.5.1',
+    title: '播放器切歌进度补丁',
+    date: '2026-08-13',
+    status: '已上线',
+    points: ['保留秒数只用于刷新页面或重新打开网站时恢复离开前正在播放的那首歌', '手动点歌、上一首下一首、随机切歌和列表自动下一首都会从 0 秒开始', '切歌瞬间不再把上一首歌的暂停进度写到下一首歌']
+  },
+  {
     version: 'v6.5.0',
     title: '音乐、写作和备份工作流增强',
     date: '2026-08-13',
@@ -1931,6 +1938,7 @@ function App() {
   const SidebarToggleIcon = isSidebarCollapsed ? PanelLeftOpen : PanelLeftClose;
   const globalAudioRef = useRef(null);
   const pendingMusicResumeRef = useRef(Number(initialMusicSession.progress) || 0);
+  const pendingMusicFreshStartRef = useRef(false);
   const lastMusicSessionWriteRef = useRef(0);
   const sidebarAvatarUrl = profile.avatarUrl || '/avatar.jpg';
   const canViewSummerPlan = sitePreferences.summerPlanVisible || currentUser?.role === 'admin';
@@ -2070,15 +2078,21 @@ function App() {
 
   function playMusicTrack(track, playlistId = selectedMusicPlaylistId, options = {}) {
     if (!track) return;
+    const shouldResume = Number.isFinite(options.resumeAt) && options.resumeAt > 0;
+    pendingMusicFreshStartRef.current = !shouldResume;
+    if (!shouldResume && globalAudioRef.current) {
+      globalAudioRef.current.currentTime = 0;
+    }
     rememberMusicTrack(track);
     setSelectedMusicPlaylistId(playlistId);
     setMusicCurrentFilename(track.filename);
     if (musicRepeatMode === 'shuffle' && options.resetShuffle !== false) {
       setMusicShuffleQueue(shuffleMusicQueue(musicQueue, track.filename));
     }
-    const nextProgress = Number.isFinite(options.resumeAt) ? Math.max(0, options.resumeAt) : 0;
+    const nextProgress = shouldResume ? Math.max(0, options.resumeAt) : 0;
     pendingMusicResumeRef.current = nextProgress;
     persistMusicSession({ filename: track.filename, playlistId, progress: nextProgress, allowZeroProgress: true });
+    setMusicProgress(nextProgress);
     setMusicIsPlaying(true);
     window.setTimeout(() => {
       globalAudioRef.current?.play().catch(() => setMusicIsPlaying(false));
@@ -2111,6 +2125,12 @@ function App() {
     playMusicTrack(queue[nextIndex], selectedMusicPlaylistId, { resetShuffle: false });
   }
 
+  function beginMusicTrackFromStart(track, playlistId = selectedMusicPlaylistId, options = {}) {
+    if (!track?.filename) return;
+    persistMusicSession({ filename: track.filename, playlistId, progress: 0, allowZeroProgress: true });
+    playMusicTrack(track, playlistId, { ...options, resumeAt: 0 });
+  }
+
   function seekMusicTrack(nextTime) {
     if (globalAudioRef.current) {
       globalAudioRef.current.currentTime = nextTime;
@@ -2122,15 +2142,26 @@ function App() {
   function handleMusicEnded() {
     if (musicRepeatMode === 'one' && globalAudioRef.current) {
       globalAudioRef.current.currentTime = 0;
+      setMusicProgress(0);
+      persistCurrentAudioSession({ progress: 0, allowZeroProgress: true });
       globalAudioRef.current.play().catch(() => setMusicIsPlaying(false));
       return;
     }
     const queue = musicRepeatMode === 'shuffle' && musicShuffleQueue.length ? musicShuffleQueue : musicQueue;
     const currentIndex = queue.findIndex((track) => track.filename === currentMusicTrack?.filename);
     if (currentIndex < queue.length - 1 || musicRepeatMode === 'list' || musicRepeatMode === 'shuffle') {
-      stepMusicTrack(1);
+      const nextIndex = (Math.max(0, currentIndex) + 1) % queue.length;
+      if (musicRepeatMode === 'shuffle' && currentIndex === queue.length - 1 && queue.length > 1) {
+        const nextShuffleQueue = shuffleMusicQueue(musicQueue);
+        setMusicShuffleQueue(nextShuffleQueue);
+        beginMusicTrackFromStart(nextShuffleQueue[0], selectedMusicPlaylistId, { resetShuffle: false });
+        return;
+      }
+      beginMusicTrackFromStart(queue[nextIndex], selectedMusicPlaylistId, { resetShuffle: false });
       return;
     }
+    persistCurrentAudioSession({ progress: 0, allowZeroProgress: true });
+    setMusicProgress(0);
     setMusicIsPlaying(false);
   }
 
@@ -2316,7 +2347,9 @@ function App() {
     if (!currentMusicTrack?.filename) return;
     const saved = readStoredMusicSession();
     const shouldResume = saved.filename && saved.filename === currentMusicTrack?.filename;
-    const resumeAt = shouldResume
+    const resumeAt = pendingMusicFreshStartRef.current
+      ? 0
+      : shouldResume
       ? Math.max(0, Number(saved.progress) || 0)
       : Math.max(0, Number(musicProgress) || 0);
     pendingMusicResumeRef.current = resumeAt;
@@ -4243,8 +4276,18 @@ function App() {
           onLoadedMetadata={(event) => {
             const audio = event.currentTarget;
             const duration = audio.duration || 0;
-            const resumeAt = Math.min(Math.max(0, pendingMusicResumeRef.current || 0), Math.max(0, duration - 1));
+            const resumeAt = pendingMusicFreshStartRef.current
+              ? 0
+              : Math.min(Math.max(0, pendingMusicResumeRef.current || 0), Math.max(0, duration - 1));
             setMusicDuration(duration);
+            if (pendingMusicFreshStartRef.current) {
+              audio.currentTime = 0;
+              pendingMusicResumeRef.current = 0;
+              setMusicProgress(0);
+              persistCurrentAudioSession({ progress: 0, duration, allowZeroProgress: true });
+              pendingMusicFreshStartRef.current = false;
+              return;
+            }
             if (resumeAt > 0 && Math.abs(audio.currentTime - resumeAt) > 0.5) {
               audio.currentTime = resumeAt;
               setMusicProgress(resumeAt);
@@ -4265,6 +4308,9 @@ function App() {
           onPlay={() => setMusicIsPlaying(true)}
           onPause={(event) => {
             setMusicIsPlaying(false);
+            if (pendingMusicFreshStartRef.current) {
+              return;
+            }
             const pausedAt = Number.isFinite(event.currentTarget.currentTime) && event.currentTarget.currentTime > 0
               ? event.currentTarget.currentTime
               : musicProgress;
