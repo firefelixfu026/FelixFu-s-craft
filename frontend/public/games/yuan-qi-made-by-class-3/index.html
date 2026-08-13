@@ -7,60 +7,107 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <main class="container">
-        <h1>元气</h1>
+    <main class="app-shell">
+        <section id="home-screen" class="screen home-screen active">
+            <div class="hero-panel">
+                <p class="eyebrow">Yuan Qi Battle</p>
+                <h1>元气</h1>
+                <p>选择模式，攒元气，读对手技能，在同一回合里打出更强攻击。</p>
+            </div>
 
-        <section class="game-info" aria-label="对战状态">
-            <div class="player player1">
-                <h2>你 <span class="mp-badge">元气 <span id="mp1">0</span></span></h2>
-                <div class="stats">
-                    <div class="hp">状态：<span id="hp1">存活</span></div>
+            <div class="mode-grid">
+                <button class="mode-card primary" data-start-mode="normal">
+                    <span>普通模式</span>
+                    <strong>连续对战</strong>
+                    <em>可调整局数、人数和 AI 强度。</em>
+                </button>
+                <button class="mode-card" data-start-mode="timed">
+                    <span>限时模式</span>
+                    <strong>倒计时出招</strong>
+                    <em>每回合限时，时间到没出招就失败。</em>
+                </button>
+                <button class="mode-card locked" id="crisis-mode">
+                    <span>危机合约</span>
+                    <strong>正在制作中</strong>
+                    <em>未来加入特殊限制、词条和高难挑战。</em>
+                </button>
+            </div>
+
+            <div class="home-actions">
+                <button id="open-settings" class="secondary-action">设置</button>
+                <button id="quick-start" class="primary-action">开始普通模式</button>
+            </div>
+        </section>
+
+        <section id="settings-screen" class="screen settings-screen">
+            <div class="screen-heading">
+                <button class="text-button" data-go-home>返回首页</button>
+                <h1>模式设置</h1>
+            </div>
+
+            <div class="settings-grid">
+                <label>
+                    <span>普通模式局数</span>
+                    <input id="setting-rounds" type="number" min="1" max="9" value="3">
+                </label>
+                <label>
+                    <span>对战人数</span>
+                    <select id="setting-players">
+                        <option value="2">2 人</option>
+                        <option value="3">3 人</option>
+                        <option value="4">4 人</option>
+                    </select>
+                </label>
+                <label>
+                    <span>AI 强度</span>
+                    <select id="setting-ai">
+                        <option value="easy">简单</option>
+                        <option value="normal" selected>普通</option>
+                        <option value="hard">困难</option>
+                    </select>
+                </label>
+                <label>
+                    <span>限时模式每回合秒数</span>
+                    <input id="setting-timer" type="number" min="3" max="60" value="10">
+                </label>
+            </div>
+
+            <div class="settings-note">
+                <strong>多人对战雏形</strong>
+                <p>现在会把 1 名玩家和若干 AI 放进同一场。后面如果做双人或多人联机，可以把“出招选择”改成等待每个玩家提交，再统一结算。</p>
+            </div>
+
+            <div class="home-actions">
+                <button class="secondary-action" data-go-home>保存并返回</button>
+                <button class="primary-action" data-start-mode="normal">按设置开始</button>
+            </div>
+        </section>
+
+        <section id="battle-screen" class="screen battle-screen">
+            <div class="battle-topbar">
+                <div>
+                    <p class="eyebrow" id="mode-label">普通模式</p>
+                    <h1 id="battle-title">第 1 局</h1>
+                </div>
+                <div class="battle-actions">
+                    <span id="timer-pill" class="timer-pill hidden">10s</span>
+                    <button class="secondary-action" id="back-home">首页</button>
+                    <button class="secondary-action" id="restart-match">重开</button>
                 </div>
             </div>
-            <div class="vs">VS</div>
-            <div class="player player2">
-                <h2>AI <span class="mp-badge">元气 <span id="mp2">0</span></span></h2>
-                <div class="stats">
-                    <div class="hp">状态：<span id="hp2">存活</span></div>
-                </div>
-            </div>
-        </section>
 
-        <section class="round-info" aria-live="polite">
-            <div id="round-status">第 <span id="round">1</span> 回合 - 请选择技能</div>
-        </section>
+            <div class="score-row" id="score-row"></div>
+            <div class="fighters-grid" id="fighters-grid"></div>
 
-        <section class="skills" aria-label="你的技能">
-            <div class="player-skills">
-                <h3>你的技能</h3>
-                <div class="skill-buttons" id="skills1">
-                    <button class="skill" data-skill="ramen">拉面<br><small>获得 2 点元气</small></button>
-                    <button class="skill" data-skill="slash">一斩<br><small>造成 0.5 点伤害</small></button>
-                    <button class="skill" data-skill="Ldef">L 防<br><small>获得 1 点元气，防一斩</small></button>
-                    <button class="skill" data-skill="wave">波<br><small>消耗 2 点元气，造成 2 点伤害</small></button>
-                    <button class="skill" data-skill="Xdef">X 防<br><small>获得 1 点元气，防波和一斩</small></button>
-                </div>
-            </div>
-        </section>
+            <section class="round-panel">
+                <div class="round-info" id="round-status">请选择技能</div>
+                <div class="skill-buttons" id="skill-buttons"></div>
+            </section>
 
-        <section class="battle-log-container" aria-label="战斗记录">
-            <div class="battle-log" id="player-log">
-                <h3>你的记录</h3>
-                <div id="player-log-content"></div>
-            </div>
-            <div class="battle-log" id="ai-log">
-                <h3>AI 的记录</h3>
-                <div id="ai-log-content"></div>
-            </div>
-        </section>
-
-        <div class="actions">
-            <button id="next-round" style="display:none;">重新开始</button>
-        </div>
-
-        <section class="result" id="result" style="display:none;" aria-live="assertive">
-            <h2 id="winner"></h2>
-            <button id="restart">重新开始</button>
+            <section class="battle-log">
+                <h2>战斗记录</h2>
+                <div id="battle-log-content"></div>
+            </section>
         </section>
     </main>
 

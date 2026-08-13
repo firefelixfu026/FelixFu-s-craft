@@ -9395,6 +9395,15 @@ function GameWorkspace() {
       playUrl: gameModule.playUrl
     },
     {
+      id: 'card-war',
+      title: '决斗小游戏',
+      subtitle: 'Card War',
+      status: '已接入',
+      plan: '原先接入博客的卡牌决斗小游戏，保留在游戏库里方便继续试玩和对比后续优化。',
+      repository: 'https://github.com/firefelixfu026/card-war-made-by-class-3',
+      playUrl: 'https://firefelixfu026.github.io/card-war-made-by-class-3/'
+    },
+    {
       id: 'isaac-notes',
       title: '以撒道具速查',
       subtitle: '计划中',
