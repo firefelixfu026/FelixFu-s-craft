@@ -547,6 +547,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.5.7',
+    title: '后台工具箱崩溃修复',
+    date: '2026-08-14',
+    status: '已上线',
+    points: ['后台工具箱接入正确的图片上传函数，修复 uploadAdminImage 未定义导致的整页崩溃', '管理页友链封面上传与前台工具箱复用同一套上传逻辑']
+  },
+  {
     version: 'v6.5.6',
     title: 'Live2D 切换贴图闪烁修复',
     date: '2026-08-13',
@@ -4591,6 +4598,7 @@ function App() {
             importNoteFiles={importNoteFiles}
             uploadArticleCover={uploadArticleCover}
             uploadArticleContentImage={uploadArticleContentImage}
+            uploadAdminImage={uploadAdminImage}
             refreshUploadedImages={refreshUploadedImages}
             copyUploadedImageUrl={copyUploadedImageUrl}
             deleteUploadedImage={deleteUploadedImage}
@@ -10091,6 +10099,7 @@ function AdminWorkspace({
   importNoteFiles,
   uploadArticleCover,
   uploadArticleContentImage,
+  uploadAdminImage,
   refreshUploadedImages,
   copyUploadedImageUrl,
   deleteUploadedImage,
