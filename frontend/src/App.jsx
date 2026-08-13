@@ -340,7 +340,7 @@ function readStoredSidebarCollapsed() {
 function readStoredAdminPage() {
   if (typeof localStorage === 'undefined') return 'overview';
   const storedPage = localStorage.getItem(ADMIN_PAGE_KEY) || 'overview';
-  const knownPages = new Set(['overview', 'ops', 'releases', 'editor', 'notes', 'articles', 'music', 'toolbox', 'comments', 'visual', 'security', 'backups', 'corpus', 'study']);
+  const knownPages = new Set(['overview', 'health', 'ops', 'releases', 'editor', 'notes', 'articles', 'music', 'toolbox', 'comments', 'visual', 'security', 'backups', 'corpus', 'study']);
   return knownPages.has(storedPage) ? storedPage : 'overview';
 }
 
@@ -546,6 +546,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.6.0',
+    title: '后台体验和工具箱批量能力',
+    date: '2026-08-14',
+    status: '已上线',
+    points: ['后台新增站点健康面板，集中查看文章、评论、音乐、错误日志和部署状态', '后台内容区加入局部错误兜底，单个模块异常不再拖垮整页', '工具箱支持 JSON 批量导入导出，方便备份和迁移常用网址', '写作台补充快捷键提示和常用 Markdown 快捷操作', 'Live2D 模型延后到浏览器空闲时挂载，减轻首屏压力']
+  },
   {
     version: 'v6.5.7',
     title: '后台工具箱崩溃修复',
@@ -7914,6 +7921,7 @@ function ToolboxWorkspace({ currentUser, authToken, uploadImage, profile = fallb
   const [isLoadingToolboxLinks, setIsLoadingToolboxLinks] = useState(false);
   const [isSavingToolboxLink, setIsSavingToolboxLink] = useState(false);
   const [isUploadingToolboxImage, setIsUploadingToolboxImage] = useState(false);
+  const [isImportingToolboxLinks, setIsImportingToolboxLinks] = useState(false);
   const canManageToolbox = currentUser?.role === 'admin';
   async function persistToolboxDefaultOverrides(nextOverrides) {
     setToolboxDefaultOverrides(nextOverrides);
@@ -8174,6 +8182,88 @@ function ToolboxWorkspace({ currentUser, authToken, uploadImage, profile = fallb
     }
   }
 
+  function exportToolboxLinks() {
+    const exportItems = allToolboxLinks.map((link) => ({
+      title: link.title,
+      category: link.category || '自定义',
+      url: link.url,
+      imageUrl: link.imageUrl || '',
+      description: link.description || '',
+      tags: link.tags || [],
+      pinned: Boolean(link.pinned),
+      sourceType: link.sourceType || (link.custom ? 'custom' : 'default')
+    }));
+    const payload = {
+      type: 'felixfu-toolbox-links',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      items: exportItems
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `felixfu-toolbox-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    setToolboxMessage(`已导出 ${exportItems.length} 个工具箱链接`);
+  }
+
+  async function importToolboxLinks(file) {
+    if (!file || !canManageToolbox || !authToken) return;
+    setIsImportingToolboxLinks(true);
+    try {
+      const raw = await file.text();
+      const parsed = JSON.parse(raw);
+      const items = Array.isArray(parsed) ? parsed : Array.isArray(parsed.items) ? parsed.items : [];
+      const existingUrls = new Set(allToolboxLinks.map((link) => link.url.trim().toLowerCase()).filter(Boolean));
+      const normalizedItems = items
+        .map((item) => normalizeToolboxLink({
+          title: item.title,
+          category: item.category || '自定义',
+          url: item.url,
+          imageUrl: item.imageUrl || item.avatar || '',
+          description: item.description || item.desc || '',
+          tags: Array.isArray(item.tags) ? item.tags : String(item.tags || '').split(/[,，]/),
+          pinned: Boolean(item.pinned)
+        }))
+        .filter((item) => item.title && item.url && !existingUrls.has(item.url.trim().toLowerCase()))
+        .slice(0, 80);
+      if (!normalizedItems.length) {
+        setToolboxMessage('没有可导入的新链接，可能都已经存在了');
+        return;
+      }
+      let successCount = 0;
+      for (const item of normalizedItems) {
+        const response = await fetch('/api/admin/toolbox-links', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            title: item.title,
+            category: item.category,
+            url: item.url,
+            imageUrl: item.imageUrl,
+            description: item.description,
+            tags: item.tags,
+            pinned: item.pinned
+          })
+        });
+        if (response.ok) successCount += 1;
+      }
+      await refreshToolboxLinks();
+      setToolboxMessage(`已导入 ${successCount} 个新链接`);
+    } catch {
+      setToolboxMessage('导入失败，请确认是工具箱 JSON 文件');
+    } finally {
+      setIsImportingToolboxLinks(false);
+    }
+  }
+
   const toolboxEditor = canManageToolbox ? (
     <form className="toolbox-editor" onSubmit={submitToolboxLink}>
       <div className="admin-panel-heading compact-heading">
@@ -8238,6 +8328,23 @@ function ToolboxWorkspace({ currentUser, authToken, uploadImage, profile = fallb
           <Save size={17} />
           <span>{isSavingToolboxLink ? '保存中' : editingToolboxLinkId ? '保存修改' : '添加网址'}</span>
         </button>
+        <button className="ghost-button" type="button" onClick={exportToolboxLinks}>
+          <Copy size={17} />
+          <span>导出 JSON</span>
+        </button>
+        <label className="ghost-button file-upload-control compact-upload">
+          <UploadCloud size={17} />
+          <span>{isImportingToolboxLinks ? '导入中' : '导入 JSON'}</span>
+          <input
+            type="file"
+            accept="application/json,.json"
+            disabled={isImportingToolboxLinks}
+            onChange={(event) => {
+              importToolboxLinks(event.target.files?.[0]);
+              event.target.value = '';
+            }}
+          />
+        </label>
         <button className="ghost-button" type="button" onClick={() => resetToolboxForm('')}>
           <X size={17} />
           <span>清空</span>
@@ -8623,9 +8730,9 @@ function Live2DMascot({ activeView = 'overview' }) {
     }
 
     if ('requestIdleCallback' in window) {
-      idleHandle = window.requestIdleCallback(mountMascot, { timeout: 1200 });
+      idleHandle = window.requestIdleCallback(mountMascot, { timeout: 2400 });
     } else {
-      timeoutHandle = window.setTimeout(mountMascot, 360);
+      timeoutHandle = window.setTimeout(mountMascot, 900);
     }
     return () => {
       cancelled = true;
@@ -10207,8 +10314,47 @@ function AdminWorkspace({
       tone: 'ready'
     }
   ];
+  const siteHealthItems = [
+    {
+      label: '文章接口',
+      value: `${articles.length} 篇`,
+      detail: articles.length ? '文章列表已加载' : '文章为空或接口未返回内容',
+      tone: articles.length ? 'ready' : 'attention'
+    },
+    {
+      label: '评论队列',
+      value: pendingCommentCount ? `${pendingCommentCount} 待处理` : '清爽',
+      detail: pendingCommentCount ? '建议先处理评论' : `${adminComments.length} 条评论已同步`,
+      tone: pendingCommentCount ? 'attention' : 'ready'
+    },
+    {
+      label: '音乐资源',
+      value: `${musicTracks.length} 首`,
+      detail: musicTracks.length ? '播放器资源可用' : '还没有上传音乐',
+      tone: musicTracks.length ? 'ready' : 'neutral'
+    },
+    {
+      label: '前端错误',
+      value: frontendErrorLogs.length ? `${frontendErrorLogs.length} 条` : '暂无',
+      detail: frontendErrorLogs.length ? '最近有页面错误记录' : '本地错误日志为空',
+      tone: frontendErrorLogs.length ? 'attention' : 'ready'
+    },
+    {
+      label: 'Live2D',
+      value: LIVE2D_MODELS.length + ' 个模型',
+      detail: '模型会在浏览器空闲时挂载',
+      tone: 'ready'
+    },
+    {
+      label: '部署版本',
+      value: releaseRoadmap[0].version,
+      detail: releaseRoadmap[0].title,
+      tone: 'ready'
+    }
+  ];
   const adminPageItems = [
     { id: 'overview', label: '总览', detail: '状态、统计、待办', icon: Star, count: `${publishedCount} 篇` },
+    { id: 'health', label: '健康', detail: '接口、错误、资源', icon: ShieldCheck, count: frontendErrorLogs.length ? `${frontendErrorLogs.length} 错误` : 'OK' },
     { id: 'editor', label: '写文章', detail: editingArticleId ? '继续编辑当前文章' : '随笔和普通文章', icon: FilePenLine, count: draftCount ? `${draftCount} 草稿` : 'Markdown' },
     { id: 'notes', label: '笔记上传', detail: '导入 .md 和内含图片', icon: BookOpen, count: 'MkDocs 感' },
     { id: 'articles', label: '内容库', detail: '编辑、删除、置顶', icon: BookOpen, count: `${articles.length} 篇` },
@@ -10430,6 +10576,35 @@ function AdminWorkspace({
   function insertImageMarkdown(url, filename = '文章图片') {
     const altText = filename.replace(/\.[^.]+$/, '') || '文章图片';
     insertContentSnippet(`![${altText}](${url})`);
+  }
+
+  function handleEditorShortcut(event) {
+    if (!(event.ctrlKey || event.metaKey)) return;
+    const key = event.key.toLowerCase();
+    if (key === 's') {
+      event.preventDefault();
+      saveDraftSnapshot('快捷键快照');
+      return;
+    }
+    if (key === 'b') {
+      event.preventDefault();
+      insertIntoContent('**', '**', '加粗文字');
+      return;
+    }
+    if (key === 'k') {
+      event.preventDefault();
+      insertIntoContent('[', '](https://example.com)', '链接文字');
+      return;
+    }
+    if (event.shiftKey && key === '7') {
+      event.preventDefault();
+      insertIntoContent('- ', '', '列表项');
+      return;
+    }
+    if (event.shiftKey && key === '8') {
+      event.preventDefault();
+      insertIntoContent('- [ ] ', '', '待办事项');
+    }
   }
 
   async function uploadDroppedArticleImage(file) {
@@ -10722,6 +10897,11 @@ function AdminWorkspace({
         })}
       </nav>
 
+      <AdminPanelErrorBoundary
+        resetKey={activeAdminPage}
+        title={`${adminPageItems.find((item) => item.id === activeAdminPage)?.label || '后台'}页暂时打不开`}
+        onReset={() => openAdminPage('overview')}
+      >
       {activeAdminPage === 'ops' && (
         <AdminPanelErrorBoundary
           resetKey={activeAdminPage}
@@ -11018,6 +11198,54 @@ function AdminWorkspace({
         </div>
       </section>
         </>
+      )}
+
+      {activeAdminPage === 'health' && (
+        <section className="admin-panel site-health-panel">
+          <div className="admin-panel-heading">
+            <div>
+              <h2>站点健康</h2>
+              <span>把容易出问题的接口、资源和前端错误集中放在这里。</span>
+            </div>
+            <div className="manager-actions">
+              <button className="ghost-button" type="button" onClick={refreshAdminStats}>
+                <RefreshCw size={16} />
+                <span>刷新统计</span>
+              </button>
+              <button className="ghost-button" type="button" onClick={refreshFrontendErrorLogs}>
+                <RefreshCw size={16} />
+                <span>刷新错误</span>
+              </button>
+            </div>
+          </div>
+          <div className="admin-health-grid">
+            {siteHealthItems.map((item) => (
+              <article className={`admin-health-card ${item.tone}`} key={item.label}>
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+                <p>{item.detail}</p>
+              </article>
+            ))}
+          </div>
+          <div className="admin-insight-grid">
+            <div>
+              <h3>最近错误</h3>
+              {frontendErrorLogs.length === 0 ? (
+                <p>暂无前端错误记录。</p>
+              ) : frontendErrorLogs.slice(0, 4).map((errorLog) => (
+                <p key={errorLog.id || errorLog.createdAt}>
+                  <span>{errorLog.message || '未知错误'}</span>
+                  <strong>{errorLog.view || '页面'}</strong>
+                </p>
+              ))}
+            </div>
+            <div>
+              <h3>下一步建议</h3>
+              <p>{draftCount ? `先处理 ${draftCount} 篇草稿，避免内容堆积。` : '草稿队列干净，可以继续写新内容。'}</p>
+              <p>{frontendErrorLogs.length ? '有错误日志时先截图或复制错误，再刷新页面复测。' : '当前本地错误日志为空，状态不错。'}</p>
+            </div>
+          </div>
+        </section>
       )}
 
       {activeAdminPage === 'ai' && (
@@ -11605,6 +11833,13 @@ function AdminWorkspace({
                 <em>{editorStats.images} 张图</em>
               </div>
             </div>
+            <div className="editor-shortcut-hints" aria-label="编辑器快捷键">
+              <span>Ctrl/⌘ + S 快照</span>
+              <span>Ctrl/⌘ + B 加粗</span>
+              <span>Ctrl/⌘ + K 链接</span>
+              <span>Ctrl/⌘ + Shift + 7 列表</span>
+              <span>Ctrl/⌘ + Shift + 8 待办</span>
+            </div>
             <div className="editor-compose-grid">
               <div className="editor-source-pane">
                 <div className="markdown-toolbar" aria-label="Markdown 工具栏">
@@ -11666,6 +11901,7 @@ function AdminWorkspace({
                   ref={contentTextareaRef}
                   value={articleForm.content}
                   onChange={(event) => updateArticleForm('content', event.target.value)}
+                  onKeyDown={handleEditorShortcut}
                   onScroll={syncPreviewScroll}
                   onDragOver={(event) => {
                     if ([...event.dataTransfer.items].some((item) => item.type.startsWith('image/'))) {
@@ -12380,6 +12616,7 @@ function AdminWorkspace({
         )}
       </div>
       )}
+      </AdminPanelErrorBoundary>
     </section>
   );
 }

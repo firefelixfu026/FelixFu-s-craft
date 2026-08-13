@@ -5446,6 +5446,45 @@ h3 {
   overflow-wrap: anywhere;
 }
 
+.admin-health-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-health-card {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.admin-health-card.ready {
+  border-color: #b9e4d2;
+  background: #f1fbf6;
+}
+
+.admin-health-card.attention {
+  border-color: #f4d08b;
+  background: #fff8e6;
+}
+
+.admin-health-card span,
+.admin-health-card p {
+  margin: 0;
+  color: #5b6878;
+  font-size: 13px;
+}
+
+.admin-health-card strong {
+  color: #102033;
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+
 .lazy-panel {
   color: #5b6878;
   min-height: 140px;
@@ -6873,6 +6912,25 @@ h3 {
   font-size: 12px;
   font-style: normal;
   background: rgba(47, 143, 131, 0.08);
+}
+
+.editor-shortcut-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.editor-shortcut-hints span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+  color: #6a7685;
+  font-size: 12px;
+  font-weight: 800;
+  background: rgba(248, 250, 252, 0.82);
 }
 
 .editor-compose-grid {
@@ -8678,6 +8736,7 @@ h3 {
 :root[data-theme='dark'] .admin-page-card,
 :root[data-theme='dark'] .admin-panel,
 :root[data-theme='dark'] .admin-pulse-card,
+:root[data-theme='dark'] .admin-health-card,
 :root[data-theme='dark'] .admin-site-switch-card,
 :root[data-theme='dark'] .admin-profile-editor,
 :root[data-theme='dark'] .admin-task-card,
@@ -8833,6 +8892,7 @@ h3 {
 
 :root[data-theme='dark'] .admin-task-card.ready,
 :root[data-theme='dark'] .admin-pulse-card.ready,
+:root[data-theme='dark'] .admin-health-card.ready,
 :root[data-theme='dark'] .study-task.done,
 :root[data-theme='dark'] .weekly-plan-row.done,
 :root[data-theme='dark'] .weekly-check:has(input:checked) {
@@ -8842,6 +8902,7 @@ h3 {
 }
 
 :root[data-theme='dark'] .admin-pulse-card.attention,
+:root[data-theme='dark'] .admin-health-card.attention,
 :root[data-theme='dark'] .admin-task-card.attention {
   border-color: rgba(245, 158, 11, 0.46);
   background: rgba(245, 158, 11, 0.13);
@@ -9268,6 +9329,8 @@ h3 {
 :root[data-theme='dark'] .comment-filter-row label,
 :root[data-theme='dark'] .admin-pulse-card span,
 :root[data-theme='dark'] .admin-pulse-card small,
+:root[data-theme='dark'] .admin-health-card span,
+:root[data-theme='dark'] .admin-health-card p,
 :root[data-theme='dark'] .admin-site-switch-card span,
 :root[data-theme='dark'] .admin-profile-editor label span,
 :root[data-theme='dark'] .admin-profile-preview,
@@ -9308,6 +9371,7 @@ h3 {
 :root[data-theme='dark'] .note-tree-group strong,
 :root[data-theme='dark'] .note-import-card strong,
 :root[data-theme='dark'] .admin-pulse-card strong,
+:root[data-theme='dark'] .admin-health-card strong,
 :root[data-theme='dark'] .admin-task-card strong,
 :root[data-theme='dark'] .security-rule-grid strong,
 :root[data-theme='dark'] .image-resource-meta strong,
@@ -9571,6 +9635,12 @@ h3 {
   border-color: rgba(52, 211, 153, 0.32);
   color: var(--accent);
   background: rgba(52, 211, 153, 0.10);
+}
+
+:root[data-theme='dark'] .editor-shortcut-hints span {
+  border-color: rgba(255, 211, 220, 0.14);
+  color: var(--text-soft);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 :root[data-theme='dark'] .chart-axis {
