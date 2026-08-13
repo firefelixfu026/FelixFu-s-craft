@@ -546,6 +546,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.5.4',
+    title: 'Live2D 热切换稳定补丁',
+    date: '2026-08-13',
+    status: '已上线',
+    points: ['右键切换模型和重试加载会先销毁旧 PIXI 舞台，再重建 canvas', '模型切换等待浏览器完成两帧渲染后再挂载新模型，避免旧 WebGL 实例残留导致崩溃', '刷新页面、关闭再显示和页面内切换使用同一套干净挂载流程']
+  },
+  {
     version: 'v6.5.3',
     title: 'Live2D 模型切换补丁',
     date: '2026-08-13',
@@ -8470,6 +8477,7 @@ function Live2DMascot({ activeView = 'overview' }) {
   const [status, setStatus] = useState('idle');
   const [lineIndex, setLineIndex] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
+  const [isMascotRemounting, setIsMascotRemounting] = useState(false);
   const [speechVisible, setSpeechVisible] = useState(false);
   const [closedNotice, setClosedNotice] = useState(false);
   const [menuPosition, setMenuPosition] = useState(null);
@@ -8541,6 +8549,12 @@ function Live2DMascot({ activeView = 'overview' }) {
     speechTimerRef.current = window.setTimeout(() => setSpeechVisible(false), 5200);
   }
 
+  function destroyMascotApp() {
+    if (!appRef.current) return;
+    appRef.current.destroy(false, { children: true, texture: true, baseTexture: true });
+    appRef.current = null;
+  }
+
   useEffect(() => {
     if (isHidden || !canvasRef.current) return undefined;
     let cancelled = false;
@@ -8602,10 +8616,7 @@ function Live2DMascot({ activeView = 'overview' }) {
         window.clearTimeout(speechTimerRef.current);
         speechTimerRef.current = null;
       }
-      if (appRef.current) {
-        appRef.current.destroy(false, { children: true, texture: true, baseTexture: true });
-        appRef.current = null;
-      }
+      destroyMascotApp();
     };
   }, [activeMascotLines.length, activeModel.modelUrl, isHidden, reloadKey]);
 
@@ -8686,23 +8697,33 @@ function Live2DMascot({ activeView = 'overview' }) {
     setMenuPosition(null);
   }
 
-  function retryMascotLoad() {
+  function remountMascot(nextModelId = modelId) {
+    if (!LIVE2D_MODELS.some((model) => model.id === nextModelId)) return;
+    destroyMascotApp();
     setStatus('idle');
-    setReloadKey((current) => current + 1);
+    setIsMascotRemounting(true);
     setMenuPosition(null);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LIVE2D_MODEL_KEY, nextModelId);
+    }
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        setModelId(nextModelId);
+        setReloadKey((current) => current + 1);
+        setIsMascotRemounting(false);
+        window.dispatchEvent(new Event(LIVE2D_SHOW_EVENT));
+      });
+    });
+  }
+
+  function retryMascotLoad() {
+    remountMascot(modelId);
   }
 
   function switchMascotModel(nextModelId) {
     if (!LIVE2D_MODELS.some((model) => model.id === nextModelId)) return;
-    setModelId(nextModelId);
-    setStatus('idle');
-    setReloadKey((current) => current + 1);
     setSpeechVisible(true);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(LIVE2D_MODEL_KEY, nextModelId);
-    }
-    window.dispatchEvent(new Event(LIVE2D_SHOW_EVENT));
-    setMenuPosition(null);
+    remountMascot(nextModelId);
   }
 
   function openMascotMenu(event) {
@@ -8776,13 +8797,13 @@ function Live2DMascot({ activeView = 'overview' }) {
           dragRef.current = null;
         }}
       >
-        <canvas ref={canvasRef} width="260" height="340" />
-        {status !== 'ready' && (
+        {!isMascotRemounting && <canvas key={`${activeModel.id}-${reloadKey}`} ref={canvasRef} width="260" height="340" />}
+        {(isMascotRemounting || status !== 'ready') && (
           <span className="live2d-fallback">
             <img src={activeModel.fallbackUrl} alt="" loading="lazy" decoding="async" />
           </span>
         )}
-        {status === 'loading' && <span className="live2d-loading">加载中</span>}
+        {(isMascotRemounting || status === 'loading') && <span className="live2d-loading">加载中</span>}
       </div>
       {menuPosition && (
         <div
