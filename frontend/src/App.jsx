@@ -123,12 +123,28 @@ const PLAN_SECTION_PATHS = {
   sleep: '/plan/sleep'
 };
 const ROUTED_VIEW_IDS = new Set(Object.keys(VIEW_PATHS));
-const LIVE2D_MODEL_URL = '/live2d/shu-bubble/model.model3.json';
-const LIVE2D_TEXTURE_FALLBACK_URL = '/live2d/shu-bubble/textures/texture_00.png';
+const LIVE2D_MODELS = [
+  {
+    id: 'shu-bubble',
+    name: '黍泡泡',
+    source: '切丁鱼片',
+    modelUrl: '/live2d/shu-bubble/model.model3.json',
+    fallbackUrl: '/live2d/shu-bubble/textures/texture_00.png'
+  },
+  {
+    id: 'kaltsit',
+    name: '凯尔希',
+    source: '什行在要',
+    modelUrl: '/live2d/kaltsit/model.model3.json',
+    fallbackUrl: '/live2d/kaltsit/textures/texture_00.png'
+  }
+];
+const DEFAULT_LIVE2D_MODEL_ID = LIVE2D_MODELS[0].id;
 const LIVE2D_HIDDEN_KEY = 'felix_blog_live2d_hidden';
 const LIVE2D_POSITION_KEY = 'felix_blog_live2d_position_v2';
 const LIVE2D_MODE_KEY = 'felix_blog_live2d_mode';
 const LIVE2D_QUIET_KEY = 'felix_blog_live2d_quiet';
+const LIVE2D_MODEL_KEY = 'felix_blog_live2d_model';
 const LIVE2D_SHOW_EVENT = 'felix-live2d-show';
 const LIVE2D_SCRIPT_SOURCES = [
   'https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js',
@@ -520,6 +536,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.5.2',
+    title: 'Live2D 模型切换',
+    date: '2026-08-13',
+    status: '已上线',
+    points: ['新增凯尔希 Live2D 模型资源并整理为稳定英文路径', '黍泡泡右键菜单新增模型切换入口，可在黍泡泡和凯尔希之间切换', '模型名称、来源和静态兜底图会跟随当前模型变化']
+  },
   {
     version: 'v6.5.1',
     title: '播放器切歌进度补丁',
@@ -8438,6 +8461,11 @@ function Live2DMascot({ activeView = 'overview' }) {
     if (typeof localStorage === 'undefined') return 'pet';
     return localStorage.getItem(LIVE2D_MODE_KEY) === 'window' ? 'window' : 'pet';
   });
+  const [modelId, setModelId] = useState(() => {
+    if (typeof localStorage === 'undefined') return DEFAULT_LIVE2D_MODEL_ID;
+    const storedModelId = localStorage.getItem(LIVE2D_MODEL_KEY);
+    return LIVE2D_MODELS.some((model) => model.id === storedModelId) ? storedModelId : DEFAULT_LIVE2D_MODEL_ID;
+  });
   const [isQuiet, setIsQuiet] = useState(() => (
     typeof localStorage !== 'undefined' && localStorage.getItem(LIVE2D_QUIET_KEY) === 'true'
   ));
@@ -8463,6 +8491,7 @@ function Live2DMascot({ activeView = 'overview' }) {
     const pageLines = mascotPageLines[activeView] || [];
     return [...pageLines, ...mascotLines];
   }, [activeView]);
+  const activeModel = LIVE2D_MODELS.find((model) => model.id === modelId) || LIVE2D_MODELS[0];
 
   function getDefaultPosition(nextMode = mode) {
     if (typeof window === 'undefined') return { x: 0, y: 0 };
@@ -8521,7 +8550,7 @@ function Live2DMascot({ activeView = 'overview' }) {
         });
         appRef.current = app;
 
-        const model = await Live2DModel.from(LIVE2D_MODEL_URL, { autoInteract: true });
+        const model = await Live2DModel.from(activeModel.modelUrl, { autoInteract: true });
         if (cancelled) {
           app.destroy(false, { children: true, texture: true, baseTexture: true });
           return;
@@ -8564,7 +8593,7 @@ function Live2DMascot({ activeView = 'overview' }) {
         appRef.current = null;
       }
     };
-  }, [activeMascotLines.length, isHidden, reloadKey]);
+  }, [activeMascotLines.length, activeModel.modelUrl, isHidden, reloadKey]);
 
   useEffect(() => {
     if (isHidden || isQuiet) return undefined;
@@ -8643,6 +8672,18 @@ function Live2DMascot({ activeView = 'overview' }) {
     setMenuPosition(null);
   }
 
+  function switchMascotModel(nextModelId) {
+    if (!LIVE2D_MODELS.some((model) => model.id === nextModelId)) return;
+    setModelId(nextModelId);
+    setStatus('idle');
+    setReloadKey((current) => current + 1);
+    setSpeechVisible(true);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LIVE2D_MODEL_KEY, nextModelId);
+    }
+    setMenuPosition(null);
+  }
+
   function openMascotMenu(event) {
     event.preventDefault();
     event.stopPropagation();
@@ -8694,13 +8735,13 @@ function Live2DMascot({ activeView = 'overview' }) {
       ref={mascotRef}
       className={`live2d-mascot ${mode === 'window' ? 'windowed' : 'pet'}`}
       style={{ left: `${position.x}px`, top: `${position.y}px` }}
-      aria-label="本站吉祥物黍泡泡"
+      aria-label={`本站吉祥物${activeModel.name}`}
     >
       {speechVisible && (
         <div className="live2d-speech">
-          <strong>黍泡泡</strong>
+          <strong>{activeModel.name}</strong>
           <p>{status === 'error' ? 'Live2D 加载失败，右键可以重试。' : activeMascotLines[lineIndex % activeMascotLines.length]}</p>
-          <span>模型来源：切丁鱼片</span>
+          <span>模型来源：{activeModel.source}</span>
         </div>
       )}
       <div
@@ -8717,7 +8758,7 @@ function Live2DMascot({ activeView = 'overview' }) {
         <canvas ref={canvasRef} width="260" height="340" />
         {status !== 'ready' && (
           <span className="live2d-fallback">
-            <img src={LIVE2D_TEXTURE_FALLBACK_URL} alt="" loading="lazy" decoding="async" />
+            <img src={activeModel.fallbackUrl} alt="" loading="lazy" decoding="async" />
           </span>
         )}
         {status === 'loading' && <span className="live2d-loading">加载中</span>}
@@ -8728,6 +8769,18 @@ function Live2DMascot({ activeView = 'overview' }) {
           onClick={(event) => event.stopPropagation()}
         >
           <button type="button" onClick={() => speak()}>说句话</button>
+          <div className="live2d-model-switcher" aria-label="切换 Live2D 模型">
+            {LIVE2D_MODELS.map((model) => (
+              <button
+                key={model.id}
+                type="button"
+                className={model.id === activeModel.id ? 'active' : ''}
+                onClick={() => switchMascotModel(model.id)}
+              >
+                {model.name}
+              </button>
+            ))}
+          </div>
           <button type="button" onClick={toggleMode}>{mode === 'window' ? '切回贴边模式' : '变成悬浮窗'}</button>
           <button type="button" onClick={toggleQuietMode}>{isQuiet ? '关闭低打扰' : '低打扰模式'}</button>
           <button className="danger" type="button" onClick={hideMascot}>关闭</button>

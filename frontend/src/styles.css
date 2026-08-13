@@ -620,6 +620,28 @@ textarea {
   background: rgba(47, 143, 131, 0.08);
 }
 
+.live2d-model-switcher {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.live2d-context-menu .live2d-model-switcher button {
+  padding: 7px 8px;
+  border: 1px solid rgba(47, 143, 131, 0.16);
+  border-radius: 7px;
+  background: rgba(47, 143, 131, 0.05);
+  text-align: center;
+}
+
+.live2d-context-menu .live2d-model-switcher button.active {
+  color: #0f766e;
+  background: rgba(47, 143, 131, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(47, 143, 131, 0.18);
+}
+
 .live2d-context-menu .danger {
   color: #b91c1c;
 }
@@ -10436,6 +10458,21 @@ h3 {
 :root[data-theme='dark'] .live2d-context-menu button:hover {
   color: #6ee7c8;
   background: rgba(110, 231, 200, 0.1);
+}
+
+:root[data-theme='dark'] .live2d-model-switcher {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme='dark'] .live2d-context-menu .live2d-model-switcher button {
+  border-color: rgba(110, 231, 200, 0.14);
+  background: rgba(110, 231, 200, 0.06);
+}
+
+:root[data-theme='dark'] .live2d-context-menu .live2d-model-switcher button.active {
+  color: #7dd3fc;
+  background: rgba(125, 211, 252, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.18);
 }
 
 :root[data-theme='dark'] .live2d-context-menu .danger {
