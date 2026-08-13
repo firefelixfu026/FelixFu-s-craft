@@ -4,9 +4,7 @@
     "Moc": "model.moc3",
     "Textures": [
       "textures/texture_00.png"
-    ],
-    "Physics": "model.physics3.json",
-    "DisplayInfo": "model.cdi3.json"
+    ]
   },
   "Groups": [
     {

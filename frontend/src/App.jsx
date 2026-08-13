@@ -151,6 +151,15 @@ const LIVE2D_SCRIPT_SOURCES = [
   'https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js',
   'https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js'
 ];
+
+function getLive2DModelById(modelId) {
+  return LIVE2D_MODELS.find((model) => model.id === modelId) || LIVE2D_MODELS[0];
+}
+
+function readStoredLive2DModel() {
+  if (typeof localStorage === 'undefined') return getLive2DModelById(DEFAULT_LIVE2D_MODEL_ID);
+  return getLive2DModelById(localStorage.getItem(LIVE2D_MODEL_KEY));
+}
 const mascotLines = [
   '欢迎回来，今天也要稳稳推进。',
   '首页已经瘦身，剩下的内容都在独立入口里。',
@@ -536,6 +545,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.5.3',
+    title: 'Live2D 模型切换补丁',
+    date: '2026-08-13',
+    status: '已上线',
+    points: ['凯尔希模型入口移除损坏的物理和显示信息引用，避免 JSON 解析失败导致加载失败', '右键菜单恢复 Live2D 重试加载入口', '关闭提示和账号页显示按钮会跟随当前模型名称变化']
+  },
   {
     version: 'v6.5.2',
     title: 'Live2D 模型切换',
@@ -8462,9 +8478,7 @@ function Live2DMascot({ activeView = 'overview' }) {
     return localStorage.getItem(LIVE2D_MODE_KEY) === 'window' ? 'window' : 'pet';
   });
   const [modelId, setModelId] = useState(() => {
-    if (typeof localStorage === 'undefined') return DEFAULT_LIVE2D_MODEL_ID;
-    const storedModelId = localStorage.getItem(LIVE2D_MODEL_KEY);
-    return LIVE2D_MODELS.some((model) => model.id === storedModelId) ? storedModelId : DEFAULT_LIVE2D_MODEL_ID;
+    return readStoredLive2DModel().id;
   });
   const [isQuiet, setIsQuiet] = useState(() => (
     typeof localStorage !== 'undefined' && localStorage.getItem(LIVE2D_QUIET_KEY) === 'true'
@@ -8491,7 +8505,7 @@ function Live2DMascot({ activeView = 'overview' }) {
     const pageLines = mascotPageLines[activeView] || [];
     return [...pageLines, ...mascotLines];
   }, [activeView]);
-  const activeModel = LIVE2D_MODELS.find((model) => model.id === modelId) || LIVE2D_MODELS[0];
+  const activeModel = getLive2DModelById(modelId);
 
   function getDefaultPosition(nextMode = mode) {
     if (typeof window === 'undefined') return { x: 0, y: 0 };
@@ -8672,6 +8686,12 @@ function Live2DMascot({ activeView = 'overview' }) {
     setMenuPosition(null);
   }
 
+  function retryMascotLoad() {
+    setStatus('idle');
+    setReloadKey((current) => current + 1);
+    setMenuPosition(null);
+  }
+
   function switchMascotModel(nextModelId) {
     if (!LIVE2D_MODELS.some((model) => model.id === nextModelId)) return;
     setModelId(nextModelId);
@@ -8681,6 +8701,7 @@ function Live2DMascot({ activeView = 'overview' }) {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(LIVE2D_MODEL_KEY, nextModelId);
     }
+    window.dispatchEvent(new Event(LIVE2D_SHOW_EVENT));
     setMenuPosition(null);
   }
 
@@ -8724,7 +8745,7 @@ function Live2DMascot({ activeView = 'overview' }) {
     return (
       closedNotice && (
         <div className="live2d-closed-toast">
-          已关闭黍泡泡，可以在账号页重新显示。
+          已关闭{activeModel.name}，可以在账号页重新显示。
         </div>
       )
     );
@@ -8769,6 +8790,7 @@ function Live2DMascot({ activeView = 'overview' }) {
           onClick={(event) => event.stopPropagation()}
         >
           <button type="button" onClick={() => speak()}>说句话</button>
+          {status === 'error' && <button type="button" onClick={retryMascotLoad}>重试加载</button>}
           <div className="live2d-model-switcher" aria-label="切换 Live2D 模型">
             {LIVE2D_MODELS.map((model) => (
               <button
@@ -9456,6 +9478,19 @@ function AccountWorkspace({
   const reactions = accountActivity?.reactions || [];
   const favoriteArticles = accountActivity?.favoriteArticles || [];
   const sidebarAvatarUrl = profile?.avatarUrl || '/avatar.jpg';
+  const [currentMascotModel, setCurrentMascotModel] = useState(readStoredLive2DModel);
+
+  useEffect(() => {
+    function refreshMascotModel() {
+      setCurrentMascotModel(readStoredLive2DModel());
+    }
+    window.addEventListener(LIVE2D_SHOW_EVENT, refreshMascotModel);
+    window.addEventListener('storage', refreshMascotModel);
+    return () => {
+      window.removeEventListener(LIVE2D_SHOW_EVENT, refreshMascotModel);
+      window.removeEventListener('storage', refreshMascotModel);
+    };
+  }, []);
 
   return (
     <section className="workspace account-workspace">
@@ -9518,7 +9553,7 @@ function AccountWorkspace({
           </span>
           <div>
             <strong>首页小组件</strong>
-            <span>如果右键关闭了黍泡泡，可以在这里重新叫出来。</span>
+            <span>如果右键关闭了{currentMascotModel.name}，可以在这里重新叫出来。</span>
           </div>
           <button
             className="ghost-button"
@@ -9531,7 +9566,7 @@ function AccountWorkspace({
             }}
           >
             <Bot size={16} />
-            <span>显示黍泡泡</span>
+            <span>显示{currentMascotModel.name}</span>
           </button>
         </div>
 
