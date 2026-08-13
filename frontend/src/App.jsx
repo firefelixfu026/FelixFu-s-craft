@@ -174,6 +174,7 @@ const mascotPageLines = {
   toolbox: ['工具箱适合放常用入口，别把主页塞满。'],
   game: ['休息也要有边界，打一局就回来。'],
   account: ['账号页可以控制我是否出现。'],
+  admin: ['后台也可以叫我出来，但我会尽量待在边上。'],
   plan: ['计划页先默认藏起来，需要公开再去后台开。']
 };
 
@@ -545,6 +546,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.5.6',
+    title: 'Live2D 切换贴图闪烁修复',
+    date: '2026-08-13',
+    status: '已上线',
+    points: ['切换模型和正常加载阶段不再显示兜底贴图', '只有 Live2D 真正加载失败时才展示静态贴图，避免凯尔希切换时短暂露出素材图']
+  },
   {
     version: 'v6.5.5',
     title: 'Live2D 切换动效收敛',
@@ -4630,7 +4638,7 @@ function App() {
           />
         )}
       </main>
-      {activeView !== 'admin' && activeView !== 'login' && <Live2DMascot activeView={activeView} />}
+      {activeView !== 'login' && <Live2DMascot activeView={activeView} />}
     </div>
   );
 }
@@ -8805,7 +8813,7 @@ function Live2DMascot({ activeView = 'overview' }) {
         }}
       >
         {!isMascotRemounting && <canvas key={`${activeModel.id}-${reloadKey}`} ref={canvasRef} width="260" height="340" />}
-        {(isMascotRemounting || status !== 'ready') && (
+        {status === 'error' && (
           <span className="live2d-fallback">
             <img src={activeModel.fallbackUrl} alt="" loading="lazy" decoding="async" />
           </span>
