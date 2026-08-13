@@ -541,13 +541,13 @@ textarea {
   height: 212px;
   pointer-events: none;
   z-index: 2;
+  animation: live2d-fade-in 180ms ease-out both;
 }
 
 .live2d-mascot.windowed .live2d-stage canvas {
   height: 232px;
 }
 
-.live2d-loading,
 .live2d-fallback {
   position: absolute;
   display: grid;
@@ -558,13 +558,6 @@ textarea {
   background: rgba(255, 255, 255, 0.92);
   box-shadow: var(--shadow-soft);
   font-weight: 900;
-}
-
-.live2d-loading {
-  inset: auto 44px 12px;
-  z-index: 4;
-  min-height: 36px;
-  font-size: 12px;
 }
 
 .live2d-fallback {
@@ -582,6 +575,17 @@ textarea {
   object-fit: contain;
   transform: translateY(4px);
   filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.16));
+}
+
+@keyframes live2d-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .live2d-context-menu {
@@ -10435,12 +10439,6 @@ h3 {
 
 :root[data-theme='dark'] .live2d-speech span {
   color: var(--text-muted);
-}
-
-:root[data-theme='dark'] .live2d-loading {
-  border-color: rgba(110, 231, 200, 0.2);
-  color: var(--text-main);
-  background: rgba(15, 23, 42, 0.9);
 }
 
 :root[data-theme='dark'] .live2d-context-menu,

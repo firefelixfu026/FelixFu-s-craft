@@ -546,6 +546,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.5.5',
+    title: 'Live2D 切换动效收敛',
+    date: '2026-08-13',
+    status: '已上线',
+    points: ['移除 Live2D 切换模型时的加载中文字，减少视觉打断', '新模型挂载时增加轻量淡入，让黍泡泡和凯尔希之间切换更顺滑']
+  },
+  {
     version: 'v6.5.4',
     title: 'Live2D 热切换稳定补丁',
     date: '2026-08-13',
@@ -8803,7 +8810,6 @@ function Live2DMascot({ activeView = 'overview' }) {
             <img src={activeModel.fallbackUrl} alt="" loading="lazy" decoding="async" />
           </span>
         )}
-        {(isMascotRemounting || status === 'loading') && <span className="live2d-loading">加载中</span>}
       </div>
       {menuPosition && (
         <div
