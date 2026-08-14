@@ -547,6 +547,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.7.1',
+    title: '完成度编辑提示优化',
+    date: '2026-08-14',
+    status: '已上线',
+    points: ['完成度表格把计划任务和完成标准改为文本展示，避免误以为只读输入框坏了', '实际完成内容、状态和备注继续作为可编辑记录项', '补充完成度只跟随每日任务清单的说明']
+  },
+  {
     version: 'v6.7.0',
     title: '暑期计划改为每日任务清单',
     date: '2026-08-14',
@@ -7244,6 +7251,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
           <div className="module-toolbar">
             <PlanCalendarSelector days={completionDays} value={selectedCompletionDay.date} onChange={setSelectedCompletionDate} label="完成日期" />
           </div>
+          <p className="completion-edit-note">今日任务和完成标准会自动跟随“每日任务”清单；这里主要填写实际完成内容、状态和备注。</p>
           <div className="completion-summary-grid">
             <div>
               <span>今日完成度</span>
@@ -7858,9 +7866,9 @@ function CompletionTable({ rows, section, disabled, updateRow }) {
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td data-label="类型"><input className="readonly-plan-cell" value={row.type || ''} readOnly /></td>
-              <td data-label="今日任务"><textarea className="readonly-plan-cell" value={row.planned || ''} readOnly /></td>
-              <td data-label="完成标准"><textarea className="readonly-plan-cell" value={row.target || ''} readOnly /></td>
+              <td data-label="类型"><span className="completion-task-type">{row.type || '任务'}</span></td>
+              <td data-label="今日任务"><p className="completion-task-text">{row.planned || '未命名任务'}</p></td>
+              <td data-label="完成标准"><p className="completion-task-text muted">{row.target || '按当天状态判断'}</p></td>
               <td data-label="我实际做了什么"><textarea value={row.actual || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'actual', event.target.value)} /></td>
               <td data-label="状态">
                 <select value={row.status || '未开始'} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'status', event.target.value)}>
