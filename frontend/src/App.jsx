@@ -547,6 +547,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.7.2',
+    title: '计划记录修复和后台入口瘦身',
+    date: '2026-08-14',
+    status: '已上线',
+    points: ['修复完成度记录被旧任务兜底数据覆盖，管理员填写实际完成内容后会按当前每日任务保存', '管理工具台移除健康、视觉巡检、语料和学习助手入口，让后台更清爽', '手机应用默认目标统一为 60 分钟，并补上红果短剧和原神', '记账记录按日期自动排序', '体重和睡眠图表忽略空值并自动放大有效波动，睡眠时长根据入睡和起床时间自动计算']
+  },
+  {
     version: 'v6.7.1',
     title: '完成度编辑提示优化',
     date: '2026-08-14',
@@ -1343,9 +1350,11 @@ const personalizedSummerPlan = {
     { id: 'course-prob', name: '概率论与数理统计', target: '随机变量、分布、期望方差、统计基础预热', progress: '0%' }
   ],
   apps: [
-    { id: 'app-wechat', name: '微信', limit: '90 分钟', actual: '' },
-    { id: 'app-bilibili', name: 'B 站', limit: '30 分钟', actual: '' },
-    { id: 'app-rednote', name: '小红书', limit: '20 分钟', actual: '' }
+    { id: 'app-wechat', name: '微信', limit: '60 分钟', actual: '' },
+    { id: 'app-bilibili', name: 'B 站', limit: '60 分钟', actual: '' },
+    { id: 'app-rednote', name: '小红书', limit: '60 分钟', actual: '' },
+    { id: 'app-hongguo', name: '红果短剧', limit: '60 分钟', actual: '' },
+    { id: 'app-genshin', name: '原神', limit: '60 分钟', actual: '' }
   ],
   expenses: [{ id: 'expense-1', date: '8月4日', type: '支出', item: '餐饮', amount: '', note: '' }],
   meals: [{ id: 'meal-1', date: '8月4日', breakfast: '', lunch: '', dinner: '', snack: '' }],
@@ -6641,14 +6650,25 @@ function normalizeDailyPlans(plan) {
 }
 
 function normalizeAppRows(rows, fallbackRows = personalizedSummerPlan.apps, dayDate = '') {
-  const source = Array.isArray(rows) && rows.length ? rows : fallbackRows;
-  return source.map((row, index) => {
-    const fallback = fallbackRows[index] || personalizedSummerPlan.apps[index] || personalizedSummerPlan.apps[0];
-    const stableName = row?.name || fallback.name || `应用 ${index + 1}`;
+  const source = Array.isArray(rows) && rows.length ? rows : [];
+  const mergedRows = fallbackRows.map((fallback, index) => {
+    const matched = source.find((row) => row?.id === fallback.id || row?.name === fallback.name);
+    return {
+      ...fallback,
+      ...(matched || {}),
+      id: matched?.id || (dayDate ? `${dayDate}-${fallback.id || `app-${index + 1}`}` : fallback.id || `app-${index + 1}`),
+      name: matched?.name || fallback.name || `应用 ${index + 1}`,
+      limit: fallback.limit ?? matched?.limit ?? '60 分钟',
+      actual: matched?.actual ?? ''
+    };
+  });
+  const customRows = source.filter((row) => !fallbackRows.some((fallback) => fallback.id === row?.id || fallback.name === row?.name));
+  return [...mergedRows, ...customRows].map((row, index) => {
+    const stableName = row?.name || `应用 ${index + 1}`;
     return {
       id: row?.id || (dayDate ? `${dayDate}-app-${index + 1}` : `app-${index + 1}`),
       name: stableName,
-      limit: row?.limit ?? fallback.limit ?? '',
+      limit: row?.limit ?? '60 分钟',
       actual: row?.actual ?? ''
     };
   });
@@ -6739,10 +6759,11 @@ function getCompletionRowsForDay(completionDay, dailyPlans) {
     : createTasksFromDailySlots(dayPlan);
   return taskList.map((task, index) => {
     const id = `${completionDay.date}-done-${task.id}`;
-    const stored = storedTasks.find((item) => item.id === id || item.planTaskId === task.id)
-      || storedTasks.find((item) => item.planned === task.title || item.planned === task.activity)
+    const exactStored = storedTasks.find((item) => item.id === id || item.planTaskId === task.id);
+    const legacyStored = storedTasks.find((item) => item.planned === task.title || item.planned === task.activity)
       || storedTasks[index]
       || {};
+    const stored = exactStored || legacyStored;
     const status = completionStatusOptions.includes(stored.status) ? stored.status : '未开始';
     return {
       id,
@@ -6770,34 +6791,61 @@ function getSevenDayCompletion(completionDays, selectedDate, dailyPlans) {
 
 function normalizeBodyRows(rows) {
   const source = Array.isArray(rows) && rows.length ? rows : personalizedSummerPlan.bodyMetrics;
-  return source.map(({ waist, ...row }, index) => ({
+  return sortDatedRows(source.map(({ waist, ...row }, index) => ({
     id: row.id || `body-${index + 1}`,
     date: row.date || '8月4日',
     weight: row.weight || '',
     exercise: row.exercise || '',
     mood: row.mood || ''
-  }));
+  })));
 }
 
 function normalizeSleepRows(rows) {
   const source = Array.isArray(rows) && rows.length ? rows : personalizedSummerPlan.sleep;
-  return source.map((row, index) => ({
-    ...row,
-    id: row.id || `sleep-${index + 1}`,
-    date: normalizeSleepDateRange(row.date || '8月4-5日')
+  return sortDatedRows(source.map((row, index) => {
+    const computedHours = calculateSleepHours(row.bed, row.wake);
+    return {
+      ...row,
+      id: row.id || `sleep-${index + 1}`,
+      date: normalizeSleepDateRange(row.date || '8月4-5日'),
+      hours: computedHours || row.hours || ''
+    };
   }));
 }
 
 function normalizeExpenseRows(rows) {
   const source = Array.isArray(rows) && rows.length ? rows : personalizedSummerPlan.expenses;
-  return source.map((row, index) => ({
+  return sortExpenseRows(source.map((row, index) => ({
     id: row.id || `expense-${index + 1}`,
     date: row.date || '8月4日',
     type: row.type === '收入' ? '收入' : '支出',
     item: row.item || '',
     amount: row.amount ?? '',
     note: row.note || ''
-  }));
+  })));
+}
+
+function parsePlanDateOrder(value) {
+  const text = String(value || '').trim();
+  const fullDate = text.match(/(\d{4})[-/年.](\d{1,2})[-/月.](\d{1,2})/);
+  if (fullDate) return Number(fullDate[1]) * 10000 + Number(fullDate[2]) * 100 + Number(fullDate[3]);
+  const monthDay = text.match(/(\d{1,2})\s*(?:月|\/|-|\.)(\d{1,2})/);
+  if (monthDay) return 20260000 + Number(monthDay[1]) * 100 + Number(monthDay[2]);
+  const dayOnly = text.match(/(\d{1,2})\s*日/);
+  if (dayOnly) return 20260800 + Number(dayOnly[1]);
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function sortDatedRows(rows) {
+  return [...rows].sort((left, right) => {
+    const orderDiff = parsePlanDateOrder(left.date) - parsePlanDateOrder(right.date);
+    if (orderDiff !== 0) return orderDiff;
+    return String(left.id || '').localeCompare(String(right.id || ''), 'zh-CN');
+  });
+}
+
+function sortExpenseRows(rows) {
+  return sortDatedRows(rows);
 }
 
 function normalizeSleepDateRange(date) {
@@ -6809,6 +6857,33 @@ function normalizeSleepDateRange(date) {
   const month = Number(match[1]);
   const day = Number(match[2]);
   return `${month}月${day}-${day + 1}日`;
+}
+
+function parseClockMinutes(value) {
+  const text = String(value || '').trim();
+  const plainHour = text.match(/^(\d{1,2})$/);
+  if (plainHour) {
+    const hour = Number(plainHour[1]);
+    return Number.isFinite(hour) && hour <= 30 ? (hour % 24) * 60 : null;
+  }
+  const match = text.match(/(\d{1,2})(?::|：|点|\s+)(\d{1,2})?/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2] || 0);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours > 30 || minutes > 59) return null;
+  return (hours % 24) * 60 + minutes;
+}
+
+function calculateSleepHours(bed, wake) {
+  const bedMinutes = parseClockMinutes(bed);
+  const wakeMinutes = parseClockMinutes(wake);
+  if (bedMinutes === null || wakeMinutes === null) return '';
+  const duration = wakeMinutes >= bedMinutes
+    ? wakeMinutes - bedMinutes
+    : wakeMinutes + 24 * 60 - bedMinutes;
+  if (duration <= 0) return '';
+  const hours = duration / 60;
+  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1).replace(/\.0$/, '');
 }
 
 function getSevenDayAppUsage(appUsageDays, selectedDate) {
@@ -6843,9 +6918,10 @@ function getRecentRows(rows, limit = 7) {
 function getBodyMetricChartData(rows) {
   return getRecentRows(rows).map((row) => {
     const filledCount = ['weight', 'exercise', 'mood'].filter((field) => String(row[field] || '').trim()).length;
+    const hasWeight = String(row.weight || '').trim();
     return {
       label: row.date || '未填日期',
-      actual: parseMetricNumber(row.weight),
+      actual: hasWeight ? parseMetricNumber(row.weight) : null,
       barValue: filledCount,
       limit: 3
     };
@@ -6853,12 +6929,17 @@ function getBodyMetricChartData(rows) {
 }
 
 function getSleepMetricChartData(rows) {
-  return getRecentRows(rows).map((row) => ({
-    label: row.date || '未填日期',
-    actual: parseMetricNumber(row.hours),
-    barValue: parseMetricNumber(row.hours),
-    limit: 8
-  }));
+  return getRecentRows(rows).map((row) => {
+    const computedHours = calculateSleepHours(row.bed, row.wake);
+    const hoursValue = computedHours || row.hours || '';
+    const hasHours = String(hoursValue).trim();
+    return {
+      label: row.date || '未填日期',
+      actual: hasHours ? parseMetricNumber(hoursValue) : null,
+      barValue: hasHours ? parseMetricNumber(hoursValue) : 0,
+      limit: 8
+    };
+  });
 }
 
 function normalizeSummerPlan(plan) {
@@ -7000,17 +7081,34 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
   function updateRow(section, rowId, field, value) {
     if (!canEdit) return;
-    setPlan((current) => ({
-      ...current,
-      [section]: current[section].map((row) => (row.id === rowId ? { ...row, [field]: value } : row))
-    }));
+    setPlan((current) => {
+      const rows = current[section].map((row) => {
+        if (row.id !== rowId) return row;
+        const nextRow = { ...row, [field]: value };
+        if (section === 'sleep' && (field === 'bed' || field === 'wake')) {
+          nextRow.hours = calculateSleepHours(
+            field === 'bed' ? value : nextRow.bed,
+            field === 'wake' ? value : nextRow.wake
+          );
+        }
+        return nextRow;
+      });
+      const shouldSortByDate = ['expenses', 'bodyMetrics', 'sleep'].includes(section);
+      return {
+        ...current,
+        [section]: shouldSortByDate ? sortDatedRows(rows) : rows
+      };
+    });
   }
 
   function addRow(section, row) {
     if (!canEdit) return;
+    const nextRow = { ...row, id: `${section}-${Date.now()}` };
     setPlan((current) => ({
       ...current,
-      [section]: [...(current[section] || []), { ...row, id: `${section}-${Date.now()}` }]
+      [section]: ['expenses', 'bodyMetrics', 'sleep'].includes(section)
+        ? sortDatedRows([...(current[section] || []), nextRow])
+        : [...(current[section] || []), nextRow]
     }));
   }
 
@@ -7018,7 +7116,9 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
     if (!canEdit) return;
     setPlan((current) => ({
       ...current,
-      [section]: current[section].filter((row) => row.id !== rowId)
+      [section]: ['expenses', 'bodyMetrics', 'sleep'].includes(section)
+        ? sortDatedRows(current[section].filter((row) => row.id !== rowId))
+        : current[section].filter((row) => row.id !== rowId)
     }));
   }
 
@@ -7097,19 +7197,19 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
   function updateCompletionTask(dayDate, rowId, field, value) {
     if (!canEdit) return;
     if (['type', 'planned', 'target'].includes(field)) return;
-    setPlan((current) => ({
-      ...current,
-      completionDays: (current.completionDays || personalizedCompletionDays).map((day) => (
-        day.date === dayDate
-          ? {
-              ...day,
-              tasks: (day.tasks || []).some((row) => row.id === rowId)
-                ? (day.tasks || []).map((row) => (row.id === rowId ? { ...row, [field]: value } : row))
-                : [...(day.tasks || []), { id: rowId, actual: '', status: '未开始', note: '', [field]: value }]
-            }
-          : day
-      ))
-    }));
+    setPlan((current) => {
+      const dailyPlans = Array.isArray(current.dailyPlans) && current.dailyPlans.length
+        ? current.dailyPlans
+        : personalizedDailyPlans;
+      const completionDays = (current.completionDays || personalizedCompletionDays).map((day) => {
+        if (day.date !== dayDate) return day;
+        const normalizedRows = getCompletionRowsForDay(day, dailyPlans).map((row) => (
+          row.id === rowId ? { ...row, [field]: value } : row
+        ));
+        return { ...day, tasks: normalizedRows };
+      });
+      return { ...current, completionDays };
+    });
   }
 
   function resetPlan() {
@@ -7435,7 +7535,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
               ['date', '日期范围', 'input'],
               ['bed', '入睡', 'input'],
               ['wake', '起床', 'input'],
-              ['hours', '时长', 'input'],
+              ['hours', '时长', 'readonly'],
               ['quality', '质量', 'textarea']
             ]}
             disabled={!canEdit}
@@ -7781,16 +7881,27 @@ function MetricLineChart({ data, title, subtitle, unit = '', fallbackMax = 10 })
   const width = 560;
   const height = 220;
   const padding = 34;
-  const maxValue = Math.max(fallbackMax, ...data.map((item) => item.actual || 0));
-  const minPositive = data.some((item) => item.actual > 0) ? Math.min(...data.filter((item) => item.actual > 0).map((item) => item.actual)) : 0;
-  const minValue = minPositive > 20 ? Math.floor(minPositive - 2) : 0;
-  const range = Math.max(1, maxValue - minValue);
+  const validValues = data
+    .map((item) => item.actual)
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const rawMin = validValues.length ? Math.min(...validValues) : 0;
+  const rawMax = validValues.length ? Math.max(...validValues) : fallbackMax;
+  const paddingValue = validValues.length ? Math.max((rawMax - rawMin) * 0.35, unit === 'kg' ? 0.25 : 0.5) : 0;
+  const minValue = Math.max(0, rawMin - paddingValue);
+  const maxValue = rawMax + paddingValue;
+  const range = Math.max(0.1, maxValue - minValue);
   const points = data.map((item, index) => {
     const x = padding + (index * (width - padding * 2)) / Math.max(1, data.length - 1);
-    const y = height - padding - ((Math.max(item.actual || 0, minValue) - minValue) / range) * (height - padding * 2);
-    return { ...item, x, y };
+    const hasActual = Number.isFinite(item.actual) && item.actual > 0;
+    const y = hasActual
+      ? height - padding - ((item.actual - minValue) / range) * (height - padding * 2)
+      : null;
+    return { ...item, x, y, hasActual };
   });
-  const path = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+  const path = points
+    .filter((point) => point.hasActual)
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+    .join(' ');
 
   return (
     <div className="usage-chart-card">
@@ -7801,11 +7912,15 @@ function MetricLineChart({ data, title, subtitle, unit = '', fallbackMax = 10 })
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
         <line className="chart-axis" x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} />
         <line className="chart-axis" x1={padding} y1={padding} x2={padding} y2={height - padding} />
-        <path className="chart-line metric-line" d={path} />
+        {path ? <path className="chart-line metric-line" d={path} /> : null}
         {points.map((point) => (
           <g key={point.label}>
-            <circle className="chart-point metric-point" cx={point.x} cy={point.y} r="4" />
-            <text className="chart-value-label" x={point.x} y={Math.max(18, point.y - 10)} textAnchor="middle">{point.actual ? `${point.actual}${unit}` : '0'}</text>
+            {point.hasActual && (
+              <>
+                <circle className="chart-point metric-point" cx={point.x} cy={point.y} r="4" />
+                <text className="chart-value-label" x={point.x} y={Math.max(18, point.y - 10)} textAnchor="middle">{`${point.actual}${unit}`}</text>
+              </>
+            )}
             <text className="chart-label" x={point.x} y={height - 10} textAnchor="middle">{formatPlanChartLabel(point.label)}</text>
           </g>
         ))}
@@ -7833,13 +7948,17 @@ function MetricBarChart({ data, title, subtitle, unit = '', valueKey = 'actual',
           const groupWidth = (width - padding * 2) / Math.max(1, data.length);
           const x = padding + index * groupWidth + (groupWidth - barWidth) / 2;
           const value = item[valueKey] || 0;
+          const hasActualValue = Number.isFinite(item.actual) && item.actual > 0;
+          const shouldShowValue = value > 0 || hasActualValue;
           const barHeight = (value / maxValue) * (height - padding * 2);
           const limitHeight = ((item.limit || 0) / maxValue) * (height - padding * 2);
           return (
             <g key={item.label}>
               {item.limit ? <rect className="chart-bar-limit" x={x} y={height - padding - limitHeight} width={barWidth} height={limitHeight} rx="5" /> : null}
               <rect className="chart-bar-actual metric-bar" x={x} y={height - padding - barHeight} width={barWidth} height={barHeight} rx="5" />
-              <text className="chart-value-label" x={x + barWidth / 2} y={Math.max(18, height - padding - barHeight - 8)} textAnchor="middle">{value ? `${value}${unit}` : '0'}</text>
+              {shouldShowValue ? (
+                <text className="chart-value-label" x={x + barWidth / 2} y={Math.max(18, height - padding - barHeight - 8)} textAnchor="middle">{`${value}${unit}`}</text>
+              ) : null}
               <text className="chart-label" x={x + barWidth / 2} y={height - 10} textAnchor="middle">{formatPlanChartLabel(item.label)}</text>
             </g>
           );
@@ -7911,6 +8030,8 @@ function EditableTable({ columns, rows, section, disabled, updateRow, deleteRow,
                         <option key={option} value={option}>{option}</option>
                       ))}
                     </select>
+                  ) : type === 'readonly' ? (
+                    <input className="readonly-plan-cell" value={row[field] || ''} readOnly />
                   ) : (
                     <input value={row[field] || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, field, event.target.value)} />
                   )}
@@ -10498,7 +10619,6 @@ function AdminWorkspace({
   ];
   const adminPageItems = [
     { id: 'overview', label: '总览', detail: '状态、统计、待办', icon: Star, count: `${publishedCount} 篇` },
-    { id: 'health', label: '健康', detail: '接口、错误、资源', icon: ShieldCheck, count: frontendErrorLogs.length ? `${frontendErrorLogs.length} 错误` : 'OK' },
     { id: 'editor', label: '写文章', detail: editingArticleId ? '继续编辑当前文章' : '随笔和普通文章', icon: FilePenLine, count: draftCount ? `${draftCount} 草稿` : 'Markdown' },
     { id: 'articles', label: '内容库', detail: '编辑、删除、置顶', icon: BookOpen, count: `${articles.length} 篇` },
     { id: 'notes', label: '笔记上传', detail: '导入 .md 和内含图片', icon: BookOpen, count: 'MkDocs 感' },
@@ -10506,17 +10626,22 @@ function AdminWorkspace({
     { id: 'toolbox', label: '工具箱', detail: '自定义网址和友链', icon: Wrench, count: 'Links' },
     { id: 'comments', label: '评论', detail: '查看和删除评论', icon: MessageCircle, count: `${adminComments.length} 条` },
     { id: 'backups', label: '备份', detail: '导出、导入和恢复', icon: Save, count: `${backupRecords.length} 份` },
-    { id: 'corpus', label: '语料', detail: '群聊语气和样本', icon: Bot, count: `${botCorpusSamples.length} 条` },
-    { id: 'study', label: '学习助手', detail: '复盘和学习任务', icon: CheckCircle2, count: `${studyState.tasks.length} 项` },
     { id: 'releases', label: '版本', detail: '更新记录和路线', icon: Code2, count: releaseRoadmap[0].version },
-    { id: 'visual', label: '视觉巡检', detail: '白底、控件、夜间模式', icon: Eye, count: 'QA' },
     { id: 'ops', label: '运维', detail: '服务、部署、脚本', icon: ShieldCheck, count: '控制台' },
     { id: 'security', label: '安全', detail: '操作日志和删除保护', icon: ShieldCheck, count: `${adminAuditLogs.length} 条` }
   ];
+  const visibleAdminPageIds = new Set(adminPageItems.map((item) => item.id));
 
   useEffect(() => {
     localStorage.setItem(ADMIN_PAGE_KEY, activeAdminPage);
   }, [activeAdminPage]);
+
+  useEffect(() => {
+    if (!visibleAdminPageIds.has(activeAdminPage)) {
+      setActiveAdminPage('overview');
+      writeBrowserRoute('/admin');
+    }
+  }, [activeAdminPage, visibleAdminPageIds]);
 
   const articleCategoryOptions = Array.from(
     new Set(articles.map((article) => article.category || '未分类'))
