@@ -547,6 +547,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.6.1',
+    title: '后台健康面板初始化修复',
+    date: '2026-08-14',
+    status: '已上线',
+    points: ['修复后台健康面板和导航统计读取错误日志状态过早导致的 /admin 白屏', '保留后台局部错误兜底，后续模块异常会更容易定位']
+  },
+  {
     version: 'v6.6.0',
     title: '后台体验和工具箱批量能力',
     date: '2026-08-14',
@@ -10323,6 +10330,42 @@ function AdminWorkspace({
       tone: 'ready'
     }
   ];
+  const contentTextareaRef = useRef(null);
+  const previewScrollRef = useRef(null);
+  const [aiInsertMode, setAiInsertMode] = useState('append');
+  const [activeAdminPage, setActiveAdminPage] = useState(readStoredAdminPage);
+  const [adminStatsRange, setAdminStatsRange] = useState('7d');
+  const [articleManagerQuery, setArticleManagerQuery] = useState('');
+  const [articleManagerStatus, setArticleManagerStatus] = useState('all');
+  const [articleManagerCategory, setArticleManagerCategory] = useState('all');
+  const [selectedManagerArticleIds, setSelectedManagerArticleIds] = useState([]);
+  const [managerCollectionDraft, setManagerCollectionDraft] = useState('');
+  const [managerPathDraft, setManagerPathDraft] = useState('');
+  const [draggingArticleId, setDraggingArticleId] = useState(null);
+  const [dragOverArticleId, setDragOverArticleId] = useState(null);
+  const [imageManagerQuery, setImageManagerQuery] = useState('');
+  const [imageManagerSort, setImageManagerSort] = useState('newest');
+  const [draftHistory, setDraftHistory] = useState(readDraftHistory);
+  const [frontendErrorLogs, setFrontendErrorLogs] = useState(readFrontendErrorLogs);
+  const [backupRecords, setBackupRecords] = useState(readBackupRecords);
+  const [backupNote, setBackupNote] = useState('');
+  const [backupImportPreview, setBackupImportPreview] = useState(null);
+  const [botCorpusSamples, setBotCorpusSamples] = useState(readBotCorpusSamples);
+  const [corpusInput, setCorpusInput] = useState('');
+  const [studyState, setStudyState] = useState(readStudyState);
+  const [studyInput, setStudyInput] = useState('');
+  const shouldShowAdminLayout = ['editor', 'notes', 'articles', 'music', 'comments', 'toolbox'].includes(activeAdminPage);
+  const deferredArticleContent = useDeferredValue(articleForm.content);
+  const editorStats = useMemo(() => {
+    const content = articleForm.content || '';
+    return {
+      words: countReadableWords(content),
+      readTime: estimateReadingTime(content),
+      headings: (content.match(/^#{1,6}\s+.+$/gm) || []).length + (content.match(/^[^\n]+\n[=-]{3,}\s*$/gm) || []).length,
+      tasks: (content.match(/^- \[[ xX]\]\s+/gm) || []).length,
+      images: (content.match(/!\[[^\]]*]\([^)]*\)/g) || []).length
+    };
+  }, [articleForm.content]);
   const siteHealthItems = [
     {
       label: '文章接口',
@@ -10375,42 +10418,6 @@ function AdminWorkspace({
     { id: 'ops', label: '运维', detail: '服务、部署、脚本', icon: ShieldCheck, count: '控制台' },
     { id: 'security', label: '安全', detail: '操作日志和删除保护', icon: ShieldCheck, count: `${adminAuditLogs.length} 条` }
   ];
-  const contentTextareaRef = useRef(null);
-  const previewScrollRef = useRef(null);
-  const [aiInsertMode, setAiInsertMode] = useState('append');
-  const [activeAdminPage, setActiveAdminPage] = useState(readStoredAdminPage);
-  const [adminStatsRange, setAdminStatsRange] = useState('7d');
-  const [articleManagerQuery, setArticleManagerQuery] = useState('');
-  const [articleManagerStatus, setArticleManagerStatus] = useState('all');
-  const [articleManagerCategory, setArticleManagerCategory] = useState('all');
-  const [selectedManagerArticleIds, setSelectedManagerArticleIds] = useState([]);
-  const [managerCollectionDraft, setManagerCollectionDraft] = useState('');
-  const [managerPathDraft, setManagerPathDraft] = useState('');
-  const [draggingArticleId, setDraggingArticleId] = useState(null);
-  const [dragOverArticleId, setDragOverArticleId] = useState(null);
-  const [imageManagerQuery, setImageManagerQuery] = useState('');
-  const [imageManagerSort, setImageManagerSort] = useState('newest');
-  const [draftHistory, setDraftHistory] = useState(readDraftHistory);
-  const [frontendErrorLogs, setFrontendErrorLogs] = useState(readFrontendErrorLogs);
-  const [backupRecords, setBackupRecords] = useState(readBackupRecords);
-  const [backupNote, setBackupNote] = useState('');
-  const [backupImportPreview, setBackupImportPreview] = useState(null);
-  const [botCorpusSamples, setBotCorpusSamples] = useState(readBotCorpusSamples);
-  const [corpusInput, setCorpusInput] = useState('');
-  const [studyState, setStudyState] = useState(readStudyState);
-  const [studyInput, setStudyInput] = useState('');
-  const shouldShowAdminLayout = ['editor', 'notes', 'articles', 'music', 'comments', 'toolbox'].includes(activeAdminPage);
-  const deferredArticleContent = useDeferredValue(articleForm.content);
-  const editorStats = useMemo(() => {
-    const content = articleForm.content || '';
-    return {
-      words: countReadableWords(content),
-      readTime: estimateReadingTime(content),
-      headings: (content.match(/^#{1,6}\s+.+$/gm) || []).length + (content.match(/^[^\n]+\n[=-]{3,}\s*$/gm) || []).length,
-      tasks: (content.match(/^- \[[ xX]\]\s+/gm) || []).length,
-      images: (content.match(/!\[[^\]]*]\([^)]*\)/g) || []).length
-    };
-  }, [articleForm.content]);
 
   useEffect(() => {
     localStorage.setItem(ADMIN_PAGE_KEY, activeAdminPage);
