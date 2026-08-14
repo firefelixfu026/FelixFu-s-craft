@@ -103,7 +103,7 @@ p {
 
 .mode-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 14px;
 }
 
@@ -123,6 +123,10 @@ p {
 
 .mode-card.primary {
     background: linear-gradient(135deg, #1f8b78, #667eea);
+}
+
+.mode-card.online {
+    background: linear-gradient(135deg, #256f97, #1f8b78);
 }
 
 .mode-card.locked {
@@ -204,7 +208,8 @@ p {
     gap: 14px;
 }
 
-.settings-grid label {
+.settings-grid label,
+.online-panel label {
     display: grid;
     gap: 8px;
     padding: 16px;
@@ -214,13 +219,56 @@ p {
 }
 
 .settings-grid input,
-.settings-grid select {
+.settings-grid select,
+.online-panel input {
     min-height: 42px;
     padding: 0 12px;
     border: 1px solid #d7ddea;
     border-radius: 8px;
     color: #172033;
     background: #ffffff;
+}
+
+.online-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.online-panel,
+.online-status {
+    border: 1px solid rgba(255, 255, 255, 0.58);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 18px 42px rgba(30, 23, 60, 0.18);
+}
+
+.online-panel {
+    display: grid;
+    gap: 12px;
+    padding: 18px;
+}
+
+.online-panel > span {
+    color: #667eea;
+    font-size: 13px;
+    font-weight: 950;
+}
+
+.online-panel h2 {
+    margin: 0;
+    font-size: 28px;
+}
+
+.online-status {
+    padding: 16px 18px;
+    color: #4f5c75;
+    font-weight: 900;
+}
+
+.online-status[data-tone="error"] {
+    color: #a9273e;
+    background: rgba(255, 236, 241, 0.94);
 }
 
 .settings-note {
@@ -480,6 +528,7 @@ p {
 
 @media (max-width: 860px) {
     .mode-grid,
+    .online-grid,
     .settings-grid,
     .skill-buttons {
         grid-template-columns: 1fr;
