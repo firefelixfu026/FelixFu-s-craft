@@ -10,7 +10,7 @@ class YuanQiGame {
             star5: { name: '五星连珠', mpDelta: -4, attack: 4, type: 'wave', category: '波类', note: '4 魔，4 伤害' },
             star7: { name: '七星连珠', mpDelta: -6, attack: 6, type: 'wave', category: '波类', note: '6 魔，6 伤害' },
             star9: { name: '九星连珠', mpDelta: -8, attack: 8, type: 'wave', category: '波类', note: '8 魔，8 伤害' },
-            ramen: { name: '拉面', mpDelta: 2, attack: 0, type: 'charge', category: '攒魔/防御类', note: '获得 2 魔' },
+            ramen: { name: '拉面', mpDelta: 2, attack: 0, type: 'charge', category: '攒魔/防御类', blocks: ['despise', 'airplane'], note: '获得 2 魔，可以防住鄙视和伟哲开飞机' },
             Ldef: { name: 'L 防', mpDelta: 1, attack: 0, type: 'defense', category: '攒魔/防御类', blocks: ['slash', 'gun', 'thunder'], maxBlockedAttack: 1, note: '+1 魔，防斩类、小枪、大枪、雷切和小于 1 伤害' },
             Xdef: { name: 'X 防', mpDelta: 1, attack: 0, type: 'defense', category: '攒魔/防御类', blocks: ['wave', 'gun', 'thunder'], maxBlockedAttack: 1, note: '+1 魔，防波类、小枪、大枪、雷切和小于 1 伤害' },
             equalDef: { name: '= 防', mpDelta: 1, attack: 0, type: 'defense', category: '攒魔/防御类', blocks: ['sweep'], bonusOnBlock: 5, note: '+1 魔，防扫堂腿，成功额外 +5 魔' },
@@ -66,6 +66,8 @@ class YuanQiGame {
         this.mode = 'normal';
         this.match = null;
         this.timerId = null;
+        this.online = null;
+        this.onlinePollId = null;
         this.timeLeft = 0;
         this.bindEvents();
         this.renderSkillCategoryNav();
@@ -79,20 +81,35 @@ class YuanQiGame {
         });
         document.querySelectorAll('[data-go-home]').forEach((button) => {
             button.addEventListener('click', () => {
+                this.stopOnlinePolling();
+                this.online = null;
                 this.readSettings();
                 this.showScreen('home');
             });
         });
         document.getElementById('open-settings').addEventListener('click', () => this.showScreen('settings'));
         document.getElementById('quick-start').addEventListener('click', () => this.startMatch('normal'));
+        document.getElementById('online-mode').addEventListener('click', () => this.openOnlineScreen());
+        document.getElementById('create-online-room').addEventListener('click', () => this.createOnlineRoom());
+        document.getElementById('join-online-room').addEventListener('click', () => this.joinOnlineRoom());
         document.getElementById('crisis-mode').addEventListener('click', () => {
             window.alert('危机合约模式正在制作中：未来会加入词条、限制条件和高难奖励。');
         });
         document.getElementById('back-home').addEventListener('click', () => {
             this.stopTimer();
+            this.stopOnlinePolling();
+            this.online = null;
             this.showScreen('home');
         });
-        document.getElementById('restart-match').addEventListener('click', () => this.startMatch(this.mode));
+        document.getElementById('restart-match').addEventListener('click', () => {
+            if (this.mode === 'online') {
+                this.stopOnlinePolling();
+                this.online = null;
+                this.openOnlineScreen();
+                return;
+            }
+            this.startMatch(this.mode);
+        });
         document.getElementById('toggle-fullscreen').addEventListener('click', () => this.toggleFullscreen());
         document.addEventListener('fullscreenchange', () => this.updateFullscreenButton());
     }
@@ -100,6 +117,108 @@ class YuanQiGame {
     showScreen(name) {
         document.querySelectorAll('.screen').forEach((screen) => screen.classList.remove('active'));
         document.getElementById(`${name}-screen`).classList.add('active');
+    }
+
+    openOnlineScreen() {
+        this.stopTimer();
+        this.stopOnlinePolling();
+        this.online = null;
+        this.mode = 'online';
+        this.setOnlineStatus('创建房间后，把房间号发给对手；对手加入后会自动进入对战。');
+        this.showScreen('online');
+    }
+
+    setOnlineStatus(message, tone = '') {
+        const status = document.getElementById('online-status');
+        status.textContent = message;
+        status.dataset.tone = tone;
+    }
+
+    async yuanQiApi(path, options = {}) {
+        const response = await fetch(`/api/yuan-qi${path}`, {
+            headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+            ...options
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(data.detail || '联网请求失败');
+        }
+        return data;
+    }
+
+    async createOnlineRoom() {
+        this.readSettings();
+        const playerName = document.getElementById('online-create-name').value || '玩家 1';
+        this.setOnlineStatus('正在创建房间...');
+        try {
+            const payload = await this.yuanQiApi('/rooms', {
+                method: 'POST',
+                body: JSON.stringify({ playerName, rounds: this.settings.rounds })
+            });
+            this.enterOnlineRoom(payload);
+            this.setOnlineStatus(`房间 ${payload.roomCode} 已创建，发给对手加入。`);
+        } catch (error) {
+            this.setOnlineStatus(error.message, 'error');
+        }
+    }
+
+    async joinOnlineRoom() {
+        const playerName = document.getElementById('online-join-name').value || '玩家 2';
+        const code = document.getElementById('online-room-code').value.trim().toUpperCase();
+        if (!code) {
+            this.setOnlineStatus('先输入房间号。', 'error');
+            return;
+        }
+        this.setOnlineStatus('正在加入房间...');
+        try {
+            const payload = await this.yuanQiApi(`/rooms/${encodeURIComponent(code)}/join`, {
+                method: 'POST',
+                body: JSON.stringify({ playerName })
+            });
+            this.enterOnlineRoom(payload);
+        } catch (error) {
+            this.setOnlineStatus(error.message, 'error');
+        }
+    }
+
+    enterOnlineRoom(payload) {
+        this.mode = 'online';
+        this.online = {
+            roomCode: payload.roomCode,
+            playerId: payload.playerId,
+            token: payload.token
+        };
+        this.match = payload.state;
+        this.showScreen('battle');
+        this.renderBattle();
+        this.startOnlinePolling();
+    }
+
+    startOnlinePolling() {
+        this.stopOnlinePolling();
+        this.onlinePollId = window.setInterval(() => this.refreshOnlineRoom(), 1200);
+        this.refreshOnlineRoom();
+    }
+
+    stopOnlinePolling() {
+        if (this.onlinePollId) window.clearInterval(this.onlinePollId);
+        this.onlinePollId = null;
+    }
+
+    async refreshOnlineRoom() {
+        if (!this.online) return;
+        try {
+            const query = new URLSearchParams({
+                playerId: this.online.playerId,
+                token: this.online.token
+            });
+            const payload = await this.yuanQiApi(`/rooms/${encodeURIComponent(this.online.roomCode)}?${query.toString()}`);
+            this.match = payload.state;
+            this.renderBattle();
+            if (this.match.status === 'finished') this.stopOnlinePolling();
+        } catch (error) {
+            document.getElementById('round-status').textContent = error.message;
+        }
     }
 
     readSettings() {
@@ -118,6 +237,8 @@ class YuanQiGame {
         this.readSettings();
         this.mode = mode;
         this.stopTimer();
+        this.stopOnlinePolling();
+        this.online = null;
         this.match = {
             currentBattle: 1,
             totalBattles: mode === 'normal' ? this.settings.rounds : 1,
@@ -247,13 +368,32 @@ class YuanQiGame {
     renderBattle() {
         if (!this.match) return;
         this.ensureSelectedTarget();
-        document.getElementById('mode-label').textContent = this.mode === 'timed' ? '限时模式' : '普通模式';
+        document.getElementById('mode-label').textContent = this.getModeLabel();
         document.getElementById('battle-title').textContent = `第 ${this.match.currentBattle} / ${this.match.totalBattles} 局 · 第 ${this.match.round} 回合`;
-        document.getElementById('round-status').textContent = this.match.locked ? '本回合结算中' : '请选择技能';
+        document.getElementById('round-status').textContent = this.getRoundStatus();
+        document.getElementById('restart-match').textContent = this.mode === 'online' ? '换房间' : '重开';
+        document.getElementById('timer-pill').classList.toggle('hidden', this.mode !== 'timed');
         this.renderScores();
         this.renderFighters();
         this.renderTargetPicker();
         this.updateSkillButtons();
+    }
+
+    getModeLabel() {
+        if (this.mode === 'online') return `联网双人 · 房间 ${this.online?.roomCode || this.match.code || ''}`;
+        return this.mode === 'timed' ? '限时模式' : '普通模式';
+    }
+
+    getRoundStatus() {
+        if (this.mode !== 'online') return this.match.locked ? '本回合结算中' : '请选择技能';
+        if (this.match.status === 'waiting') return `房间 ${this.online?.roomCode || this.match.code} 已创建，等待对手加入`;
+        if (this.match.status === 'finished') {
+            const winner = this.match.fighters.find((fighter) => fighter.id === this.match.winnerId);
+            return `对战结束，胜者：${winner?.name || '无人'}`;
+        }
+        const player = this.getPlayer();
+        if (this.match.submitted?.includes(player?.id)) return '你已出招，等待对手';
+        return '请选择技能';
     }
 
     renderScores() {
@@ -270,8 +410,10 @@ class YuanQiGame {
         const grid = document.getElementById('fighters-grid');
         grid.innerHTML = this.match.fighters.map((fighter) => {
             const lastSkill = fighter.lastSkill ? this.skills[fighter.lastSkill].name : '未出招';
+            const submitted = this.mode === 'online' && this.match.submitted?.includes(fighter.id);
+            const role = fighter.id === this.online?.playerId ? '你' : fighter.kind === 'human' ? '对手' : '电脑';
             return `<article class="fighter-card ${fighter.alive ? '' : 'down'}">
-                <span>${fighter.kind === 'human' ? '玩家' : '电脑'}</span>
+                <span>${role}${submitted ? ' · 已出招' : ''}</span>
                 <strong>${fighter.name}</strong>
                 <p>元气 ${fighter.mp}</p>
                 <em>上一轮：${lastSkill}</em>
@@ -282,6 +424,10 @@ class YuanQiGame {
     ensureSelectedTarget() {
         if (!this.match) return;
         const player = this.getPlayer();
+        if (!player) {
+            this.match.selectedTarget = null;
+            return;
+        }
         const targets = this.match.fighters.filter((fighter) => fighter.id !== player.id && fighter.alive);
         if (!targets.some((fighter) => fighter.id === this.match.selectedTarget)) {
             this.match.selectedTarget = targets[0]?.id || null;
@@ -291,6 +437,11 @@ class YuanQiGame {
     renderTargetPicker() {
         const picker = document.getElementById('target-picker');
         const player = this.getPlayer();
+        if (!player || this.match.status === 'waiting' || this.match.status === 'finished') {
+            picker.classList.add('hidden');
+            picker.innerHTML = '';
+            return;
+        }
         const targets = this.match.fighters.filter((fighter) => fighter.id !== player.id && fighter.alive);
         picker.classList.toggle('hidden', targets.length <= 1);
         if (targets.length <= 1) {
@@ -321,8 +472,10 @@ class YuanQiGame {
         const player = this.getPlayer();
         document.querySelectorAll('#skill-buttons .skill').forEach((button) => {
             const skill = this.skills[button.dataset.skill];
-            const lacksMagic = player.mp + skill.mpDelta < 0;
-            const usable = player.alive && !this.match.locked && !lacksMagic;
+            const lacksMagic = !player || player.mp + skill.mpDelta < 0;
+            const waitingOnline = this.mode === 'online' && this.match.status !== 'playing';
+            const submittedOnline = this.mode === 'online' && this.match.submitted?.includes(player?.id);
+            const usable = player?.alive && !this.match.locked && !waitingOnline && !submittedOnline && !lacksMagic;
             button.disabled = !usable;
             button.classList.toggle('unaffordable', lacksMagic);
             button.classList.toggle('selected', this.match.selectedSkill === button.dataset.skill);
@@ -333,6 +486,10 @@ class YuanQiGame {
         const player = this.getPlayer();
         const skill = this.skills[skillId];
         if (!this.match || this.match.locked || !player.alive || player.mp + skill.mpDelta < 0) return;
+        if (this.mode === 'online') {
+            this.chooseOnlineSkill(skillId);
+            return;
+        }
         this.stopTimer();
         this.match.locked = true;
         this.match.selectedSkill = skillId;
@@ -344,6 +501,33 @@ class YuanQiGame {
         });
         window.setTimeout(() => this.resolveRound(), 450);
         this.renderBattle();
+    }
+
+    async chooseOnlineSkill(skillId) {
+        const player = this.getPlayer();
+        const skill = this.skills[skillId];
+        if (!this.online || !player || this.match.status !== 'playing') return;
+        if (this.match.submitted?.includes(player.id)) return;
+        if (player.mp + skill.mpDelta < 0) return;
+        this.match.selectedSkill = skillId;
+        this.updateSkillButtons();
+        try {
+            const payload = await this.yuanQiApi(`/rooms/${encodeURIComponent(this.online.roomCode)}/move`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    playerId: this.online.playerId,
+                    token: this.online.token,
+                    skillId,
+                    targetId: skill.attack > 0 && !skill.group ? this.match.selectedTarget : null
+                })
+            });
+            this.match = payload.state;
+            this.renderBattle();
+        } catch (error) {
+            document.getElementById('round-status').textContent = error.message;
+            this.match.selectedSkill = null;
+            this.updateSkillButtons();
+        }
     }
 
     chooseAiSkill(fighter) {
@@ -481,6 +665,9 @@ class YuanQiGame {
     }
 
     getPlayer() {
+        if (this.mode === 'online' && this.online?.playerId) {
+            return this.match.fighters.find((fighter) => fighter.id === this.online.playerId);
+        }
         return this.match.fighters.find((fighter) => fighter.kind === 'human');
     }
 

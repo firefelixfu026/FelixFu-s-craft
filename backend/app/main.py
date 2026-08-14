@@ -2,6 +2,7 @@ import hmac
 import json
 import os
 import re
+import secrets
 import subprocess
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -31,7 +32,7 @@ from app.auth import (
 )
 from app.database import SessionLocal, get_db, init_db
 from app.github_oauth import fetch_github_identity, get_github_authorize_url
-from app.models import AdminAuditLog, AiGeneration, Article, Comment, ReactionCounter, SiteSetting, SummerPlan, Tag, ToolboxLink, User, UserReaction
+from app.models import AdminAuditLog, AiGeneration, Article, Comment, ReactionCounter, SiteSetting, SummerPlan, Tag, ToolboxLink, User, UserReaction, YuanQiRoom
 from app.seed import REACTION_TYPES, seed_database
 
 
@@ -364,6 +365,22 @@ class CommentBulkActionIn(BaseModel):
 class ReactionIn(BaseModel):
     type: Literal["like", "favorite", "downvote", "question"]
     active: bool = True
+
+
+class YuanQiCreateRoomIn(BaseModel):
+    playerName: str = "玩家 1"
+    rounds: int = 1
+
+
+class YuanQiJoinRoomIn(BaseModel):
+    playerName: str = "玩家 2"
+
+
+class YuanQiMoveIn(BaseModel):
+    playerId: str
+    token: str
+    skillId: str
+    targetId: str | None = None
 
 
 class ArticleIn(BaseModel):
@@ -2312,6 +2329,348 @@ def _build_local_ai_editor_content(
         "### 3. 总结和下一步\n\n"
         "- 当前结论\n- 后续计划\n"
     )
+
+
+YUAN_QI_ROOM_TTL_HOURS = 12
+YUAN_QI_ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+YUAN_QI_SKILLS: dict[str, dict[str, Any]] = {
+    "slash1": {"name": "一斩", "mpDelta": 0, "attack": 0.5, "type": "slash"},
+    "slash2": {"name": "二斩", "mpDelta": -1, "attack": 1, "type": "slash"},
+    "slash3": {"name": "三斩", "mpDelta": -3, "attack": 3, "type": "slash"},
+    "slash6": {"name": "六斩", "mpDelta": -6, "attack": 6, "type": "slash"},
+    "slash11": {"name": "十一斩", "mpDelta": -11, "attack": 11, "type": "slash"},
+    "wave": {"name": "波", "mpDelta": -2, "attack": 2, "type": "wave"},
+    "star5": {"name": "五星连珠", "mpDelta": -4, "attack": 4, "type": "wave"},
+    "star7": {"name": "七星连珠", "mpDelta": -6, "attack": 6, "type": "wave"},
+    "star9": {"name": "九星连珠", "mpDelta": -8, "attack": 8, "type": "wave"},
+    "ramen": {"name": "拉面", "mpDelta": 2, "attack": 0, "type": "charge", "blocks": ["despise", "airplane"]},
+    "Ldef": {"name": "L 防", "mpDelta": 1, "attack": 0, "type": "defense", "blocks": ["slash", "gun", "thunder"], "maxBlockedAttack": 1},
+    "Xdef": {"name": "X 防", "mpDelta": 1, "attack": 0, "type": "defense", "blocks": ["wave", "gun", "thunder"], "maxBlockedAttack": 1},
+    "equalDef": {"name": "= 防", "mpDelta": 1, "attack": 0, "type": "defense", "blocks": ["sweep"], "bonusOnBlock": 5},
+    "entryDef": {"name": "入防", "mpDelta": 1, "attack": 0, "type": "defense", "blocks": ["tsunami"], "bonusOnBlock": 10},
+    "goldenBell": {"name": "金钟罩", "mpDelta": -1, "attack": 0, "type": "defense", "blockRange": [1, 5], "brokenBy": ["gun"]},
+    "ironShirt": {"name": "铁布衫", "mpDelta": -1, "attack": 0, "type": "defense", "blockRange": [6, 10]},
+    "energyShield": {"name": "能量罩", "mpDelta": -1, "attack": 0, "type": "defense", "blockRange": [11, 100]},
+    "indifferent": {"name": "无动于衷", "mpDelta": 1, "attack": 0, "type": "defense", "blocks": ["gun", "despise", "absorb"]},
+    "selfKill": {"name": "自杀", "mpDelta": 0, "attack": 0, "type": "self"},
+    "absorb": {"name": "吸", "mpDelta": 0, "attack": 0, "type": "absorb"},
+    "store": {"name": "屯", "mpDelta": 0, "attack": 0, "type": "store"},
+    "bell": {"name": "铃", "mpDelta": 1, "attack": 0.25, "type": "bell"},
+    "zeroSlash": {"name": "零斩", "mpDelta": 1, "attack": 0, "type": "defense", "blocks": ["mudslide"], "bonusOnBlock": 5},
+    "scissors": {"name": "剪刀", "mpDelta": 0, "attack": 0, "type": "defense", "blocks": ["airplane"]},
+    "despise": {"name": "鄙视", "mpDelta": -3, "attack": 2, "type": "despise"},
+    "airplane": {"name": "伟哲开飞机", "mpDelta": -5, "attack": 2, "type": "airplane"},
+    "tsunami": {"name": "海啸", "mpDelta": -10, "attack": 10, "type": "tsunami"},
+    "tornado": {"name": "龙卷风", "mpDelta": -30, "attack": 30, "type": "finale"},
+    "doomsday": {"name": "世界末日", "mpDelta": -100, "attack": 100, "type": "finale"},
+    "fireGun": {"name": "火枪", "mpDelta": -2, "attack": 0.5, "type": "slash", "group": True},
+    "cannon": {"name": "火炮", "mpDelta": -3, "attack": 1, "type": "slash", "group": True},
+    "volcano": {"name": "火山", "mpDelta": -5, "attack": 2, "type": "wave", "group": True},
+    "iceberg": {"name": "冰山", "mpDelta": -5, "attack": 0, "type": "freeze", "group": True},
+    "bomber": {"name": "伟哲开轰炸机", "mpDelta": -12, "attack": 2, "type": "airplane", "group": True},
+    "thunderStrike": {"name": "雷霆万钧", "mpDelta": -7, "attack": 6, "type": "thunder", "group": True, "breaks": ["ironShirt"]},
+    "pistol": {"name": "小枪", "mpDelta": -2, "attack": 3, "type": "gun", "breaks": ["goldenBell"]},
+    "rifle": {"name": "大枪", "mpDelta": -3, "attack": 4, "type": "gun", "breaks": ["goldenBell"]},
+    "thunder": {"name": "雷切", "mpDelta": -4, "attack": 6, "type": "thunder", "breaks": ["ironShirt"]},
+    "mudslide": {"name": "泥石流", "mpDelta": -5, "attack": 5, "type": "mudslide"},
+    "sweep": {"name": "扫堂腿", "mpDelta": -6, "attack": 6, "type": "sweep"},
+    "bind": {"name": "绑定", "mpDelta": 0, "attack": 0, "type": "special"},
+    "curse": {"name": "诅咒", "mpDelta": 0, "attack": 0, "type": "curse"},
+    "freeze": {"name": "冻", "mpDelta": 0, "attack": 0, "type": "freeze"},
+    "ignition": {"name": "打火", "mpDelta": 0, "attack": 0, "type": "ignite"},
+    "upstairs": {"name": "上楼", "mpDelta": -1, "attack": 0, "type": "height"},
+    "downstairs": {"name": "下楼", "mpDelta": 1, "attack": 0, "type": "height"},
+    "clearPool": {"name": "举身赴清池", "mpDelta": 0, "attack": 0, "type": "state"},
+    "hangBranch": {"name": "自挂东南枝", "mpDelta": 0, "attack": 0, "type": "state"},
+    "basketball": {"name": "打篮球", "mpDelta": 0, "attack": 0, "type": "state"},
+    "volleyball": {"name": "打排球", "mpDelta": 0, "attack": 0, "type": "state"},
+}
+
+for _yuan_qi_skill_id, _yuan_qi_skill in YUAN_QI_SKILLS.items():
+    _yuan_qi_skill["id"] = _yuan_qi_skill_id
+
+
+def _yuan_qi_clean_name(name: str, fallback: str) -> str:
+    clean = re.sub(r"\s+", " ", (name or "").strip())
+    return (clean or fallback)[:16]
+
+
+def _yuan_qi_new_room_code(db: Session) -> str:
+    for _ in range(20):
+        code = "".join(secrets.choice(YUAN_QI_ROOM_CODE_ALPHABET) for _ in range(6))
+        if db.get(YuanQiRoom, code) is None:
+            return code
+    raise HTTPException(status_code=503, detail="房间号生成失败，请重试")
+
+
+def _yuan_qi_new_fighter(player_id: str, name: str) -> dict[str, Any]:
+    return {
+        "id": player_id,
+        "name": name,
+        "kind": "human",
+        "alive": True,
+        "mp": 0,
+        "skill": None,
+        "targetId": None,
+        "lastSkill": None,
+    }
+
+
+def _yuan_qi_public_state(state: dict[str, Any]) -> dict[str, Any]:
+    public = {
+        key: value
+        for key, value in state.items()
+        if key not in {"tokens", "moves"}
+    }
+    public["submitted"] = sorted((state.get("moves") or {}).keys())
+    return public
+
+
+def _yuan_qi_room_payload(room: YuanQiRoom, player_id: str, token: str | None = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "roomCode": room.code,
+        "playerId": player_id,
+        "state": _yuan_qi_public_state(room.state or {}),
+    }
+    if token:
+        payload["token"] = token
+    return payload
+
+
+def _yuan_qi_get_room(db: Session, room_code: str) -> YuanQiRoom:
+    room = db.get(YuanQiRoom, room_code.strip().upper())
+    if room is None:
+        raise HTTPException(status_code=404, detail="房间不存在")
+    return room
+
+
+def _yuan_qi_require_player(state: dict[str, Any], player_id: str, token: str) -> None:
+    if (state.get("tokens") or {}).get(player_id) != token:
+        raise HTTPException(status_code=403, detail="玩家身份无效")
+
+
+def _yuan_qi_alive_fighters(state: dict[str, Any]) -> list[dict[str, Any]]:
+    return [fighter for fighter in state.get("fighters", []) if fighter.get("alive")]
+
+
+def _yuan_qi_blocks_attack(defense_skill: dict[str, Any] | None, attack_skill: dict[str, Any] | None) -> bool:
+    if not defense_skill or not attack_skill or attack_skill.get("attack", 0) <= 0:
+        return False
+    if defense_skill.get("id") in attack_skill.get("breaks", []) or defense_skill.get("name") in attack_skill.get("breaks", []):
+        return False
+    if attack_skill.get("type") in defense_skill.get("brokenBy", []):
+        return False
+    if attack_skill.get("type") in defense_skill.get("blocks", []):
+        return True
+    if defense_skill.get("maxBlockedAttack") and attack_skill.get("attack", 0) < defense_skill["maxBlockedAttack"]:
+        return True
+    if defense_skill.get("blockRange"):
+        min_attack, max_attack = defense_skill["blockRange"]
+        return min_attack <= attack_skill.get("attack", 0) <= max_attack
+    return False
+
+
+def _yuan_qi_attack_targets_fighter(attacker: dict[str, Any], target: dict[str, Any]) -> bool:
+    attack_skill = YUAN_QI_SKILLS.get(attacker.get("skill") or "")
+    if not attack_skill or attack_skill.get("attack", 0) <= 0:
+        return False
+    return bool(attack_skill.get("group")) or attacker.get("targetId") == target.get("id")
+
+
+def _yuan_qi_incoming_attack(attacker: dict[str, Any], target: dict[str, Any]) -> float:
+    attack_skill = YUAN_QI_SKILLS.get(attacker.get("skill") or "")
+    defense_skill = YUAN_QI_SKILLS.get(target.get("skill") or "")
+    if not attack_skill or attack_skill.get("attack", 0) <= 0:
+        return 0
+    if not _yuan_qi_attack_targets_fighter(attacker, target):
+        return 0
+    if _yuan_qi_blocks_attack(defense_skill, attack_skill):
+        return 0
+    return float(attack_skill.get("attack", 0))
+
+
+def _yuan_qi_reset_fighters_for_next_battle(state: dict[str, Any]) -> None:
+    state["fighters"] = [
+        _yuan_qi_new_fighter(fighter["id"], fighter["name"])
+        for fighter in state.get("fighters", [])
+    ]
+    state["moves"] = {}
+
+
+def _yuan_qi_resolve_if_ready(state: dict[str, Any]) -> None:
+    alive = _yuan_qi_alive_fighters(state)
+    moves = state.get("moves") or {}
+    if not alive or any(fighter["id"] not in moves for fighter in alive):
+        return
+
+    for fighter in alive:
+        move = moves[fighter["id"]]
+        skill = YUAN_QI_SKILLS[move["skillId"]]
+        fighter["skill"] = move["skillId"]
+        fighter["targetId"] = move.get("targetId")
+        fighter["mp"] += skill["mpDelta"]
+        fighter["lastSkill"] = move["skillId"]
+
+    for target in alive:
+        defense_skill = YUAN_QI_SKILLS.get(target.get("skill") or "")
+        if not defense_skill or not defense_skill.get("bonusOnBlock"):
+            continue
+        blocked = any(
+            attacker["id"] != target["id"]
+            and _yuan_qi_attack_targets_fighter(attacker, target)
+            and _yuan_qi_blocks_attack(defense_skill, YUAN_QI_SKILLS.get(attacker.get("skill") or ""))
+            for attacker in alive
+        )
+        if blocked:
+            target["mp"] += defense_skill["bonusOnBlock"]
+
+    for target in alive:
+        target_skill = YUAN_QI_SKILLS.get(target.get("skill") or "")
+        if target_skill and target_skill.get("type") == "self":
+            was_attacked = any(
+                attacker["id"] != target["id"] and _yuan_qi_incoming_attack(attacker, target) > 0
+                for attacker in alive
+            )
+            target["alive"] = was_attacked
+            if was_attacked:
+                target["mp"] += 2
+            continue
+
+        target_attack = float(target_skill.get("attack", 0)) if target_skill else 0
+        strongest_incoming = max(
+            [0, *[
+                _yuan_qi_incoming_attack(attacker, target)
+                for attacker in alive
+                if attacker["id"] != target["id"]
+            ]]
+        )
+        if strongest_incoming > target_attack:
+            target["alive"] = False
+
+    survivors = _yuan_qi_alive_fighters(state)
+    state["moves"] = {}
+    if len(survivors) <= 1:
+        if len(survivors) == 1:
+            state["scores"][survivors[0]["id"]] = state["scores"].get(survivors[0]["id"], 0) + 1
+        if state["currentBattle"] >= state["totalBattles"]:
+            state["status"] = "finished"
+            ordered_scores = sorted(state["scores"].items(), key=lambda item: item[1], reverse=True)
+            state["winnerId"] = ordered_scores[0][0] if ordered_scores else survivors[0]["id"] if survivors else None
+            return
+        state["currentBattle"] += 1
+        state["round"] = 1
+        _yuan_qi_reset_fighters_for_next_battle(state)
+        return
+
+    state["round"] += 1
+    for fighter in state["fighters"]:
+        fighter["skill"] = None
+        fighter["targetId"] = None
+
+
+def _yuan_qi_cleanup_rooms(db: Session) -> None:
+    expires_at = datetime.utcnow() - timedelta(hours=YUAN_QI_ROOM_TTL_HOURS)
+    db.query(YuanQiRoom).filter(YuanQiRoom.updated_at < expires_at).delete(synchronize_session=False)
+    db.commit()
+
+
+@app.post("/api/yuan-qi/rooms")
+def create_yuan_qi_room(payload: YuanQiCreateRoomIn, db: Session = Depends(get_db)) -> dict[str, Any]:
+    _yuan_qi_cleanup_rooms(db)
+    code = _yuan_qi_new_room_code(db)
+    player_id = "p1"
+    token = secrets.token_urlsafe(24)
+    rounds = max(1, min(9, payload.rounds))
+    state = {
+        "code": code,
+        "status": "waiting",
+        "currentBattle": 1,
+        "totalBattles": rounds,
+        "round": 1,
+        "scores": {player_id: 0},
+        "fighters": [_yuan_qi_new_fighter(player_id, _yuan_qi_clean_name(payload.playerName, "玩家 1"))],
+        "moves": {},
+        "tokens": {player_id: token},
+        "winnerId": None,
+    }
+    room = YuanQiRoom(code=code, state=state)
+    db.add(room)
+    db.commit()
+    db.refresh(room)
+    return _yuan_qi_room_payload(room, player_id, token)
+
+
+@app.post("/api/yuan-qi/rooms/{room_code}/join")
+def join_yuan_qi_room(room_code: str, payload: YuanQiJoinRoomIn, db: Session = Depends(get_db)) -> dict[str, Any]:
+    room = _yuan_qi_get_room(db, room_code)
+    state = dict(room.state or {})
+    fighters = list(state.get("fighters") or [])
+    if state.get("status") != "waiting" or len(fighters) >= 2:
+        raise HTTPException(status_code=409, detail="房间已经开始或已满")
+
+    player_id = "p2"
+    token = secrets.token_urlsafe(24)
+    fighters.append(_yuan_qi_new_fighter(player_id, _yuan_qi_clean_name(payload.playerName, "玩家 2")))
+    state["fighters"] = fighters
+    state.setdefault("scores", {})[player_id] = 0
+    state.setdefault("tokens", {})[player_id] = token
+    state["status"] = "playing"
+    state["updatedAt"] = datetime.utcnow().isoformat()
+    room.state = state
+    room.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(room)
+    return _yuan_qi_room_payload(room, player_id, token)
+
+
+@app.get("/api/yuan-qi/rooms/{room_code}")
+def get_yuan_qi_room(room_code: str, playerId: str = Query(...), token: str = Query(...), db: Session = Depends(get_db)) -> dict[str, Any]:
+    room = _yuan_qi_get_room(db, room_code)
+    state = dict(room.state or {})
+    _yuan_qi_require_player(state, playerId, token)
+    return _yuan_qi_room_payload(room, playerId)
+
+
+@app.post("/api/yuan-qi/rooms/{room_code}/move")
+def submit_yuan_qi_move(room_code: str, payload: YuanQiMoveIn, db: Session = Depends(get_db)) -> dict[str, Any]:
+    room = _yuan_qi_get_room(db, room_code)
+    state = dict(room.state or {})
+    _yuan_qi_require_player(state, payload.playerId, payload.token)
+    if state.get("status") != "playing":
+        raise HTTPException(status_code=409, detail="当前房间不能出招")
+
+    fighter = next((item for item in state.get("fighters", []) if item.get("id") == payload.playerId), None)
+    if not fighter or not fighter.get("alive"):
+        raise HTTPException(status_code=409, detail="玩家已经无法出招")
+    moves = dict(state.get("moves") or {})
+    if payload.playerId in moves:
+        raise HTTPException(status_code=409, detail="本回合已经出招")
+
+    skill = YUAN_QI_SKILLS.get(payload.skillId)
+    if not skill:
+        raise HTTPException(status_code=400, detail="未知技能")
+    if fighter.get("mp", 0) + skill["mpDelta"] < 0:
+        raise HTTPException(status_code=400, detail="元气不足")
+
+    target_id = payload.targetId
+    if skill.get("attack", 0) > 0 and not skill.get("group"):
+        valid_targets = [item for item in state.get("fighters", []) if item.get("id") != payload.playerId and item.get("alive")]
+        if not valid_targets:
+            raise HTTPException(status_code=409, detail="没有可攻击对象")
+        if not any(item["id"] == target_id for item in valid_targets):
+            target_id = valid_targets[0]["id"]
+    else:
+        target_id = None
+
+    moves[payload.playerId] = {"skillId": payload.skillId, "targetId": target_id}
+    state["moves"] = moves
+    _yuan_qi_resolve_if_ready(state)
+    state["updatedAt"] = datetime.utcnow().isoformat()
+    room.state = state
+    room.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(room)
+    return _yuan_qi_room_payload(room, payload.playerId)
 
 
 @app.get("/api/game/card-war")

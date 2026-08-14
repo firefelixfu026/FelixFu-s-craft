@@ -26,6 +26,11 @@
                     <strong>倒计时出招</strong>
                     <em>每回合限时，时间到没出招就失败。</em>
                 </button>
+                <button class="mode-card online" id="online-mode">
+                    <span>联网双人</span>
+                    <strong>创建或加入房间</strong>
+                    <em>两台设备输入同一个房间号，双方出招后统一结算。</em>
+                </button>
                 <button class="mode-card locked" id="crisis-mode">
                     <span>危机合约</span>
                     <strong>正在制作中</strong>
@@ -37,6 +42,41 @@
                 <button id="open-settings" class="secondary-action">设置</button>
                 <button id="quick-start" class="primary-action">开始普通模式</button>
             </div>
+        </section>
+
+        <section id="online-screen" class="screen online-screen">
+            <div class="screen-heading">
+                <button class="text-button" data-go-home>返回首页</button>
+                <h1>联网双人</h1>
+            </div>
+
+            <div class="online-grid">
+                <section class="online-panel">
+                    <span>创建房间</span>
+                    <h2>我是房主</h2>
+                    <label>
+                        <span>昵称</span>
+                        <input id="online-create-name" type="text" maxlength="16" value="玩家 1">
+                    </label>
+                    <button class="primary-action" id="create-online-room">创建房间</button>
+                </section>
+
+                <section class="online-panel">
+                    <span>加入房间</span>
+                    <h2>我是挑战者</h2>
+                    <label>
+                        <span>昵称</span>
+                        <input id="online-join-name" type="text" maxlength="16" value="玩家 2">
+                    </label>
+                    <label>
+                        <span>房间号</span>
+                        <input id="online-room-code" type="text" maxlength="6" placeholder="例如 A7K2Q9">
+                    </label>
+                    <button class="primary-action" id="join-online-room">加入房间</button>
+                </section>
+            </div>
+
+            <div class="online-status" id="online-status">创建房间后，把房间号发给对手；对手加入后会自动进入对战。</div>
         </section>
 
         <section id="settings-screen" class="screen settings-screen">
@@ -73,8 +113,8 @@
             </div>
 
             <div class="settings-note">
-                <strong>多人对战雏形</strong>
-                <p>现在会把 1 名玩家和若干 AI 放进同一场。后面如果做双人或多人联机，可以把“出招选择”改成等待每个玩家提交，再统一结算。</p>
+                <strong>多人对战</strong>
+                <p>普通模式会把 1 名玩家和若干 AI 放进同一场；联网双人会创建房间，等待双方提交技能后统一结算。</p>
             </div>
 
             <div class="home-actions">

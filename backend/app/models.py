@@ -166,6 +166,15 @@ class ToolboxLink(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class YuanQiRoom(Base):
+    __tablename__ = "yuan_qi_rooms"
+
+    code: Mapped[str] = mapped_column(String(12), primary_key=True, index=True)
+    state: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class AdminAuditLog(Base):
     __tablename__ = "admin_audit_logs"
 
