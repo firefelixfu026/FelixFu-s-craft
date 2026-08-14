@@ -29,6 +29,17 @@ button {
     margin: 16px auto;
 }
 
+.app-shell:fullscreen {
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    padding: 16px;
+    overflow: auto;
+    background:
+        linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.92)),
+        #667eea;
+}
+
 .screen {
     display: none;
 }
@@ -287,6 +298,75 @@ p {
     text-align: center;
 }
 
+.target-picker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 10px;
+    border-radius: 8px;
+    background: rgba(102, 126, 234, 0.09);
+}
+
+.target-picker span {
+    color: #4f5c75;
+    font-size: 13px;
+    font-weight: 950;
+}
+
+.target-picker div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.target-picker button {
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid #cfd7ea;
+    border-radius: 8px;
+    color: #172033;
+    background: #ffffff;
+    font-weight: 900;
+}
+
+.target-picker button.active {
+    color: #ffffff;
+    border-color: transparent;
+    background: #1f8b78;
+    box-shadow: 0 10px 20px rgba(31, 139, 120, 0.2);
+}
+
+.skill-category-nav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding-bottom: 4px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.skill-category-nav button {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid #d7ddea;
+    border-radius: 8px;
+    color: #4f5c75;
+    background: #ffffff;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.skill-category-nav button.active {
+    color: #ffffff;
+    border-color: transparent;
+    background: #667eea;
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.2);
+}
+
 .skill-buttons {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -306,12 +386,36 @@ p {
     box-shadow: 0 12px 24px rgba(30, 23, 60, 0.18);
 }
 
-.skill:nth-child(1) {
-    background: linear-gradient(135deg, #ec79dd, #f5576c);
+.skill[data-category="斩类"] {
+    background: linear-gradient(135deg, #667eea, #764ba2);
 }
 
-.skill:nth-child(4) {
-    background: linear-gradient(135deg, #9baaf2, #b8a1d5);
+.skill[data-category="波类"] {
+    background: linear-gradient(135deg, #256f97, #667eea);
+}
+
+.skill[data-category="攒魔/防御类"] {
+    background: linear-gradient(135deg, #1f8b78, #667eea);
+}
+
+.skill[data-category="精神类"] {
+    background: linear-gradient(135deg, #7b61c7, #d94c63);
+}
+
+.skill[data-category="决战技"] {
+    background: linear-gradient(135deg, #172033, #764ba2);
+}
+
+.skill[data-category="群攻"] {
+    background: linear-gradient(135deg, #d94c63, #7b61c7);
+}
+
+.skill[data-category="特殊类"] {
+    background: linear-gradient(135deg, #4f5c75, #1f8b78);
+}
+
+.skill[data-category="状态类"] {
+    background: linear-gradient(135deg, #2f7c85, #764ba2);
 }
 
 .skill strong {
