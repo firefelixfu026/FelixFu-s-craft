@@ -547,6 +547,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.7.0',
+    title: '暑期计划改为每日任务清单',
+    date: '2026-08-14',
+    status: '已上线',
+    points: ['计划页从时间段安排改为每天必做任务清单，弱化吃饭、复盘等低价值格子', '完成度统计跟随每日任务计算，按任务类型、完成标准和实际完成情况记录', '复制 Markdown 输出同步改成任务清单格式']
+  },
+  {
     version: 'v6.6.3',
     title: '后台入口网格收敛',
     date: '2026-08-14',
@@ -1439,7 +1446,7 @@ const personalizedDailyPlans = [
     'slot-1530': { activity: '轻松快走', focus: '30 分钟，恢复为主。' },
     'slot-2030': { activity: '自由复盘', focus: '可以看番/阅读/游戏，但把应用时长记上。' }
   })
-];
+].map(ensureDailyPlanTasks);
 
 function createDailyPlan(date, label, theme, overrides = {}) {
   return {
@@ -1452,6 +1459,49 @@ function createDailyPlan(date, label, theme, overrides = {}) {
       ...(overrides[slot.id] || {}),
       id: `${date}-${slot.id}`
     }))
+  };
+}
+
+function isRequiredDailySlot(slot) {
+  const requiredTypes = ['学习', '运动'];
+  const excludedWords = ['起床', '早餐', '午餐', '晚餐', '洗漱', '睡眠', '弹性', '娱乐', '记录', '复盘', '红与黑', '芙莉莲', '以撒', '第五人格', '自由'];
+  const text = `${slot?.activity || ''} ${slot?.focus || ''}`;
+  return requiredTypes.includes(slot?.type) && !excludedWords.some((word) => text.includes(word));
+}
+
+function createTasksFromDailySlots(day) {
+  const slots = Array.isArray(day?.slots) ? day.slots : [];
+  const meaningfulSlots = slots.filter(isRequiredDailySlot);
+  const source = meaningfulSlots.length ? meaningfulSlots : slots.filter((slot) => ['学习', '运动'].includes(slot?.type));
+  return source.map((slot, index) => ({
+    id: `${day.date || day.id || 'day'}-task-${index + 1}`,
+    type: slot.type || '任务',
+    title: slot.activity || `任务 ${index + 1}`,
+    target: slot.focus || '',
+    priority: slot.type === '学习' ? '重点' : '保持'
+  }));
+}
+
+function normalizeDailyTasks(tasks, fallbackTasks = [], dayDate = '') {
+  const source = Array.isArray(tasks) && tasks.length ? tasks : fallbackTasks;
+  return source.map((task, index) => {
+    const fallback = fallbackTasks[index] || {};
+    const title = task?.title ?? task?.planned ?? task?.activity ?? fallback.title ?? `任务 ${index + 1}`;
+    return {
+      id: task?.id || (dayDate ? `${dayDate}-task-${index + 1}` : `task-${index + 1}`),
+      type: task?.type ?? fallback.type ?? '任务',
+      title,
+      target: task?.target ?? task?.focus ?? fallback.target ?? '',
+      priority: task?.priority ?? fallback.priority ?? (task?.type === '运动' ? '保持' : '重点')
+    };
+  });
+}
+
+function ensureDailyPlanTasks(day) {
+  const fallbackTasks = createTasksFromDailySlots(day);
+  return {
+    ...day,
+    tasks: normalizeDailyTasks(day?.tasks, fallbackTasks, day?.date || day?.id)
   };
 }
 
@@ -1474,10 +1524,12 @@ const personalizedCompletionDays = personalizedDailyPlans.map((day) => ({
   date: day.date,
   label: day.label,
   theme: day.theme,
-  tasks: day.slots.map((slot) => ({
-    id: `${day.date}-done-${slot.id}`,
-    time: slot.time,
-    planned: slot.activity,
+  tasks: day.tasks.map((task) => ({
+    id: `${day.date}-done-${task.id}`,
+    planTaskId: task.id,
+    type: task.type,
+    planned: task.title,
+    target: task.target,
     actual: '',
     status: '未开始',
     note: ''
@@ -6561,8 +6613,7 @@ function normalizeDailyPlans(plan) {
       ...slot,
       id: slot.id || fallback.slots?.[slotIndex]?.id || `${date}-slot-${slotIndex + 1}`
     }));
-
-    return {
+    const planWithSlots = {
       ...fallback,
       ...(day || {}),
       id: day?.id || date,
@@ -6570,6 +6621,14 @@ function normalizeDailyPlans(plan) {
       label: day?.label || fallback.label || date,
       theme: day?.theme || fallback.theme || '',
       slots
+    };
+    const fallbackTasks = Array.isArray(fallback.tasks) && fallback.tasks.length
+      ? fallback.tasks
+      : createTasksFromDailySlots(planWithSlots);
+
+    return {
+      ...planWithSlots,
+      tasks: normalizeDailyTasks(day?.tasks, fallbackTasks, date)
     };
   });
 }
@@ -6618,8 +6677,10 @@ function normalizeCompletionTasks(tasks, fallbackTasks = personalizedCompletionD
     const status = completionStatusOptions.includes(task?.status) ? task.status : '未开始';
     return {
       id: task?.id || (dayDate ? `${dayDate}-done-${index + 1}` : `done-${index + 1}`),
-      time: task?.time ?? fallback.time ?? '',
+      planTaskId: task?.planTaskId ?? fallback.planTaskId ?? '',
+      type: task?.type ?? fallback.type ?? '',
       planned: task?.planned ?? task?.activity ?? fallback.planned ?? '',
+      target: task?.target ?? task?.focus ?? fallback.target ?? '',
       actual: task?.actual ?? '',
       status,
       note: task?.note ?? ''
@@ -6666,18 +6727,22 @@ function calculateCompletionRate(tasks = []) {
 function getCompletionRowsForDay(completionDay, dailyPlans) {
   const dayPlan = dailyPlans.find((day) => day.date === completionDay.date) || dailyPlans[0];
   const storedTasks = Array.isArray(completionDay.tasks) ? completionDay.tasks : [];
-  return (dayPlan.slots || []).map((slot, index) => {
-    const id = `${completionDay.date}-done-${slot.id}`;
-    const stored = storedTasks.find((task) => task.id === id || task.planSlotId === slot.id)
-      || storedTasks.find((task) => task.time === slot.time)
+  const taskList = Array.isArray(dayPlan.tasks) && dayPlan.tasks.length
+    ? dayPlan.tasks
+    : createTasksFromDailySlots(dayPlan);
+  return taskList.map((task, index) => {
+    const id = `${completionDay.date}-done-${task.id}`;
+    const stored = storedTasks.find((item) => item.id === id || item.planTaskId === task.id)
+      || storedTasks.find((item) => item.planned === task.title || item.planned === task.activity)
       || storedTasks[index]
       || {};
     const status = completionStatusOptions.includes(stored.status) ? stored.status : '未开始';
     return {
       id,
-      planSlotId: slot.id,
-      time: slot.time,
-      planned: slot.activity,
+      planTaskId: task.id,
+      type: task.type || stored.type || '',
+      planned: task.title,
+      target: task.target || '',
       actual: stored.actual || '',
       status,
       note: stored.note || ''
@@ -6800,6 +6865,7 @@ function normalizeSummerPlan(plan) {
     profile: { ...personalizedSummerPlan.profile, ...(plan?.profile || {}) },
     goals: { ...personalizedSummerPlan.goals, ...(plan?.goals || {}) },
     daily: dailyPlans[0]?.slots || normalizeDailyRows(plan?.daily),
+    dailyTasks: dailyPlans[0]?.tasks || normalizeDailyTasks(plan?.dailyTasks),
     dailyPlans,
     appUsageDays,
     completionDays,
@@ -6813,8 +6879,8 @@ function normalizeSummerPlan(plan) {
 }
 
 const summerPlanSections = [
-  { id: 'schedule', label: '时间安排', detail: '每天做什么' },
-  { id: 'completion', label: '完成度', detail: '做了什么' },
+  { id: 'schedule', label: '每日任务', detail: '当天清单' },
+  { id: 'completion', label: '完成度', detail: '任务记录' },
   { id: 'courses', label: '课程', detail: '预习进度' },
   { id: 'apps', label: '应用', detail: '手机时间' },
   { id: 'finance', label: '记账', detail: '支出记录' },
@@ -6949,39 +7015,39 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
     }));
   }
 
-  function updateDailySlot(dayDate, rowId, field, value) {
+  function updateDailyTask(dayDate, rowId, field, value) {
     if (!canEdit) return;
     setPlan((current) => {
       const dailyPlans = (current.dailyPlans || personalizedDailyPlans).map((day) => (
         day.date === dayDate
-          ? { ...day, slots: day.slots.map((row) => (row.id === rowId ? { ...row, [field]: value } : row)) }
+          ? { ...day, tasks: normalizeDailyTasks(day.tasks).map((row) => (row.id === rowId ? { ...row, [field]: value } : row)) }
           : day
       ));
-      return { ...current, dailyPlans, daily: dailyPlans[0]?.slots || current.daily };
+      return { ...current, dailyPlans, dailyTasks: dailyPlans[0]?.tasks || current.dailyTasks };
     });
   }
 
-  function addDailySlot(dayDate, row) {
+  function addDailyTask(dayDate, row) {
     if (!canEdit) return;
     setPlan((current) => {
       const dailyPlans = (current.dailyPlans || personalizedDailyPlans).map((day) => (
         day.date === dayDate
-          ? { ...day, slots: [...(day.slots || []), { ...row, id: `${dayDate}-slot-${Date.now()}` }] }
+          ? { ...day, tasks: [...normalizeDailyTasks(day.tasks), { ...row, id: `${dayDate}-task-${Date.now()}` }] }
           : day
       ));
-      return { ...current, dailyPlans, daily: dailyPlans[0]?.slots || current.daily };
+      return { ...current, dailyPlans, dailyTasks: dailyPlans[0]?.tasks || current.dailyTasks };
     });
   }
 
-  function deleteDailySlot(dayDate, rowId) {
+  function deleteDailyTask(dayDate, rowId) {
     if (!canEdit) return;
     setPlan((current) => {
       const dailyPlans = (current.dailyPlans || personalizedDailyPlans).map((day) => (
         day.date === dayDate
-          ? { ...day, slots: (day.slots || []).filter((row) => row.id !== rowId) }
+          ? { ...day, tasks: normalizeDailyTasks(day.tasks).filter((row) => row.id !== rowId) }
           : day
       ));
-      return { ...current, dailyPlans, daily: dailyPlans[0]?.slots || current.daily };
+      return { ...current, dailyPlans, dailyTasks: dailyPlans[0]?.tasks || current.dailyTasks };
     });
   }
 
@@ -7023,7 +7089,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
   function updateCompletionTask(dayDate, rowId, field, value) {
     if (!canEdit) return;
-    if (field === 'time' || field === 'planned') return;
+    if (['type', 'planned', 'target'].includes(field)) return;
     setPlan((current) => ({
       ...current,
       completionDays: (current.completionDays || personalizedCompletionDays).map((day) => (
@@ -7058,12 +7124,12 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
       '## 课程预习',
       ...plan.courses.map((course) => `- ${course.name}：${course.target}（进度 ${course.progress || '0%'}）`),
       '',
-      '## 每日时间段安排',
+      '## 每日任务清单',
       ...dayPlans.flatMap((day) => [
         `### ${day.label} · ${day.theme}`,
-        '| 时间段 | 要做什么 | 重点/说明 | 类型 |',
+        '| 任务 | 完成标准 | 类型 | 优先级 |',
         '|---|---|---|---|',
-        ...(day.slots || []).map((row) => `| ${row.time || ' '} | ${row.activity || ' '} | ${row.focus || ' '} | ${row.type || ' '} |`),
+        ...(day.tasks || []).map((row) => `| ${row.title || ' '} | ${row.target || ' '} | ${row.type || ' '} | ${row.priority || ' '} |`),
         ''
       ])
     ].join('\n');
@@ -7148,27 +7214,27 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
       <section className="content-band summer-plan-panel">
         <div className="admin-panel-heading">
           <div>
-            <h2>每日时间段安排</h2>
-            <p>先选择日期，再按时间段看当天该做什么；每一天都可以单独修改。</p>
+            <h2>每日任务清单</h2>
+            <p>每天只列真正需要推进的任务，剩下时间自由支配；临时任务也可以直接加进来。</p>
           </div>
-          <button className="primary-action" type="button" onClick={() => addDailySlot(selectedDayPlan.date, { time: '新增时间段', activity: '临时活动', focus: '', type: '弹性' })} disabled={!canEdit}>
+          <button className="primary-action" type="button" onClick={() => addDailyTask(selectedDayPlan.date, { type: '学习', title: '新增任务', target: '', priority: '普通' })} disabled={!canEdit}>
             <PlusCircle size={17} />
-            <span>新增时间段</span>
+            <span>新增任务</span>
           </button>
         </div>
         <PlanCalendarSelector days={dayPlans} value={selectedDayPlan.date} onChange={setSelectedPlanDate} label="选择日期" />
         <EditableTable
           columns={[
-            ['time', '时间段', 'input'],
-            ['activity', '要做什么', 'input'],
-            ['focus', '重点 / 说明', 'textarea'],
-            ['type', '类型', 'input']
+            ['type', '类型', 'select', ['学习', '运动', '阅读', '项目', '生活', '其他']],
+            ['title', '今日任务', 'textarea'],
+            ['target', '完成标准 / 说明', 'textarea'],
+            ['priority', '优先级', 'select', ['重点', '普通', '保持', '可选']]
           ]}
           disabled={!canEdit}
-          rows={selectedDayPlan.slots || []}
+          rows={selectedDayPlan.tasks || []}
           section={selectedDayPlan.date}
-          updateRow={updateDailySlot}
-          deleteRow={deleteDailySlot}
+          updateRow={updateDailyTask}
+          deleteRow={deleteDailyTask}
         />
       </section>
       )}
@@ -7781,8 +7847,9 @@ function CompletionTable({ rows, section, disabled, updateRow }) {
       <table className="summer-plan-table completion-table">
         <thead>
           <tr>
-            <th>时间段</th>
-            <th>计划做什么</th>
+            <th>类型</th>
+            <th>今日任务</th>
+            <th>完成标准</th>
             <th>我实际做了什么</th>
             <th>状态</th>
             <th>备注</th>
@@ -7791,8 +7858,9 @@ function CompletionTable({ rows, section, disabled, updateRow }) {
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td data-label="时间段"><input className="readonly-plan-cell" value={row.time || ''} readOnly /></td>
-              <td data-label="计划做什么"><textarea className="readonly-plan-cell" value={row.planned || ''} readOnly /></td>
+              <td data-label="类型"><input className="readonly-plan-cell" value={row.type || ''} readOnly /></td>
+              <td data-label="今日任务"><textarea className="readonly-plan-cell" value={row.planned || ''} readOnly /></td>
+              <td data-label="完成标准"><textarea className="readonly-plan-cell" value={row.target || ''} readOnly /></td>
               <td data-label="我实际做了什么"><textarea value={row.actual || ''} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'actual', event.target.value)} /></td>
               <td data-label="状态">
                 <select value={row.status || '未开始'} disabled={disabled} onChange={(event) => updateRow(section, row.id, 'status', event.target.value)}>
