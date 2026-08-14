@@ -547,6 +547,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.6.3',
+    title: '后台入口网格收敛',
+    date: '2026-08-14',
+    status: '已上线',
+    points: ['后台入口改回统一网格，去掉三块大分组造成的割裂感', '保留备份、语料、学习助手等新增入口，但用更紧凑的同尺寸卡片呈现']
+  },
+  {
     version: 'v6.6.2',
     title: '后台分区导航和写作缩进',
     date: '2026-08-14',
@@ -10417,11 +10424,11 @@ function AdminWorkspace({
     { id: 'overview', label: '总览', detail: '状态、统计、待办', icon: Star, count: `${publishedCount} 篇` },
     { id: 'health', label: '健康', detail: '接口、错误、资源', icon: ShieldCheck, count: frontendErrorLogs.length ? `${frontendErrorLogs.length} 错误` : 'OK' },
     { id: 'editor', label: '写文章', detail: editingArticleId ? '继续编辑当前文章' : '随笔和普通文章', icon: FilePenLine, count: draftCount ? `${draftCount} 草稿` : 'Markdown' },
-    { id: 'notes', label: '笔记上传', detail: '导入 .md 和内含图片', icon: BookOpen, count: 'MkDocs 感' },
     { id: 'articles', label: '内容库', detail: '编辑、删除、置顶', icon: BookOpen, count: `${articles.length} 篇` },
-    { id: 'comments', label: '评论', detail: '查看和删除评论', icon: MessageCircle, count: `${adminComments.length} 条` },
+    { id: 'notes', label: '笔记上传', detail: '导入 .md 和内含图片', icon: BookOpen, count: 'MkDocs 感' },
     { id: 'music', label: '音乐', detail: '上传歌单和管理播放', icon: Music, count: `${musicTracks.length} 首` },
     { id: 'toolbox', label: '工具箱', detail: '自定义网址和友链', icon: Wrench, count: 'Links' },
+    { id: 'comments', label: '评论', detail: '查看和删除评论', icon: MessageCircle, count: `${adminComments.length} 条` },
     { id: 'backups', label: '备份', detail: '导出、导入和恢复', icon: Save, count: `${backupRecords.length} 份` },
     { id: 'corpus', label: '语料', detail: '群聊语气和样本', icon: Bot, count: `${botCorpusSamples.length} 条` },
     { id: 'study', label: '学习助手', detail: '复盘和学习任务', icon: CheckCircle2, count: `${studyState.tasks.length} 项` },
@@ -10430,15 +10437,6 @@ function AdminWorkspace({
     { id: 'ops', label: '运维', detail: '服务、部署、脚本', icon: ShieldCheck, count: '控制台' },
     { id: 'security', label: '安全', detail: '操作日志和删除保护', icon: ShieldCheck, count: `${adminAuditLogs.length} 条` }
   ];
-  const adminPageMap = new Map(adminPageItems.map((item) => [item.id, item]));
-  const adminPageGroups = [
-    { title: '日常', detail: '每天最常用', ids: ['overview', 'health', 'editor', 'articles', 'notes'] },
-    { title: '资源', detail: '内容和入口', ids: ['music', 'toolbox', 'comments'] },
-    { title: '维护', detail: '站点后台', ids: ['backups', 'corpus', 'study', 'releases', 'visual', 'ops', 'security'] }
-  ].map((group) => ({
-    ...group,
-    items: group.ids.map((id) => adminPageMap.get(id)).filter(Boolean)
-  }));
 
   useEffect(() => {
     localStorage.setItem(ADMIN_PAGE_KEY, activeAdminPage);
@@ -10946,38 +10944,28 @@ function AdminWorkspace({
 
       {adminMessage && <p className="admin-message">{adminMessage}</p>}
 
-      <nav className="admin-page-nav grouped" aria-label="后台页面">
-        {adminPageGroups.map((group) => (
-          <section className="admin-page-group" key={group.title}>
-            <div className="admin-page-group-heading">
-              <strong>{group.title}</strong>
-              <span>{group.detail}</span>
-            </div>
-            <div className="admin-page-group-grid">
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    className={activeAdminPage === item.id ? 'admin-page-card active' : 'admin-page-card'}
-                    key={item.id}
-                    type="button"
-                    onClick={() => openAdminPage(item.id)}
-                    aria-pressed={activeAdminPage === item.id}
-                  >
-                    <span className="admin-page-card-icon">
-                      <Icon size={18} />
-                    </span>
-                    <span>
-                      <strong>{item.label}</strong>
-                      <em>{item.detail}</em>
-                    </span>
-                    <small>{item.count}</small>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+      <nav className="admin-page-nav" aria-label="后台页面">
+        {adminPageItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              className={activeAdminPage === item.id ? 'admin-page-card active' : 'admin-page-card'}
+              key={item.id}
+              type="button"
+              onClick={() => openAdminPage(item.id)}
+              aria-pressed={activeAdminPage === item.id}
+            >
+              <span className="admin-page-card-icon">
+                <Icon size={18} />
+              </span>
+              <span>
+                <strong>{item.label}</strong>
+                <em>{item.detail}</em>
+              </span>
+              <small>{item.count}</small>
+            </button>
+          );
+        })}
       </nav>
 
       <AdminPanelErrorBoundary
