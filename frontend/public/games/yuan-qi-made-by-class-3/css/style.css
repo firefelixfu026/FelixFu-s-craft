@@ -40,7 +40,6 @@ button {
 
 .hero-panel,
 .round-panel,
-.battle-log,
 .settings-note,
 .fighter-card,
 .score-card {
@@ -290,7 +289,7 @@ p {
 
 .skill-buttons {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 10px;
 }
 
@@ -319,6 +318,12 @@ p {
     font-size: 19px;
 }
 
+.skill small {
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 12px;
+    font-weight: 900;
+}
+
 .skill span,
 .skill em {
     color: rgba(255, 255, 255, 0.84);
@@ -328,36 +333,25 @@ p {
 
 .skill:disabled {
     cursor: not-allowed;
-    opacity: 0.45;
+}
+
+.skill.unaffordable {
+    color: #8d94a3;
+    background: linear-gradient(135deg, #edf0f7, #dfe4ef) !important;
+    box-shadow: none;
+    filter: grayscale(0.95) saturate(0.12);
+    opacity: 0.78;
+}
+
+.skill.unaffordable small,
+.skill.unaffordable span,
+.skill.unaffordable em {
+    color: #8d94a3;
 }
 
 .skill.selected {
     border-color: #172033;
     transform: translateY(-2px);
-}
-
-.battle-log {
-    padding: 18px;
-}
-
-.battle-log h2 {
-    margin-bottom: 12px;
-}
-
-#battle-log-content {
-    display: grid;
-    gap: 8px;
-    max-height: 310px;
-    overflow-y: auto;
-}
-
-.log-entry {
-    padding: 9px 12px;
-    border-left: 4px solid #667eea;
-    border-radius: 8px;
-    background: #f6f8fc;
-    color: #283247;
-    line-height: 1.5;
 }
 
 .timer-pill {
