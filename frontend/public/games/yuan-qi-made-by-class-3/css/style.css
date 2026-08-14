@@ -40,7 +40,6 @@ button {
 
 .hero-panel,
 .round-panel,
-.battle-log,
 .settings-note,
 .fighter-card,
 .score-card {
@@ -334,30 +333,6 @@ p {
 .skill.selected {
     border-color: #172033;
     transform: translateY(-2px);
-}
-
-.battle-log {
-    padding: 18px;
-}
-
-.battle-log h2 {
-    margin-bottom: 12px;
-}
-
-#battle-log-content {
-    display: grid;
-    gap: 8px;
-    max-height: 310px;
-    overflow-y: auto;
-}
-
-.log-entry {
-    padding: 9px 12px;
-    border-left: 4px solid #667eea;
-    border-radius: 8px;
-    background: #f6f8fc;
-    color: #283247;
-    line-height: 1.5;
 }
 
 .timer-pill {

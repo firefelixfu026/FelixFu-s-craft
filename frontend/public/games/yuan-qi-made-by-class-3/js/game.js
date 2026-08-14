@@ -78,15 +78,14 @@ class YuanQiGame {
             this.match.scores[fighter.id] = 0;
         });
         this.showScreen('battle');
-        this.addLog(`${mode === 'timed' ? '限时模式' : '普通模式'}开始。`);
         this.renderBattle();
         this.beginTurn();
     }
 
     createFighters() {
-        const fighters = [{ id: 'player', name: '你', kind: 'human', alive: true, mp: 0, skill: null }];
+        const fighters = [{ id: 'player', name: '你', kind: 'human', alive: true, mp: 0, skill: null, lastSkill: null }];
         for (let index = 2; index <= this.settings.players; index += 1) {
-            fighters.push({ id: `ai-${index - 1}`, name: `AI ${index - 1}`, kind: 'ai', alive: true, mp: 0, skill: null });
+            fighters.push({ id: `ai-${index - 1}`, name: `AI ${index - 1}`, kind: 'ai', alive: true, mp: 0, skill: null, lastSkill: null });
         }
         return fighters;
     }
@@ -131,7 +130,7 @@ class YuanQiGame {
         this.match.locked = true;
         const player = this.match.fighters.find((fighter) => fighter.kind === 'human');
         player.alive = false;
-        this.addLog('时间到，你没有出招，本局失败。');
+        player.lastSkill = null;
         this.finishBattle();
     }
 
@@ -172,12 +171,12 @@ class YuanQiGame {
     renderFighters() {
         const grid = document.getElementById('fighters-grid');
         grid.innerHTML = this.match.fighters.map((fighter) => {
-            const skill = fighter.skill ? this.skills[fighter.skill].name : '未出招';
+            const lastSkill = fighter.lastSkill ? this.skills[fighter.lastSkill].name : '未出招';
             return `<article class="fighter-card ${fighter.alive ? '' : 'down'}">
                 <span>${fighter.kind === 'human' ? '玩家' : '电脑'}</span>
                 <strong>${fighter.name}</strong>
                 <p>元气 ${fighter.mp}</p>
-                <em>${fighter.alive ? skill : '已阵亡'}</em>
+                <em>上一轮：${lastSkill}</em>
             </article>`;
         }).join('');
     }
@@ -203,7 +202,6 @@ class YuanQiGame {
         this.match.fighters.filter((fighter) => fighter.kind === 'ai' && fighter.alive).forEach((fighter) => {
             fighter.skill = this.chooseAiSkill(fighter);
         });
-        this.addLog(`你选择了 ${skill.name}。`);
         window.setTimeout(() => this.resolveRound(), 450);
         this.renderBattle();
     }
@@ -229,7 +227,7 @@ class YuanQiGame {
         alive.forEach((fighter) => {
             const skill = this.skills[fighter.skill];
             fighter.mp += skill.mpDelta;
-            this.addLog(`${fighter.name} 使用 ${skill.name}，攻击 ${skill.attack}，元气变为 ${fighter.mp}。`);
+            fighter.lastSkill = fighter.skill;
         });
 
         alive.forEach((target) => {
@@ -248,7 +246,6 @@ class YuanQiGame {
         }
 
         this.match.round += 1;
-        this.addLog('无人完全压过全场，进入下一回合。');
         this.beginTurn();
     }
 
@@ -265,9 +262,6 @@ class YuanQiGame {
         const survivors = this.match.fighters.filter((fighter) => fighter.alive);
         if (survivors.length === 1) {
             this.match.scores[survivors[0].id] += 1;
-            this.addLog(`${survivors[0].name} 赢下第 ${this.match.currentBattle} 局。`);
-        } else {
-            this.addLog(`第 ${this.match.currentBattle} 局无人获胜。`);
         }
         this.renderBattle();
 
@@ -280,7 +274,6 @@ class YuanQiGame {
             this.match.currentBattle += 1;
             this.match.round = 1;
             this.match.fighters = this.createFighters();
-            this.addLog(`第 ${this.match.currentBattle} 局开始。`);
             this.beginTurn();
         }, 900);
     }
@@ -289,8 +282,7 @@ class YuanQiGame {
         const sorted = Object.entries(this.match.scores).sort((a, b) => b[1] - a[1]);
         const winner = this.match.fighters.find((fighter) => fighter.id === sorted[0][0]);
         this.match.locked = true;
-        this.addLog(`对战结束，胜者：${winner?.name || '无人'}。`);
-        document.getElementById('round-status').textContent = '对战结束，可以重开或返回首页';
+        document.getElementById('round-status').textContent = `对战结束，胜者：${winner?.name || '无人'}`;
         this.updateSkillButtons();
     }
 
@@ -298,13 +290,6 @@ class YuanQiGame {
         return this.match.fighters.find((fighter) => fighter.kind === 'human');
     }
 
-    addLog(message) {
-        const logContent = document.getElementById('battle-log-content');
-        const entry = document.createElement('div');
-        entry.className = 'log-entry';
-        entry.textContent = message;
-        logContent.prepend(entry);
-    }
 }
 
 window.addEventListener('DOMContentLoaded', () => new YuanQiGame());
