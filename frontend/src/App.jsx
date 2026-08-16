@@ -547,6 +547,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.8.0',
+    title: '暑期在校计划阶段切换',
+    date: '2026-08-16',
+    status: '已上线',
+    points: ['暑期在家计划收束为阶段总结，计划页默认进入 8.16-9.11 暑期在校计划', '新阶段每日任务保持空清单，方便自己从零填写当天目标', '旧数据库里的 8.4-8.15 阶段会自动迁移到新阶段，但饮食、记账、身体和睡眠记录会保留', '饮食、记账、身体和睡眠新增记录会根据当前日期和现有最后日期自动顺延', '睡眠新增记录会自动生成跨日日期范围', '记账模块新增收入/支出来源饼图，以及每日收支折线图和柱状图']
+  },
+  {
     version: 'v6.7.2',
     title: '计划记录修复和后台入口瘦身',
     date: '2026-08-14',
@@ -1321,13 +1328,15 @@ const personalizedSummerPlan = {
   profile: {
     name: '副将凡',
     identity: '浙江大学准大二',
-    range: '2026-08-04 至 2026-08-15',
-    theme: '期末冲刺式预习 + 规律生活记录'
+    range: '2026-08-16 至 2026-09-11',
+    theme: '暑期在校计划 · 自主任务推进',
+    stage: '暑期在校计划',
+    previousSummary: '暑期在家计划（8.4-8.15）已收束：完成了预习节奏、运动、饮食、记账、身体和睡眠记录的第一轮搭建。下一阶段转为在校自主管理，每天只写真正要推进的任务，剩余时间留给课程、项目和生活机动。'
   },
   goals: {
-    study: '穿插预习高级数据结构与算法分析、计算机组成、大学物理（乙）Ⅱ、概率论与数理统计，按期末冲刺节奏推进。',
-    body: '游泳、快走、室内燃脂轮换，记录体重、饮食、睡眠。',
-    life: '保留以撒的结合、第五人格、葬送的芙莉莲、红与黑，同时严格控制 B 站和小红书。'
+    study: '在校阶段按每日任务清单推进课程预习、项目整理和笔记补齐，不再把吃饭、轻复盘这类固定生活项塞进主计划。',
+    body: '继续记录体重、运动、饮食和睡眠，让身体状态跟学习节奏一起可见。',
+    life: '保留娱乐和自由支配时间，但用应用记录给 B 站、小红书、红果短剧和游戏时间设边界。'
   },
   daily: [
     { id: 'day-0804', date: '8月4日', study: '高级数据结构与算法分析：复杂度、堆、并查集预热', exercise: '快走 40 分钟', rest: '红与黑 30 页', note: '' },
@@ -1356,10 +1365,10 @@ const personalizedSummerPlan = {
     { id: 'app-hongguo', name: '红果短剧', limit: '60 分钟', actual: '' },
     { id: 'app-genshin', name: '原神', limit: '60 分钟', actual: '' }
   ],
-  expenses: [{ id: 'expense-1', date: '8月4日', type: '支出', item: '餐饮', amount: '', note: '' }],
-  meals: [{ id: 'meal-1', date: '8月4日', breakfast: '', lunch: '', dinner: '', snack: '' }],
-  bodyMetrics: [{ id: 'body-1', date: '8月4日', weight: '', exercise: '', mood: '' }],
-  sleep: [{ id: 'sleep-1', date: '8月4-5日', bed: '', wake: '', hours: '', quality: '' }]
+  expenses: [{ id: 'expense-1', date: '8月16日', type: '支出', item: '', amount: '', note: '' }],
+  meals: [{ id: 'meal-1', date: '8月16日', breakfast: '', lunch: '', dinner: '', snack: '' }],
+  bodyMetrics: [{ id: 'body-1', date: '8月16日', weight: '', exercise: '', mood: '' }],
+  sleep: [{ id: 'sleep-1', date: '8月16-17日', bed: '', wake: '', hours: '', quality: '' }]
 };
 
 const personalizedTimeSlots = [
@@ -1377,92 +1386,25 @@ const personalizedTimeSlots = [
   { id: 'slot-2130', time: '21:30 - 22:30', activity: '洗漱 + 睡眠准备', focus: '填睡眠记录，尽量 22:30 前进入休息状态。', type: '睡眠' }
 ];
 
-const personalizedDailyPlans = [
-  createDailyPlan('2026-08-04', '8月4日', '启动日：数据结构 + 大物框架', {
-    'slot-0800': { activity: '高级数据结构与算法分析', focus: '复杂度、堆、并查集预热；先建立期末冲刺目录。' },
-    'slot-1030': { activity: '大学物理（乙）Ⅱ', focus: '电场、电势、电容先过概念和公式。' },
-    'slot-1400': { activity: '数据结构题目整理', focus: '整理复杂度常见坑，写 3-5 道基础题。' },
-    'slot-1530': { activity: '快走', focus: '40 分钟，低压力启动。' },
-    'slot-2030': { activity: '红与黑', focus: '阅读 30 页，B 站和小红书只保留应用限时。' }
-  }),
-  createDailyPlan('2026-08-05', '8月5日', '计组启动 + 概率基础', {
-    'slot-0800': { activity: '计算机组成', focus: '数据表示、定点数、浮点数和补码。' },
-    'slot-1030': { activity: '概率论与数理统计', focus: '随机变量、分布函数、离散/连续分布。' },
-    'slot-1400': { activity: '计组笔记整理', focus: '把数制转换、补码、浮点表示整理成速查表。' },
-    'slot-1530': { activity: '室内燃脂', focus: '25 分钟，控制强度但要出汗。' },
-    'slot-2030': { activity: '葬送的芙莉莲', focus: '看 1 集，结束后填睡眠记录。' }
-  }),
-  createDailyPlan('2026-08-06', '8月6日', '概率推进 + 数据结构图论', {
-    'slot-0800': { activity: '概率论与数理统计', focus: '期望、方差、常见分布，先抓公式适用条件。' },
-    'slot-1030': { activity: '高级数据结构与算法分析', focus: '图论基础、BFS/DFS、最短路预习。' },
-    'slot-1400': { activity: '概率题目训练', focus: '做随机变量与期望方差例题，整理错因。' },
-    'slot-1530': { activity: '游泳', focus: '以恢复和舒展为主。' },
-    'slot-2030': { activity: '以撒的结合', focus: '45 分钟内收住，避免顺手刷视频。' }
-  }),
-  createDailyPlan('2026-08-07', '8月7日', '大物电磁 + 计组指令', {
-    'slot-0800': { activity: '大学物理（乙）Ⅱ', focus: '稳恒电流、磁场基础和典型公式。' },
-    'slot-1030': { activity: '计算机组成', focus: '指令系统、寻址方式、CPU 数据通路。' },
-    'slot-1400': { activity: '大物公式卡片', focus: '把电场/磁场公式按场景归类。' },
-    'slot-1530': { activity: '快走', focus: '45 分钟，顺便复盘上午知识点。' },
-    'slot-2030': { activity: '红与黑', focus: '阅读 30 页，做一句话摘要。' }
-  }),
-  createDailyPlan('2026-08-08', '8月8日', '数据结构强化日', {
-    'slot-0800': { activity: '高级数据结构与算法分析', focus: '平衡树、哈希、摊还分析先看概念。' },
-    'slot-1030': { activity: '高级数据结构与算法分析', focus: '图论最短路和数据结构应用题型。' },
-    'slot-1400': { activity: '算法题练习', focus: '做 2-3 道图论/并查集/堆相关题。' },
-    'slot-1530': { activity: '室内燃脂', focus: '25 分钟，结束后记录体重和状态。' },
-    'slot-2030': { activity: '第五人格', focus: '45 分钟，结束即停。' }
-  }),
-  createDailyPlan('2026-08-09', '8月9日', '计组主线日', {
-    'slot-0800': { activity: '计算机组成', focus: 'CPU 数据通路、控制器、流水线概念。' },
-    'slot-1030': { activity: '计算机组成', focus: '存储层次、Cache 基础和命中率理解。' },
-    'slot-1400': { activity: '计组结构图整理', focus: '画 CPU/存储层次结构图，建立整体感。' },
-    'slot-1530': { activity: '游泳', focus: '放松肩颈，控制疲劳。' },
-    'slot-2030': { activity: '葬送的芙莉莲', focus: '看 1 集，顺手记今天花销。' }
-  }),
-  createDailyPlan('2026-08-10', '8月10日', '概率统计推进日', {
-    'slot-0800': { activity: '概率论与数理统计', focus: '二维随机变量、边缘分布、条件分布。' },
-    'slot-1030': { activity: '概率论与数理统计', focus: '大数定律、中心极限定理先看直觉。' },
-    'slot-1400': { activity: '概率错题整理', focus: '做 3-5 道分布与期望相关题。' },
-    'slot-1530': { activity: '快走', focus: '40 分钟，保持稳定运动量。' },
-    'slot-2030': { activity: '红与黑', focus: '阅读 30 页，睡前不刷信息流。' }
-  }),
-  createDailyPlan('2026-08-11', '8月11日', '大物电磁推进日', {
-    'slot-0800': { activity: '大学物理（乙）Ⅱ', focus: '电磁感应、法拉第定律、楞次定律。' },
-    'slot-1030': { activity: '大学物理（乙）Ⅱ', focus: '典型题型：感应电动势、磁通量变化。' },
-    'slot-1400': { activity: '大物题目训练', focus: '把公式代入和方向判断分开练。' },
-    'slot-1530': { activity: '室内燃脂', focus: '30 分钟，练完补水。' },
-    'slot-2030': { activity: '以撒的结合', focus: '45 分钟；如果白天进度落后，改为红与黑。' }
-  }),
-  createDailyPlan('2026-08-12', '8月12日', '算法 + 计组交叉复盘', {
-    'slot-0800': { activity: '高级数据结构与算法分析', focus: '平衡树、哈希、图算法回顾。' },
-    'slot-1030': { activity: '计算机组成', focus: '流水线和存储层次复盘。' },
-    'slot-1400': { activity: '综合笔记整理', focus: '把数据结构模板和计组结构图归档。' },
-    'slot-1530': { activity: '游泳', focus: '中等强度，避免过累。' },
-    'slot-2030': { activity: '葬送的芙莉莲', focus: '看 1 集，记录当天应用使用时间。' }
-  }),
-  createDailyPlan('2026-08-13', '8月13日', '概率 + 大物交叉复盘', {
-    'slot-0800': { activity: '概率论与数理统计', focus: '常见分布、期望方差、CLT 回顾。' },
-    'slot-1030': { activity: '大学物理（乙）Ⅱ', focus: '电磁学公式和题型串联。' },
-    'slot-1400': { activity: '综合题目训练', focus: '概率和大物各做一组基础题。' },
-    'slot-1530': { activity: '快走', focus: '45 分钟，轻松一点。' },
-    'slot-2030': { activity: '第五人格', focus: '45 分钟，结束后填睡眠计划。' }
-  }),
-  createDailyPlan('2026-08-14', '8月14日', '四门课总复盘', {
-    'slot-0800': { activity: '四门课清单复盘', focus: '列出每门课“已懂/半懂/没懂”三栏。' },
-    'slot-1030': { activity: '薄弱点补齐', focus: '优先补最影响开学听课的概念。' },
-    'slot-1400': { activity: '下学期第一周准备', focus: '整理资料、课程文件夹、预习目录。' },
-    'slot-1530': { activity: '室内燃脂', focus: '25 分钟，轻量收尾。' },
-    'slot-2030': { activity: '红与黑 / 自由娱乐', focus: '优先阅读；如果完成度高再游戏。' }
-  }),
-  createDailyPlan('2026-08-15', '8月15日', '收尾日：整理与调整', {
-    'slot-0800': { activity: '暑期计划收尾', focus: '总结 8/4-8/15 完成情况和遗留问题。' },
-    'slot-1030': { activity: '开学预习交接', focus: '给四门课写下一步任务清单。' },
-    'slot-1400': { activity: '自由调整 / 补漏', focus: '哪里欠账补哪里；没有欠账就整理博客记录。' },
-    'slot-1530': { activity: '轻松快走', focus: '30 分钟，恢复为主。' },
-    'slot-2030': { activity: '自由复盘', focus: '可以看番/阅读/游戏，但把应用时长记上。' }
-  })
-].map(ensureDailyPlanTasks);
+const personalizedDailyPlans = createCampusDailyPlans('2026-08-16', '2026-09-11').map(ensureDailyPlanTasks);
+
+function createCampusDailyPlans(startDate, endDate) {
+  const days = [];
+  const start = createLocalPlanDate(startDate);
+  const end = createLocalPlanDate(endDate);
+  for (let date = start; date <= end; date = addPlanDays(date, 1)) {
+    const iso = formatIsoDate(date);
+    days.push({
+      id: iso,
+      date: iso,
+      label: formatChinesePlanDate(date),
+      theme: '在校自主管理',
+      slots: [],
+      tasks: []
+    });
+  }
+  return days;
+}
 
 function createDailyPlan(date, label, theme, overrides = {}) {
   return {
@@ -6615,20 +6557,28 @@ function normalizeDailyRows(rows) {
     : personalizedTimeSlots;
 }
 
-function normalizeDailyPlans(plan) {
-  const source = Array.isArray(plan?.dailyPlans) && plan.dailyPlans.length
+function shouldStartCampusPlan(plan) {
+  const range = String(plan?.profile?.range || '');
+  const firstDate = plan?.dailyPlans?.[0]?.date || plan?.completionDays?.[0]?.date || '';
+  return range.includes('2026-08-04') || firstDate === '2026-08-04' || firstDate === '8月4日';
+}
+
+function normalizeDailyPlans(plan, forceTemplate = false) {
+  const source = !forceTemplate && Array.isArray(plan?.dailyPlans) && plan.dailyPlans.length
     ? plan.dailyPlans
     : personalizedDailyPlans;
 
   return source.map((day, dayIndex) => {
     const fallback = personalizedDailyPlans[dayIndex] || personalizedDailyPlans[0];
     const date = day?.date || fallback.date || day?.id || `day-${dayIndex + 1}`;
-    const rawSlots = Array.isArray(day?.slots) && day.slots.length ? day.slots : fallback.slots;
-    const slots = normalizeDailyRows(rawSlots).map((slot, slotIndex) => ({
-      ...(fallback.slots?.[slotIndex] || {}),
-      ...slot,
-      id: slot.id || fallback.slots?.[slotIndex]?.id || `${date}-slot-${slotIndex + 1}`
-    }));
+    const rawSlots = Array.isArray(day?.slots) ? day.slots : fallback.slots;
+    const slots = rawSlots?.length
+      ? normalizeDailyRows(rawSlots).map((slot, slotIndex) => ({
+          ...(fallback.slots?.[slotIndex] || {}),
+          ...slot,
+          id: slot.id || fallback.slots?.[slotIndex]?.id || `${date}-slot-${slotIndex + 1}`
+        }))
+      : [];
     const planWithSlots = {
       ...fallback,
       ...(day || {}),
@@ -6674,8 +6624,8 @@ function normalizeAppRows(rows, fallbackRows = personalizedSummerPlan.apps, dayD
   });
 }
 
-function normalizeAppUsageDays(plan) {
-  if (Array.isArray(plan?.appUsageDays) && plan.appUsageDays.length) {
+function normalizeAppUsageDays(plan, forceTemplate = false) {
+  if (!forceTemplate && Array.isArray(plan?.appUsageDays) && plan.appUsageDays.length) {
     return plan.appUsageDays.map((day, index) => {
       const fallback = personalizedAppUsageDays[index] || personalizedAppUsageDays[0];
       const date = day?.date || fallback.date || day?.id || `app-day-${index + 1}`;
@@ -6715,8 +6665,8 @@ function normalizeCompletionTasks(tasks, fallbackTasks = personalizedCompletionD
   });
 }
 
-function normalizeCompletionDays(plan) {
-  if (Array.isArray(plan?.completionDays) && plan.completionDays.length) {
+function normalizeCompletionDays(plan, forceTemplate = false) {
+  if (!forceTemplate && Array.isArray(plan?.completionDays) && plan.completionDays.length) {
     return plan.completionDays.map((day, index) => {
       const fallback = personalizedCompletionDays[index] || personalizedCompletionDays[0];
       const date = day?.date || fallback.date || day?.id || `completion-day-${index + 1}`;
@@ -6793,7 +6743,7 @@ function normalizeBodyRows(rows) {
   const source = Array.isArray(rows) && rows.length ? rows : personalizedSummerPlan.bodyMetrics;
   return sortDatedRows(source.map(({ waist, ...row }, index) => ({
     id: row.id || `body-${index + 1}`,
-    date: row.date || '8月4日',
+    date: row.date || '8月16日',
     weight: row.weight || '',
     exercise: row.exercise || '',
     mood: row.mood || ''
@@ -6807,7 +6757,7 @@ function normalizeSleepRows(rows) {
     return {
       ...row,
       id: row.id || `sleep-${index + 1}`,
-      date: normalizeSleepDateRange(row.date || '8月4-5日'),
+      date: normalizeSleepDateRange(row.date || '8月16-17日'),
       hours: computedHours || row.hours || ''
     };
   }));
@@ -6817,7 +6767,7 @@ function normalizeExpenseRows(rows) {
   const source = Array.isArray(rows) && rows.length ? rows : personalizedSummerPlan.expenses;
   return sortExpenseRows(source.map((row, index) => ({
     id: row.id || `expense-${index + 1}`,
-    date: row.date || '8月4日',
+    date: row.date || '8月16日',
     type: row.type === '收入' ? '收入' : '支出',
     item: row.item || '',
     amount: row.amount ?? '',
@@ -6850,7 +6800,7 @@ function sortExpenseRows(rows) {
 
 function normalizeSleepDateRange(date) {
   const value = String(date || '').trim();
-  if (!value) return '8月4-5日';
+  if (!value) return '8月16-17日';
   if (value.includes('-')) return value;
   const match = value.match(/^(\d{1,2})月(\d{1,2})日$/);
   if (!match) return value;
@@ -6902,7 +6852,65 @@ function parseMetricNumber(value) {
   return match ? Number(match[0]) : 0;
 }
 
+function createLocalPlanDate(value) {
+  if (value instanceof Date) return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  const text = String(value || '').trim();
+  const fullDate = text.match(/(\d{4})[-/年.](\d{1,2})[-/月.](\d{1,2})/);
+  if (fullDate) return new Date(Number(fullDate[1]), Number(fullDate[2]) - 1, Number(fullDate[3]));
+  const monthDay = text.match(/(\d{1,2})\s*(?:月|\/|-|\.)(\d{1,2})/);
+  if (monthDay) return new Date(2026, Number(monthDay[1]) - 1, Number(monthDay[2]));
+  const dayOnly = text.match(/(\d{1,2})\s*日/);
+  if (dayOnly) return new Date(2026, 7, Number(dayOnly[1]));
+  return null;
+}
+
+function addPlanDays(date, days) {
+  const next = createLocalPlanDate(date) || new Date();
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function formatIsoDate(date) {
+  const normalized = createLocalPlanDate(date) || new Date();
+  const year = normalized.getFullYear();
+  const month = String(normalized.getMonth() + 1).padStart(2, '0');
+  const day = String(normalized.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatChinesePlanDate(date) {
+  const normalized = createLocalPlanDate(date) || new Date();
+  return `${normalized.getMonth() + 1}月${normalized.getDate()}日`;
+}
+
+function formatChineseSleepRange(date) {
+  const start = createLocalPlanDate(date) || new Date();
+  const end = addPlanDays(start, 1);
+  return `${start.getMonth() + 1}月${start.getDate()}-${end.getDate()}日`;
+}
+
+function getTodayPlanDate() {
+  return createLocalPlanDate(new Date());
+}
+
+function getLatestRecordDate(rows) {
+  const dates = (Array.isArray(rows) ? rows : [])
+    .map((row) => createLocalPlanDate(row?.date))
+    .filter(Boolean)
+    .sort((left, right) => left - right);
+  return dates[dates.length - 1] || null;
+}
+
+function getNextRecordDate(rows) {
+  const today = getTodayPlanDate();
+  const latest = getLatestRecordDate(rows);
+  if (!latest) return today;
+  return latest >= today ? addPlanDays(latest, 1) : today;
+}
+
 function formatPlanChartLabel(label) {
+  const parsedDate = createLocalPlanDate(label);
+  if (parsedDate) return `${parsedDate.getMonth() + 1}/${parsedDate.getDate()}`;
   return String(label || '')
     .replace('8月', '8/')
     .replace('日', '')
@@ -6942,16 +6950,52 @@ function getSleepMetricChartData(rows) {
   });
 }
 
+function getFinanceSourceData(rows, type) {
+  const totals = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    if ((row.type || '支出') !== type) return;
+    const amount = Math.abs(parseMetricNumber(row.amount));
+    if (!amount) return;
+    const source = String(row.item || row.note || '未分类').trim() || '未分类';
+    totals.set(source, (totals.get(source) || 0) + amount);
+  });
+  return Array.from(totals.entries())
+    .map(([label, value]) => ({ label, value }))
+    .sort((left, right) => right.value - left.value);
+}
+
+function getFinanceDailyChartData(rows) {
+  const grouped = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const date = row.date || '未填日期';
+    const current = grouped.get(date) || { label: date, income: 0, expense: 0 };
+    const amount = Math.abs(parseMetricNumber(row.amount));
+    if ((row.type || '支出') === '收入') {
+      current.income += amount;
+    } else {
+      current.expense += amount;
+    }
+    grouped.set(date, current);
+  });
+  return getRecentRows(
+    Array.from(grouped.values()).sort((left, right) => parsePlanDateOrder(left.label) - parsePlanDateOrder(right.label)),
+    14
+  );
+}
+
 function normalizeSummerPlan(plan) {
-  const dailyPlans = normalizeDailyPlans(plan);
-  const appUsageDays = normalizeAppUsageDays(plan);
-  const completionDays = normalizeCompletionDays(plan);
+  const shouldMigrateStage = shouldStartCampusPlan(plan);
+  const dailyPlans = normalizeDailyPlans(plan, shouldMigrateStage);
+  const appUsageDays = normalizeAppUsageDays(plan, shouldMigrateStage);
+  const completionDays = normalizeCompletionDays(plan, shouldMigrateStage);
 
   return {
     ...personalizedSummerPlan,
     ...(plan || {}),
-    profile: { ...personalizedSummerPlan.profile, ...(plan?.profile || {}) },
-    goals: { ...personalizedSummerPlan.goals, ...(plan?.goals || {}) },
+    profile: shouldMigrateStage
+      ? { ...personalizedSummerPlan.profile, name: plan?.profile?.name || personalizedSummerPlan.profile.name, identity: plan?.profile?.identity || personalizedSummerPlan.profile.identity }
+      : { ...personalizedSummerPlan.profile, ...(plan?.profile || {}) },
+    goals: shouldMigrateStage ? personalizedSummerPlan.goals : { ...personalizedSummerPlan.goals, ...(plan?.goals || {}) },
     daily: dailyPlans[0]?.slots || normalizeDailyRows(plan?.daily),
     dailyTasks: dailyPlans[0]?.tasks || normalizeDailyTasks(plan?.dailyTasks),
     dailyPlans,
@@ -6960,7 +7004,7 @@ function normalizeSummerPlan(plan) {
     courses: Array.isArray(plan?.courses) && plan.courses.length ? plan.courses : personalizedSummerPlan.courses,
     apps: appUsageDays[0]?.apps || normalizeAppRows(plan?.apps),
     expenses: normalizeExpenseRows(plan?.expenses),
-    meals: Array.isArray(plan?.meals) && plan.meals.length ? plan.meals : personalizedSummerPlan.meals,
+    meals: sortDatedRows(Array.isArray(plan?.meals) && plan.meals.length ? plan.meals : personalizedSummerPlan.meals),
     bodyMetrics: normalizeBodyRows(plan?.bodyMetrics),
     sleep: normalizeSleepRows(plan?.sleep)
   };
@@ -6971,7 +7015,7 @@ const summerPlanSections = [
   { id: 'completion', label: '完成度', detail: '任务记录' },
   { id: 'courses', label: '课程', detail: '预习进度' },
   { id: 'apps', label: '应用', detail: '手机时间' },
-  { id: 'finance', label: '记账', detail: '支出记录' },
+  { id: 'finance', label: '记账', detail: '收支记录' },
   { id: 'meals', label: '饮食', detail: '吃了什么' },
   { id: 'body', label: '身体', detail: '体重状态' },
   { id: 'sleep', label: '睡眠', detail: '作息记录' }
@@ -7093,7 +7137,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
         }
         return nextRow;
       });
-      const shouldSortByDate = ['expenses', 'bodyMetrics', 'sleep'].includes(section);
+      const shouldSortByDate = ['expenses', 'meals', 'bodyMetrics', 'sleep'].includes(section);
       return {
         ...current,
         [section]: shouldSortByDate ? sortDatedRows(rows) : rows
@@ -7106,7 +7150,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
     const nextRow = { ...row, id: `${section}-${Date.now()}` };
     setPlan((current) => ({
       ...current,
-      [section]: ['expenses', 'bodyMetrics', 'sleep'].includes(section)
+      [section]: ['expenses', 'meals', 'bodyMetrics', 'sleep'].includes(section)
         ? sortDatedRows([...(current[section] || []), nextRow])
         : [...(current[section] || []), nextRow]
     }));
@@ -7116,10 +7160,20 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
     if (!canEdit) return;
     setPlan((current) => ({
       ...current,
-      [section]: ['expenses', 'bodyMetrics', 'sleep'].includes(section)
+      [section]: ['expenses', 'meals', 'bodyMetrics', 'sleep'].includes(section)
         ? sortDatedRows(current[section].filter((row) => row.id !== rowId))
         : current[section].filter((row) => row.id !== rowId)
     }));
+  }
+
+  function getNextRecordLabel(section) {
+    const nextDate = getNextRecordDate(plan[section]);
+    return formatChinesePlanDate(nextDate);
+  }
+
+  function getNextSleepRangeLabel() {
+    const nextDate = getNextRecordDate(plan.sleep);
+    return formatChineseSleepRange(nextDate);
   }
 
   function updateDailyTask(dayDate, rowId, field, value) {
@@ -7254,6 +7308,9 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
   const totalIncome = plan.expenses.reduce((sum, item) => sum + (item.type === '收入' ? parseMetricNumber(item.amount) : 0), 0);
   const totalExpense = plan.expenses.reduce((sum, item) => sum + (item.type === '收入' ? 0 : parseMetricNumber(item.amount)), 0);
   const financeBalance = totalIncome - totalExpense;
+  const financeIncomeSources = getFinanceSourceData(plan.expenses, '收入');
+  const financeExpenseSources = getFinanceSourceData(plan.expenses, '支出');
+  const financeDailyChartData = getFinanceDailyChartData(plan.expenses);
   const visiblePlanSections = canEdit
     ? summerPlanSections
     : summerPlanSections.filter((section) => sitePreferences?.summerPlanSections?.[section.id] !== false);
@@ -7298,6 +7355,11 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
       {!canEdit && (
         <p className="summer-readonly-note">当前是查看模式。登录管理员账号后，修改会自动保存到后端数据库，并同步到不同设备。</p>
       )}
+
+      <div className="summer-stage-summary">
+        <span>{plan.profile.stage || '阶段计划'}</span>
+        <p>{plan.profile.previousSummary || personalizedSummerPlan.profile.previousSummary}</p>
+      </div>
 
       <nav className="plan-section-tabs" aria-label="计划模块">
         {visiblePlanSections.map((section) => (
@@ -7445,14 +7507,20 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
             </div>
           </div>
           <div className="module-toolbar">
-            <button className="ghost-button module-add-button" type="button" onClick={() => addRow('expenses', { date: '8月4日', type: '支出', item: '', amount: '', note: '' })} disabled={!canEdit}>
+            <button className="ghost-button module-add-button" type="button" onClick={() => addRow('expenses', { date: getNextRecordLabel('expenses'), type: '支出', item: '', amount: '', note: '' })} disabled={!canEdit}>
               <PlusCircle size={16} />
               <span>新增支出</span>
             </button>
-            <button className="ghost-button module-add-button" type="button" onClick={() => addRow('expenses', { date: '8月4日', type: '收入', item: '', amount: '', note: '' })} disabled={!canEdit}>
+            <button className="ghost-button module-add-button" type="button" onClick={() => addRow('expenses', { date: getNextRecordLabel('expenses'), type: '收入', item: '', amount: '', note: '' })} disabled={!canEdit}>
               <PlusCircle size={16} />
               <span>新增收入</span>
             </button>
+          </div>
+          <div className="finance-chart-grid">
+            <FinanceSourcePieChart title="支出来源" data={financeExpenseSources} emptyText="还没有支出来源" />
+            <FinanceSourcePieChart title="收入来源" data={financeIncomeSources} emptyText="还没有收入来源" />
+            <FinanceDailyLineChart data={financeDailyChartData} />
+            <FinanceDailyBarChart data={financeDailyChartData} />
           </div>
           <EditableTable
             columns={[
@@ -7473,7 +7541,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
       {activePlanSection === 'meals' && (
         <PlanModule title="饮食记录" count={`${plan.meals.length} 天`} wide>
-          <button className="ghost-button module-add-button" type="button" onClick={() => addRow('meals', { date: '8月4日', breakfast: '', lunch: '', dinner: '', snack: '' })} disabled={!canEdit}>
+          <button className="ghost-button module-add-button" type="button" onClick={() => addRow('meals', { date: getNextRecordLabel('meals'), breakfast: '', lunch: '', dinner: '', snack: '' })} disabled={!canEdit}>
             <PlusCircle size={16} />
             <span>新增饮食</span>
           </button>
@@ -7496,7 +7564,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
       {activePlanSection === 'body' && (
         <PlanModule title="体重与状态" count={`${plan.bodyMetrics.length} 条`} wide>
-          <button className="ghost-button module-add-button" type="button" onClick={() => addRow('bodyMetrics', { date: '8月4日', weight: '', exercise: '', mood: '' })} disabled={!canEdit}>
+          <button className="ghost-button module-add-button" type="button" onClick={() => addRow('bodyMetrics', { date: getNextRecordLabel('bodyMetrics'), weight: '', exercise: '', mood: '' })} disabled={!canEdit}>
             <PlusCircle size={16} />
             <span>新增记录</span>
           </button>
@@ -7522,7 +7590,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
       {activePlanSection === 'sleep' && (
         <PlanModule title="睡眠记录" count={`${plan.sleep.length} 条`} wide>
-          <button className="ghost-button module-add-button" type="button" onClick={() => addRow('sleep', { date: '8月4-5日', bed: '', wake: '', hours: '', quality: '' })} disabled={!canEdit}>
+          <button className="ghost-button module-add-button" type="button" onClick={() => addRow('sleep', { date: getNextSleepRangeLabel(), bed: '', wake: '', hours: '', quality: '' })} disabled={!canEdit}>
             <PlusCircle size={16} />
             <span>新增睡眠</span>
           </button>
@@ -7873,6 +7941,148 @@ function CompletionBarChart({ data }) {
           );
         })}
       </svg>
+    </div>
+  );
+}
+
+function formatFinanceAmount(value) {
+  const number = Number(value) || 0;
+  return Number.isInteger(number) ? String(number) : number.toFixed(1);
+}
+
+function FinanceSourcePieChart({ title, data, emptyText }) {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const colors = ['#1f7a6d', '#f472b6', '#2563eb', '#f59e0b', '#8b5cf6', '#14b8a6'];
+  const radius = 52;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+
+  return (
+    <div className="usage-chart-card finance-pie-card">
+      <div className="usage-chart-heading">
+        <h3>{title}</h3>
+        <span>{total ? `${formatFinanceAmount(total)} 元` : '暂无数据'}</span>
+      </div>
+      {total ? (
+        <div className="finance-pie-layout">
+          <svg viewBox="0 0 160 160" role="img" aria-label={title}>
+            <circle className="finance-pie-track" cx="80" cy="80" r={radius} />
+            {data.map((item, index) => {
+              const dash = (item.value / total) * circumference;
+              const segment = (
+                <circle
+                  className="finance-pie-segment"
+                  cx="80"
+                  cy="80"
+                  key={item.label}
+                  r={radius}
+                  stroke={colors[index % colors.length]}
+                  strokeDasharray={`${dash} ${circumference - dash}`}
+                  strokeDashoffset={-offset}
+                />
+              );
+              offset += dash;
+              return segment;
+            })}
+            <text className="finance-pie-total" x="80" y="76" textAnchor="middle">{formatFinanceAmount(total)}</text>
+            <text className="finance-pie-unit" x="80" y="96" textAnchor="middle">元</text>
+          </svg>
+          <div className="finance-pie-legend">
+            {data.map((item, index) => (
+              <div key={item.label}>
+                <i style={{ background: colors[index % colors.length] }} />
+                <span>{item.label}</span>
+                <strong>{formatFinanceAmount(item.value)}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="empty-chart-note">{emptyText}</p>
+      )}
+    </div>
+  );
+}
+
+function FinanceDailyLineChart({ data }) {
+  const width = 560;
+  const height = 220;
+  const padding = 34;
+  const maxValue = Math.max(10, ...data.flatMap((item) => [item.income, item.expense]));
+  const pointsFor = (key) => data.map((item, index) => {
+    const x = padding + (index * (width - padding * 2)) / Math.max(1, data.length - 1);
+    const y = height - padding - ((item[key] || 0) / maxValue) * (height - padding * 2);
+    return { ...item, x, y, value: item[key] || 0 };
+  });
+  const incomePoints = pointsFor('income');
+  const expensePoints = pointsFor('expense');
+  const buildPath = (points) => points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+
+  return (
+    <div className="usage-chart-card finance-wide-chart">
+      <div className="usage-chart-heading">
+        <h3>每日收支折线图</h3>
+        <span>收入 / 支出</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="每日收入支出折线图">
+        <line className="chart-axis" x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} />
+        <line className="chart-axis" x1={padding} y1={padding} x2={padding} y2={height - padding} />
+        {incomePoints.length ? <path className="chart-line finance-income-line" d={buildPath(incomePoints)} /> : null}
+        {expensePoints.length ? <path className="chart-line finance-expense-line" d={buildPath(expensePoints)} /> : null}
+        {[...incomePoints, ...expensePoints].map((point, index) => (
+          point.value ? (
+            <circle className={index < incomePoints.length ? 'chart-point finance-income-point' : 'chart-point finance-expense-point'} cx={point.x} cy={point.y} key={`${point.label}-${index}`} r="3.5" />
+          ) : null
+        ))}
+        {data.map((item, index) => {
+          const x = padding + (index * (width - padding * 2)) / Math.max(1, data.length - 1);
+          return <text className="chart-label" x={x} y={height - 10} key={item.label} textAnchor="middle">{formatPlanChartLabel(item.label)}</text>;
+        })}
+      </svg>
+      <FinanceLegend />
+    </div>
+  );
+}
+
+function FinanceDailyBarChart({ data }) {
+  const width = 560;
+  const height = 220;
+  const padding = 34;
+  const maxValue = Math.max(10, ...data.flatMap((item) => [item.income, item.expense]));
+  const groupWidth = (width - padding * 2) / Math.max(1, data.length);
+  const barWidth = groupWidth * 0.24;
+
+  return (
+    <div className="usage-chart-card finance-wide-chart">
+      <div className="usage-chart-heading">
+        <h3>每日收支柱状图</h3>
+        <span>收入 / 支出</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="每日收入支出柱状图">
+        <line className="chart-axis" x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} />
+        {data.map((item, index) => {
+          const center = padding + index * groupWidth + groupWidth / 2;
+          const incomeHeight = ((item.income || 0) / maxValue) * (height - padding * 2);
+          const expenseHeight = ((item.expense || 0) / maxValue) * (height - padding * 2);
+          return (
+            <g key={item.label}>
+              <rect className="finance-income-bar" x={center - barWidth - 2} y={height - padding - incomeHeight} width={barWidth} height={incomeHeight} rx="5" />
+              <rect className="finance-expense-bar" x={center + 2} y={height - padding - expenseHeight} width={barWidth} height={expenseHeight} rx="5" />
+              <text className="chart-label" x={center} y={height - 10} textAnchor="middle">{formatPlanChartLabel(item.label)}</text>
+            </g>
+          );
+        })}
+      </svg>
+      <FinanceLegend />
+    </div>
+  );
+}
+
+function FinanceLegend() {
+  return (
+    <div className="finance-chart-legend">
+      <span><i className="income" />收入</span>
+      <span><i className="expense" />支出</span>
     </div>
   );
 }

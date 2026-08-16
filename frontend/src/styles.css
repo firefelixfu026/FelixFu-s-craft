@@ -8130,6 +8130,27 @@ h3 {
   background: #ffffff;
 }
 
+.summer-stage-summary {
+  display: grid;
+  gap: 6px;
+  padding: 13px 15px;
+  border: 1px solid rgba(31, 122, 109, 0.22);
+  border-radius: 8px;
+  color: #475569;
+  background: rgba(31, 122, 109, 0.07);
+}
+
+.summer-stage-summary span {
+  color: #1f7a6d;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.summer-stage-summary p {
+  margin: 0;
+  line-height: 1.7;
+}
+
 .summer-module-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -8169,6 +8190,13 @@ h3 {
 }
 
 .usage-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 12px 0 16px;
+}
+
+.finance-chart-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
@@ -8284,6 +8312,123 @@ h3 {
 
 .metric-bar {
   fill: #f472b6;
+}
+
+.finance-pie-layout {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.finance-pie-track {
+  fill: none;
+  stroke: #dbe4ee;
+  stroke-width: 20;
+}
+
+.finance-pie-segment {
+  fill: none;
+  stroke-width: 20;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 80px 80px;
+}
+
+.finance-pie-total {
+  fill: #102033;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.finance-pie-unit {
+  fill: #6a7685;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.finance-pie-legend {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.finance-pie-legend div,
+.finance-chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.finance-pie-legend i,
+.finance-chart-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.finance-pie-legend span {
+  overflow: hidden;
+  min-width: 0;
+  color: #334155;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finance-pie-legend strong {
+  margin-left: auto;
+  color: #102033;
+  font-size: 13px;
+}
+
+.empty-chart-note {
+  margin: 20px 0 8px;
+  color: #6a7685;
+  font-weight: 700;
+  text-align: center;
+}
+
+.finance-income-line {
+  stroke: #1f7a6d;
+}
+
+.finance-expense-line {
+  stroke: #f472b6;
+}
+
+.finance-income-point {
+  stroke: #1f7a6d;
+}
+
+.finance-expense-point {
+  stroke: #f472b6;
+}
+
+.finance-income-bar {
+  fill: #1f7a6d;
+}
+
+.finance-expense-bar {
+  fill: #f472b6;
+}
+
+.finance-chart-legend {
+  justify-content: flex-end;
+  margin-top: -2px;
+  color: #6a7685;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.finance-chart-legend .income {
+  background: #1f7a6d;
+}
+
+.finance-chart-legend .expense {
+  background: #f472b6;
 }
 
 .chart-label {
@@ -8806,6 +8951,7 @@ h3 {
 :root[data-theme='dark'] .ai-history-item,
 :root[data-theme='dark'] .usage-chart-card,
 :root[data-theme='dark'] .completion-summary-grid > div,
+:root[data-theme='dark'] .finance-pie-card,
 :root[data-theme='dark'] .summer-goal-card,
 :root[data-theme='dark'] .summer-readonly-note,
 :root[data-theme='dark'] .plan-date-field,
@@ -8895,6 +9041,16 @@ h3 {
 :root[data-theme='dark'] .plan-calendar-foot {
   border-color: var(--border);
   color: var(--text-soft);
+}
+
+:root[data-theme='dark'] .summer-stage-summary {
+  border-color: rgba(52, 211, 153, 0.28);
+  color: var(--text-soft);
+  background: rgba(52, 211, 153, 0.08);
+}
+
+:root[data-theme='dark'] .summer-stage-summary span {
+  color: var(--accent);
 }
 
 :root[data-theme='dark'] .home-widget-heading > span,
@@ -9379,6 +9535,9 @@ h3 {
 :root[data-theme='dark'] .image-resource-meta span,
 :root[data-theme='dark'] .usage-chart-heading span,
 :root[data-theme='dark'] .completion-summary-grid span,
+:root[data-theme='dark'] .finance-pie-legend span,
+:root[data-theme='dark'] .finance-chart-legend,
+:root[data-theme='dark'] .empty-chart-note,
 :root[data-theme='dark'] .plan-date-field small,
 :root[data-theme='dark'] .plan-date-current-theme,
 :root[data-theme='dark'] .summer-plan-panel .admin-panel-heading p,
@@ -9425,7 +9584,9 @@ h3 {
 :root[data-theme='dark'] .admin-insight-grid h3,
 :root[data-theme='dark'] .account-site-avatar-editor strong,
 :root[data-theme='dark'] .completion-summary-grid strong,
-:root[data-theme='dark'] .usage-chart-heading h3 {
+:root[data-theme='dark'] .usage-chart-heading h3,
+:root[data-theme='dark'] .finance-pie-total,
+:root[data-theme='dark'] .finance-pie-legend strong {
   color: var(--text-main);
 }
 
@@ -9687,6 +9848,14 @@ h3 {
 
 :root[data-theme='dark'] .chart-bar-limit {
   fill: #263449;
+}
+
+:root[data-theme='dark'] .finance-pie-track {
+  stroke: #263449;
+}
+
+:root[data-theme='dark'] .finance-pie-unit {
+  fill: var(--text-soft);
 }
 
 :root[data-theme='dark'] .danger-button {
@@ -9997,7 +10166,8 @@ h3 {
   .summer-goal-grid,
   .summer-module-grid,
   .completion-summary-grid,
-  .usage-chart-grid {
+  .usage-chart-grid,
+  .finance-chart-grid {
     grid-template-columns: 1fr;
   }
 
