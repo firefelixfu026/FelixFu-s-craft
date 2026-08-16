@@ -8263,6 +8263,71 @@ h3 {
   font-size: 24px;
 }
 
+.summer-summary-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.summer-summary-report {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.summer-summary-report > div,
+.summer-summary-days article {
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.summer-summary-report > div {
+  padding: 16px;
+}
+
+.summer-summary-report h3 {
+  margin: 0 0 10px;
+  color: #102033;
+  font-size: 17px;
+}
+
+.summer-summary-report ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  color: #4b5b70;
+  line-height: 1.7;
+}
+
+.summer-summary-days {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summer-summary-days article {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.summer-summary-days span {
+  color: #1f7a6d;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.summer-summary-days strong {
+  color: #102033;
+  font-size: 15px;
+}
+
+.summer-summary-days small {
+  color: #6a7685;
+}
+
 .chart-axis {
   stroke: #cbd5e1;
   stroke-width: 1.5;
@@ -8951,6 +9016,8 @@ h3 {
 :root[data-theme='dark'] .ai-history-item,
 :root[data-theme='dark'] .usage-chart-card,
 :root[data-theme='dark'] .completion-summary-grid > div,
+:root[data-theme='dark'] .summer-summary-report > div,
+:root[data-theme='dark'] .summer-summary-days article,
 :root[data-theme='dark'] .finance-pie-card,
 :root[data-theme='dark'] .summer-goal-card,
 :root[data-theme='dark'] .summer-readonly-note,
@@ -8978,6 +9045,16 @@ h3 {
 
 :root[data-theme='dark'] .visual-card-head {
   color: var(--text-main);
+}
+
+:root[data-theme='dark'] .summer-summary-report h3,
+:root[data-theme='dark'] .summer-summary-days strong {
+  color: var(--text-main);
+}
+
+:root[data-theme='dark'] .summer-summary-report ul,
+:root[data-theme='dark'] .summer-summary-days small {
+  color: var(--text-muted);
 }
 
 :root[data-theme='dark'] .visual-card-head svg,
@@ -10167,7 +10244,10 @@ h3 {
   .summer-module-grid,
   .completion-summary-grid,
   .usage-chart-grid,
-  .finance-chart-grid {
+  .finance-chart-grid,
+  .summer-summary-metrics,
+  .summer-summary-report,
+  .summer-summary-days {
     grid-template-columns: 1fr;
   }
 

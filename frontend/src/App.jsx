@@ -113,6 +113,7 @@ const ARTICLE_SECTION_PATHS = {
   notes: '/notes'
 };
 const PLAN_SECTION_PATHS = {
+  summary: '/plan/summary',
   schedule: '/plan/schedule',
   completion: '/plan/completion',
   courses: '/plan/courses',
@@ -211,6 +212,7 @@ const THEME_KEY = 'felix_blog_theme';
 const SIDEBAR_COLLAPSED_KEY = 'felix_blog_sidebar_collapsed';
 const AUTH_FAIL_STATE_KEY = 'felix_blog_auth_fail_state';
 const DEFAULT_SUMMER_PLAN_SECTION_VISIBILITY = {
+  summary: true,
   schedule: true,
   completion: true,
   courses: true,
@@ -547,11 +549,18 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.8.1',
+    title: '在家阶段计划恢复与总结',
+    date: '2026-08-16',
+    status: '已上线',
+    points: ['恢复 8.4-8.15 暑期在家计划任务，不再被 8.16-9.11 在校阶段覆盖', '计划、应用和完成度按日期合并模板与数据库记录，历史阶段和新阶段并行显示', '新增计划总结入口，自动汇总在家阶段的完成度、饮食、体重、记账、睡眠和应用记录', '修正上一版阶段说明，避免误解为旧计划被迁移隐藏']
+  },
+  {
     version: 'v6.8.0',
     title: '暑期在校计划阶段切换',
     date: '2026-08-16',
     status: '已上线',
-    points: ['暑期在家计划收束为阶段总结，计划页默认进入 8.16-9.11 暑期在校计划', '新阶段每日任务保持空清单，方便自己从零填写当天目标', '旧数据库里的 8.4-8.15 阶段会自动迁移到新阶段，但饮食、记账、身体和睡眠记录会保留', '饮食、记账、身体和睡眠新增记录会根据当前日期和现有最后日期自动顺延', '睡眠新增记录会自动生成跨日日期范围', '记账模块新增收入/支出来源饼图，以及每日收支折线图和柱状图']
+    points: ['暑期在校阶段新增 8.16-9.11 空任务清单，方便自己从零填写当天目标', '饮食、记账、身体和睡眠新增记录会根据当前日期和现有最后日期自动顺延', '睡眠新增记录会自动生成跨日日期范围', '记账模块新增收入/支出来源饼图，以及每日收支折线图和柱状图']
   },
   {
     version: 'v6.7.2',
@@ -1386,7 +1395,95 @@ const personalizedTimeSlots = [
   { id: 'slot-2130', time: '21:30 - 22:30', activity: '洗漱 + 睡眠准备', focus: '填睡眠记录，尽量 22:30 前进入休息状态。', type: '睡眠' }
 ];
 
-const personalizedDailyPlans = createCampusDailyPlans('2026-08-16', '2026-09-11').map(ensureDailyPlanTasks);
+const homeSummerDailyPlans = [
+  createDailyPlan('2026-08-04', '8月4日', '启动日：数据结构 + 大物框架', {
+    'slot-0800': { activity: '高级数据结构与算法分析', focus: '复杂度、堆、并查集预热；先建立期末冲刺目录。', type: '学习' },
+    'slot-1030': { activity: '大学物理（乙）Ⅱ', focus: '电场、电势、电容先过概念和公式。', type: '学习' },
+    'slot-1400': { activity: '数据结构题目整理', focus: '整理复杂度常见坑，写 3-5 道基础题。', type: '学习' },
+    'slot-1530': { activity: '快走', focus: '40 分钟，低压力启动。', type: '运动' },
+    'slot-2030': { activity: '红与黑', focus: '阅读 30 页，B 站和小红书只保留应用限时。', type: '阅读' }
+  }),
+  createDailyPlan('2026-08-05', '8月5日', '计组启动 + 概率基础', {
+    'slot-0800': { activity: '计算机组成', focus: '数据表示、定点数、浮点数和补码。', type: '学习' },
+    'slot-1030': { activity: '概率论与数理统计', focus: '随机变量、分布函数、离散/连续分布。', type: '学习' },
+    'slot-1400': { activity: '计组笔记整理', focus: '把数制转换、补码、浮点表示整理成速查表。', type: '学习' },
+    'slot-1530': { activity: '室内燃脂', focus: '25 分钟，控制强度但要出汗。', type: '运动' },
+    'slot-2030': { activity: '葬送的芙莉莲', focus: '看 1 集，结束后填睡眠记录。', type: '娱乐' }
+  }),
+  createDailyPlan('2026-08-06', '8月6日', '概率推进 + 数据结构图论', {
+    'slot-0800': { activity: '概率论与数理统计', focus: '期望、方差、常见分布，先抓公式适用条件。', type: '学习' },
+    'slot-1030': { activity: '高级数据结构与算法分析', focus: '图论基础、BFS/DFS、最短路预习。', type: '学习' },
+    'slot-1400': { activity: '概率题目训练', focus: '做随机变量与期望方差例题，整理错因。', type: '学习' },
+    'slot-1530': { activity: '游泳', focus: '以恢复和舒展为主。', type: '运动' },
+    'slot-2030': { activity: '以撒的结合', focus: '45 分钟内收住，避免顺手刷视频。', type: '娱乐' }
+  }),
+  createDailyPlan('2026-08-07', '8月7日', '大物电磁 + 计组指令', {
+    'slot-0800': { activity: '大学物理（乙）Ⅱ', focus: '稳恒电流、磁场基础和典型公式。', type: '学习' },
+    'slot-1030': { activity: '计算机组成', focus: '指令系统、寻址方式、CPU 数据通路。', type: '学习' },
+    'slot-1400': { activity: '大物公式卡片', focus: '把电场/磁场公式按场景归类。', type: '学习' },
+    'slot-1530': { activity: '快走', focus: '45 分钟，顺便复盘上午知识点。', type: '运动' },
+    'slot-2030': { activity: '红与黑', focus: '阅读 30 页，做一句话摘要。', type: '阅读' }
+  }),
+  createDailyPlan('2026-08-08', '8月8日', '数据结构强化日', {
+    'slot-0800': { activity: '高级数据结构与算法分析', focus: '平衡树、哈希、摊还分析先看概念。', type: '学习' },
+    'slot-1030': { activity: '高级数据结构与算法分析', focus: '图论最短路和数据结构应用题型。', type: '学习' },
+    'slot-1400': { activity: '算法题练习', focus: '做 2-3 道图论/并查集/堆相关题。', type: '学习' },
+    'slot-1530': { activity: '室内燃脂', focus: '25 分钟，结束后记录体重和状态。', type: '运动' },
+    'slot-2030': { activity: '第五人格', focus: '45 分钟，结束即停。', type: '娱乐' }
+  }),
+  createDailyPlan('2026-08-09', '8月9日', '计组主线日', {
+    'slot-0800': { activity: '计算机组成', focus: 'CPU 数据通路、控制器、流水线概念。', type: '学习' },
+    'slot-1030': { activity: '计算机组成', focus: '存储层次、Cache 基础和命中率理解。', type: '学习' },
+    'slot-1400': { activity: '计组结构图整理', focus: '画 CPU/存储层次结构图，建立整体感。', type: '学习' },
+    'slot-1530': { activity: '游泳', focus: '放松肩颈，控制疲劳。', type: '运动' },
+    'slot-2030': { activity: '葬送的芙莉莲', focus: '看 1 集，顺手记今天花销。', type: '娱乐' }
+  }),
+  createDailyPlan('2026-08-10', '8月10日', '概率统计推进日', {
+    'slot-0800': { activity: '概率论与数理统计', focus: '二维随机变量、边缘分布、条件分布。', type: '学习' },
+    'slot-1030': { activity: '概率论与数理统计', focus: '大数定律、中心极限定理先看直觉。', type: '学习' },
+    'slot-1400': { activity: '概率错题整理', focus: '做 3-5 道分布与期望相关题。', type: '学习' },
+    'slot-1530': { activity: '快走', focus: '40 分钟，保持稳定运动量。', type: '运动' },
+    'slot-2030': { activity: '红与黑', focus: '阅读 30 页，睡前不刷信息流。', type: '阅读' }
+  }),
+  createDailyPlan('2026-08-11', '8月11日', '大物电磁推进日', {
+    'slot-0800': { activity: '大学物理（乙）Ⅱ', focus: '电磁感应、法拉第定律、楞次定律。', type: '学习' },
+    'slot-1030': { activity: '大学物理（乙）Ⅱ', focus: '典型题型：感应电动势、磁通量变化。', type: '学习' },
+    'slot-1400': { activity: '大物题目训练', focus: '把公式代入和方向判断分开练。', type: '学习' },
+    'slot-1530': { activity: '室内燃脂', focus: '30 分钟，练完补水。', type: '运动' },
+    'slot-2030': { activity: '以撒的结合', focus: '45 分钟；如果白天进度落后，改为红与黑。', type: '娱乐' }
+  }),
+  createDailyPlan('2026-08-12', '8月12日', '算法 + 计组交叉复盘', {
+    'slot-0800': { activity: '高级数据结构与算法分析', focus: '平衡树、哈希、图算法回顾。', type: '学习' },
+    'slot-1030': { activity: '计算机组成', focus: '流水线和存储层次复盘。', type: '学习' },
+    'slot-1400': { activity: '综合笔记整理', focus: '把数据结构模板和计组结构图归档。', type: '学习' },
+    'slot-1530': { activity: '游泳', focus: '中等强度，避免过累。', type: '运动' },
+    'slot-2030': { activity: '葬送的芙莉莲', focus: '看 1 集，记录当天应用使用时间。', type: '娱乐' }
+  }),
+  createDailyPlan('2026-08-13', '8月13日', '概率 + 大物交叉复盘', {
+    'slot-0800': { activity: '概率论与数理统计', focus: '常见分布、期望方差、CLT 回顾。', type: '学习' },
+    'slot-1030': { activity: '大学物理（乙）Ⅱ', focus: '电磁学公式和题型串联。', type: '学习' },
+    'slot-1400': { activity: '综合题目训练', focus: '概率和大物各做一组基础题。', type: '学习' },
+    'slot-1530': { activity: '快走', focus: '45 分钟，轻松一点。', type: '运动' },
+    'slot-2030': { activity: '第五人格', focus: '45 分钟，结束后填睡眠计划。', type: '娱乐' }
+  }),
+  createDailyPlan('2026-08-14', '8月14日', '四门课总复盘', {
+    'slot-0800': { activity: '四门课清单复盘', focus: '列出每门课“已懂/半懂/没懂”三栏。', type: '学习' },
+    'slot-1030': { activity: '薄弱点补齐', focus: '优先补最影响开学听课的概念。', type: '学习' },
+    'slot-1400': { activity: '下学期第一周准备', focus: '整理资料、课程文件夹、预习目录。', type: '学习' },
+    'slot-1530': { activity: '室内燃脂', focus: '25 分钟，轻量收尾。', type: '运动' },
+    'slot-2030': { activity: '红与黑 / 自由娱乐', focus: '优先阅读；如果完成度高再游戏。', type: '阅读' }
+  }),
+  createDailyPlan('2026-08-15', '8月15日', '收尾日：整理与调整', {
+    'slot-0800': { activity: '暑期计划收尾', focus: '总结 8/4-8/15 完成情况和遗留问题。', type: '学习' },
+    'slot-1030': { activity: '开学预习交接', focus: '给四门课写下一步任务清单。', type: '学习' },
+    'slot-1400': { activity: '自由调整 / 补漏', focus: '哪里欠账补哪里；没有欠账就整理博客记录。', type: '学习' },
+    'slot-1530': { activity: '轻松快走', focus: '30 分钟，恢复为主。', type: '运动' },
+    'slot-2030': { activity: '自由复盘', focus: '可以看番/阅读/游戏，但把应用时长记上。', type: '娱乐' }
+  })
+].map(ensureDailyPlanTasks);
+
+const campusSummerDailyPlans = createCampusDailyPlans('2026-08-16', '2026-09-11').map(ensureDailyPlanTasks);
+const personalizedDailyPlans = [...homeSummerDailyPlans, ...campusSummerDailyPlans];
 
 function createCampusDailyPlans(startDate, endDate) {
   const days = [];
@@ -6563,13 +6660,40 @@ function shouldStartCampusPlan(plan) {
   return range.includes('2026-08-04') || firstDate === '2026-08-04' || firstDate === '8月4日';
 }
 
-function normalizeDailyPlans(plan, forceTemplate = false) {
-  const source = !forceTemplate && Array.isArray(plan?.dailyPlans) && plan.dailyPlans.length
-    ? plan.dailyPlans
-    : personalizedDailyPlans;
+function getStoredDayMap(days) {
+  return new Map((Array.isArray(days) ? days : [])
+    .filter((day) => day?.date || day?.id)
+    .map((day) => [day.date || day.id, day]));
+}
 
-  return source.map((day, dayIndex) => {
-    const fallback = personalizedDailyPlans[dayIndex] || personalizedDailyPlans[0];
+function getCustomStoredDays(days, fallbackDays) {
+  const fallbackDates = new Set(fallbackDays.map((day) => day.date || day.id));
+  return (Array.isArray(days) ? days : [])
+    .filter((day) => {
+      const key = day?.date || day?.id;
+      return key && !fallbackDates.has(key);
+    });
+}
+
+function sortPlanDayRows(rows) {
+  return [...rows].sort((left, right) => {
+    const orderDiff = parsePlanDateOrder(left.date || left.id) - parsePlanDateOrder(right.date || right.id);
+    if (orderDiff !== 0) return orderDiff;
+    return String(left.id || '').localeCompare(String(right.id || ''), 'zh-CN');
+  });
+}
+
+function normalizeDailyPlans(plan) {
+  const storedMap = getStoredDayMap(plan?.dailyPlans);
+  const source = [
+    ...personalizedDailyPlans.map((fallback) => storedMap.get(fallback.date) || fallback),
+    ...getCustomStoredDays(plan?.dailyPlans, personalizedDailyPlans)
+  ];
+
+  return sortPlanDayRows(source).map((day, dayIndex) => {
+    const fallback = personalizedDailyPlans.find((item) => item.date === day?.date || item.id === day?.id)
+      || personalizedDailyPlans[dayIndex]
+      || personalizedDailyPlans[0];
     const date = day?.date || fallback.date || day?.id || `day-${dayIndex + 1}`;
     const rawSlots = Array.isArray(day?.slots) ? day.slots : fallback.slots;
     const slots = rawSlots?.length
@@ -6624,27 +6748,29 @@ function normalizeAppRows(rows, fallbackRows = personalizedSummerPlan.apps, dayD
   });
 }
 
-function normalizeAppUsageDays(plan, forceTemplate = false) {
-  if (!forceTemplate && Array.isArray(plan?.appUsageDays) && plan.appUsageDays.length) {
-    return plan.appUsageDays.map((day, index) => {
-      const fallback = personalizedAppUsageDays[index] || personalizedAppUsageDays[0];
-      const date = day?.date || fallback.date || day?.id || `app-day-${index + 1}`;
-      return {
-        ...fallback,
-        ...(day || {}),
-        id: day?.id || date,
-        date,
-        label: day?.label || fallback.label || date,
-        theme: day?.theme || fallback.theme || '',
-        apps: normalizeAppRows(day?.apps, fallback.apps, date)
-      };
-    });
-  }
+function normalizeAppUsageDays(plan) {
+  const storedMap = getStoredDayMap(plan?.appUsageDays);
+  const source = [
+    ...personalizedAppUsageDays.map((fallback) => storedMap.get(fallback.date) || fallback),
+    ...getCustomStoredDays(plan?.appUsageDays, personalizedAppUsageDays)
+  ];
 
-  return personalizedAppUsageDays.map((day, index) => ({
-    ...day,
-    apps: normalizeAppRows(index === 0 ? plan?.apps : null, day.apps, day.date)
-  }));
+  return sortPlanDayRows(source).map((day, index) => {
+    const fallback = personalizedAppUsageDays.find((item) => item.date === day?.date || item.id === day?.id)
+      || personalizedAppUsageDays[index]
+      || personalizedAppUsageDays[0];
+    const date = day?.date || fallback.date || day?.id || `app-day-${index + 1}`;
+    const firstDayFallbackApps = index === 0 ? plan?.apps : null;
+    return {
+      ...fallback,
+      ...(day || {}),
+      id: day?.id || date,
+      date,
+      label: day?.label || fallback.label || date,
+      theme: day?.theme || fallback.theme || '',
+      apps: normalizeAppRows(day?.apps || firstDayFallbackApps, fallback.apps, date)
+    };
+  });
 }
 
 function normalizeCompletionTasks(tasks, fallbackTasks = personalizedCompletionDays[0].tasks, dayDate = '') {
@@ -6665,27 +6791,28 @@ function normalizeCompletionTasks(tasks, fallbackTasks = personalizedCompletionD
   });
 }
 
-function normalizeCompletionDays(plan, forceTemplate = false) {
-  if (!forceTemplate && Array.isArray(plan?.completionDays) && plan.completionDays.length) {
-    return plan.completionDays.map((day, index) => {
-      const fallback = personalizedCompletionDays[index] || personalizedCompletionDays[0];
-      const date = day?.date || fallback.date || day?.id || `completion-day-${index + 1}`;
-      return {
-        ...fallback,
-        ...(day || {}),
-        id: day?.id || date,
-        date,
-        label: day?.label || fallback.label || date,
-        theme: day?.theme || fallback.theme || '',
-        tasks: normalizeCompletionTasks(day?.tasks, fallback.tasks, date)
-      };
-    });
-  }
+function normalizeCompletionDays(plan) {
+  const storedMap = getStoredDayMap(plan?.completionDays);
+  const source = [
+    ...personalizedCompletionDays.map((fallback) => storedMap.get(fallback.date) || fallback),
+    ...getCustomStoredDays(plan?.completionDays, personalizedCompletionDays)
+  ];
 
-  return personalizedCompletionDays.map((day) => ({
-    ...day,
-    tasks: normalizeCompletionTasks(null, day.tasks, day.date)
-  }));
+  return sortPlanDayRows(source).map((day, index) => {
+    const fallback = personalizedCompletionDays.find((item) => item.date === day?.date || item.id === day?.id)
+      || personalizedCompletionDays[index]
+      || personalizedCompletionDays[0];
+    const date = day?.date || fallback.date || day?.id || `completion-day-${index + 1}`;
+    return {
+      ...fallback,
+      ...(day || {}),
+      id: day?.id || date,
+      date,
+      label: day?.label || fallback.label || date,
+      theme: day?.theme || fallback.theme || '',
+      tasks: normalizeCompletionTasks(day?.tasks, fallback.tasks, date)
+    };
+  });
 }
 
 function completionStatusScore(status) {
@@ -6983,19 +7110,98 @@ function getFinanceDailyChartData(rows) {
   );
 }
 
+function isHomeSummerStageDate(value) {
+  const order = parsePlanDateOrder(value);
+  return order >= 20260804 && order <= 20260815;
+}
+
+function filterHomeSummerRows(rows) {
+  return (Array.isArray(rows) ? rows : []).filter((row) => isHomeSummerStageDate(row?.date || row?.id));
+}
+
+function formatMaybeAmount(value) {
+  return Number.isFinite(value) ? `${value.toFixed(1)} 元` : '待补充';
+}
+
+function formatMaybeAverage(value, unit) {
+  return Number.isFinite(value) ? `${value.toFixed(1).replace(/\.0$/, '')}${unit}` : '待补充';
+}
+
+function calculateAverage(values) {
+  const numericValues = values.filter((value) => Number.isFinite(value));
+  if (!numericValues.length) return null;
+  return numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length;
+}
+
+function buildHomeSummerSummary(plan, dailyPlans, completionDays, appUsageDays) {
+  const homePlans = filterHomeSummerRows(dailyPlans);
+  const homeCompletionDays = filterHomeSummerRows(completionDays);
+  const homeExpenses = filterHomeSummerRows(plan?.expenses);
+  const homeMeals = filterHomeSummerRows(plan?.meals);
+  const homeBodyRows = filterHomeSummerRows(plan?.bodyMetrics);
+  const homeSleepRows = filterHomeSummerRows(plan?.sleep);
+  const homeAppDays = filterHomeSummerRows(appUsageDays);
+
+  const taskCount = homePlans.reduce((sum, day) => sum + (day.tasks || []).length, 0);
+  const completionRows = homeCompletionDays.flatMap((day) => getCompletionRowsForDay(day, dailyPlans));
+  const countedCompletionRows = completionRows.filter((task) => task.status !== '不计入');
+  const completed = completionRows.filter((task) => task.status === '完成').length;
+  const partial = completionRows.filter((task) => task.status === '部分完成').length;
+  const missed = completionRows.filter((task) => task.status === '未完成').length;
+  const completionRate = countedCompletionRows.length
+    ? Math.round((completionRows.reduce((sum, task) => sum + completionStatusScore(task.status), 0) / countedCompletionRows.length) * 100)
+    : 0;
+
+  const income = homeExpenses.reduce((sum, item) => sum + (item.type === '收入' ? parseMetricNumber(item.amount) : 0), 0);
+  const expense = homeExpenses.reduce((sum, item) => sum + (item.type === '收入' ? 0 : parseMetricNumber(item.amount)), 0);
+  const avgWeight = calculateAverage(homeBodyRows.map((row) => {
+    const hasWeight = String(row.weight || '').trim();
+    return hasWeight ? parseMetricNumber(row.weight) : null;
+  }));
+  const avgSleep = calculateAverage(homeSleepRows.map((row) => {
+    const computedHours = calculateSleepHours(row.bed, row.wake);
+    const hoursValue = computedHours || row.hours || '';
+    return String(hoursValue).trim() ? parseMetricNumber(hoursValue) : null;
+  }));
+  const appActualMinutes = homeAppDays.reduce((sum, day) => (
+    sum + (day.apps || []).reduce((daySum, app) => daySum + parseMinutes(app.actual), 0)
+  ), 0);
+  const loggedAppDays = homeAppDays.filter((day) => (day.apps || []).some((app) => String(app.actual || '').trim())).length;
+
+  const metrics = [
+    { label: '阶段天数', value: `${homePlans.length || 12} 天` },
+    { label: '计划任务', value: `${taskCount} 项` },
+    { label: '完成度', value: countedCompletionRows.length ? `${completionRate}%` : '待补充' },
+    { label: '记账结余', value: formatMaybeAmount(income - expense) }
+  ];
+
+  const records = [
+    `完成记录：完成 ${completed} 项，部分完成 ${partial} 项，未完成 ${missed} 项。`,
+    `饮食记录：${homeMeals.length} 条；身体记录：${homeBodyRows.length} 条，平均体重 ${formatMaybeAverage(avgWeight, 'kg')}。`,
+    `睡眠记录：${homeSleepRows.length} 条，平均睡眠 ${formatMaybeAverage(avgSleep, 'h')}。`,
+    `记账记录：收入 ${formatMaybeAmount(income)}，支出 ${formatMaybeAmount(expense)}，结余 ${formatMaybeAmount(income - expense)}。`,
+    `应用记录：${loggedAppDays} 天填写了实际使用时间，合计 ${appActualMinutes || 0} 分钟。`
+  ];
+
+  const suggestions = [
+    '在家阶段已经完成预习节奏搭建，下一阶段可以把每日任务压缩成“课程/项目/身体”三类。',
+    '饮食、睡眠和体重记录建议继续按天补齐，这样折线图会更有参考价值。',
+    '应用时间如果只填实际使用，不需要写太多备注，重点看趋势有没有越界。'
+  ];
+
+  return { metrics, records, suggestions, completionRows, homePlans };
+}
+
 function normalizeSummerPlan(plan) {
-  const shouldMigrateStage = shouldStartCampusPlan(plan);
-  const dailyPlans = normalizeDailyPlans(plan, shouldMigrateStage);
-  const appUsageDays = normalizeAppUsageDays(plan, shouldMigrateStage);
-  const completionDays = normalizeCompletionDays(plan, shouldMigrateStage);
+  const dailyPlans = normalizeDailyPlans(plan);
+  const appUsageDays = normalizeAppUsageDays(plan);
+  const completionDays = normalizeCompletionDays(plan);
 
   return {
     ...personalizedSummerPlan,
     ...(plan || {}),
-    profile: shouldMigrateStage
-      ? { ...personalizedSummerPlan.profile, name: plan?.profile?.name || personalizedSummerPlan.profile.name, identity: plan?.profile?.identity || personalizedSummerPlan.profile.identity }
-      : { ...personalizedSummerPlan.profile, ...(plan?.profile || {}) },
-    goals: shouldMigrateStage ? personalizedSummerPlan.goals : { ...personalizedSummerPlan.goals, ...(plan?.goals || {}) },
+    profile: { ...personalizedSummerPlan.profile, ...(plan?.profile || {}) },
+    goals: { ...personalizedSummerPlan.goals, ...(plan?.goals || {}) },
     daily: dailyPlans[0]?.slots || normalizeDailyRows(plan?.daily),
     dailyTasks: dailyPlans[0]?.tasks || normalizeDailyTasks(plan?.dailyTasks),
     dailyPlans,
@@ -7011,6 +7217,7 @@ function normalizeSummerPlan(plan) {
 }
 
 const summerPlanSections = [
+  { id: 'summary', label: '总结', detail: '在家阶段' },
   { id: 'schedule', label: '每日任务', detail: '当天清单' },
   { id: 'completion', label: '完成度', detail: '任务记录' },
   { id: 'courses', label: '课程', detail: '预习进度' },
@@ -7041,6 +7248,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
   const completionChartData = getSevenDayCompletion(completionDays, selectedCompletionDay.date, dayPlans);
   const bodyMetricChartData = getBodyMetricChartData(plan.bodyMetrics);
   const sleepMetricChartData = getSleepMetricChartData(plan.sleep);
+  const homeSummerSummary = buildHomeSummerSummary(plan, dayPlans, completionDays, appUsageDays);
 
   useEffect(() => {
     let cancelled = false;
@@ -7377,6 +7585,46 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
       {!visiblePlanSections.length && (
         <p className="empty-state">计划模块暂时没有公开内容。</p>
+      )}
+
+      {activePlanSection === 'summary' && (
+        <PlanModule title="暑期在家计划总结" count="8.4 - 8.15" wide>
+          <div className="completion-summary-grid summer-summary-metrics">
+            {homeSummerSummary.metrics.map((metric) => (
+              <div key={metric.label}>
+                <span>{metric.label}</span>
+                <strong>{metric.value}</strong>
+              </div>
+            ))}
+          </div>
+          <div className="summer-summary-report">
+            <div>
+              <h3>阶段概况</h3>
+              <ul>
+                {homeSummerSummary.records.map((record) => (
+                  <li key={record}>{record}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>下一阶段提醒</h3>
+              <ul>
+                {homeSummerSummary.suggestions.map((suggestion) => (
+                  <li key={suggestion}>{suggestion}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <div className="summer-summary-days">
+            {homeSummerSummary.homePlans.map((day) => (
+              <article key={day.date}>
+                <span>{day.label}</span>
+                <strong>{day.theme}</strong>
+                <small>{(day.tasks || []).length} 项任务</small>
+              </article>
+            ))}
+          </div>
+        </PlanModule>
       )}
 
       {activePlanSection === 'schedule' && (
