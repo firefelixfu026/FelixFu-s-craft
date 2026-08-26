@@ -43,6 +43,7 @@ AI_BASE_URL = os.getenv("AI_BASE_URL", "").strip()
 AI_MODEL = os.getenv("AI_MODEL", "").strip()
 AI_API_KEY = os.getenv("AI_API_KEY", "").strip()
 AI_SETTINGS_FILE = Path(os.getenv("AI_SETTINGS_FILE", "data/ai-settings.json"))
+SUMMER_PLAN_SNAPSHOT_KEY = "summer-plan-snapshots"
 try:
     AI_REQUEST_TIMEOUT = float(os.getenv("AI_REQUEST_TIMEOUT", "25") or "25")
 except ValueError:
@@ -172,9 +173,11 @@ DEFAULT_SUMMER_PLAN: dict[str, Any] = {
         {"id": "course-prob", "name": "概率论与数理统计", "target": "随机变量、分布、期望方差、统计基础预热", "progress": "0%"},
     ],
     "apps": [
-        {"id": "app-wechat", "name": "微信", "limit": "90 分钟", "actual": ""},
-        {"id": "app-bilibili", "name": "B 站", "limit": "30 分钟", "actual": ""},
-        {"id": "app-rednote", "name": "小红书", "limit": "20 分钟", "actual": ""},
+        {"id": "app-wechat", "name": "微信", "limit": "60 分钟", "actual": ""},
+        {"id": "app-bilibili", "name": "B 站", "limit": "60 分钟", "actual": ""},
+        {"id": "app-rednote", "name": "小红书", "limit": "60 分钟", "actual": ""},
+        {"id": "app-hongguo", "name": "红果短剧", "limit": "60 分钟", "actual": ""},
+        {"id": "app-genshin", "name": "原神", "limit": "60 分钟", "actual": ""},
     ],
     "expenses": [
         {"id": "expense-1", "date": "8月4日", "type": "支出", "item": "餐饮", "amount": "", "note": ""},
@@ -615,6 +618,44 @@ def get_summer_plan(
     return plan.payload if plan else DEFAULT_SUMMER_PLAN
 
 
+def _store_summer_plan_snapshot(db: Session, current_user: User, previous_payload: dict[str, Any] | None) -> None:
+    if not previous_payload:
+        return
+    setting = db.get(SiteSetting, SUMMER_PLAN_SNAPSHOT_KEY)
+    snapshots = []
+    if setting and isinstance(setting.payload, dict):
+        snapshots = setting.payload.get("records", [])
+    if not isinstance(snapshots, list):
+        snapshots = []
+    snapshots = [
+        {
+            "id": f"summer-plan-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+            "createdAt": datetime.utcnow().isoformat(),
+            "user": current_user.display_name,
+            "payload": previous_payload,
+        },
+        *snapshots,
+    ][:12]
+    next_payload = {"records": snapshots}
+    if not setting:
+        db.add(SiteSetting(key=SUMMER_PLAN_SNAPSHOT_KEY, payload=next_payload))
+    else:
+        setting.payload = next_payload
+    db.commit()
+
+
+@app.get("/api/admin/summer-plan-snapshots")
+def get_summer_plan_snapshots(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict[str, Any]:
+    setting = db.get(SiteSetting, SUMMER_PLAN_SNAPSHOT_KEY)
+    if not setting or not isinstance(setting.payload, dict):
+        return {"records": []}
+    records = setting.payload.get("records", [])
+    return {"records": records if isinstance(records, list) else []}
+
+
 @app.put("/api/admin/summer-plan")
 def update_summer_plan(
     payload: SummerPlanIn,
@@ -626,6 +667,7 @@ def update_summer_plan(
         plan = SummerPlan(key="current", payload=payload.payload)
         db.add(plan)
     else:
+        _store_summer_plan_snapshot(db, current_user, plan.payload)
         plan.payload = payload.payload
     db.commit()
     db.refresh(plan)

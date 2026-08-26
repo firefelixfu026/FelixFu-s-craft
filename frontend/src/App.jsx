@@ -196,6 +196,7 @@ const BACKUP_CENTER_KEY = 'felix_blog_backup_records';
 const BOT_CORPUS_KEY = 'felix_blog_bot_corpus_samples';
 const STUDY_ASSISTANT_KEY = 'felix_blog_study_assistant';
 const SUMMER_PLAN_KEY = 'felix_blog_summer_plan';
+const SUMMER_PLAN_RECOVERY_KEY = 'felix_blog_summer_plan_recovery';
 const AUTH_TOKEN_KEY = 'felix_blog_token';
 const AUTH_USER_KEY = 'felix_blog_user';
 const AUTH_EXPIRES_KEY = 'felix_blog_token_expires_at';
@@ -548,6 +549,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.8.2',
+    title: '计划数据防覆盖保护',
+    date: '2026-08-26',
+    status: '已上线',
+    points: ['计划页加载和模板补全不再自动写回数据库，只有实际编辑后才保存', '应用使用时间和完成度会尝试从本地缓存找回 8.4-8.15 的历史填写内容', '后端保存计划前会保留上一版快照，降低后续误覆盖风险']
+  },
   {
     version: 'v6.8.1',
     title: '在家阶段计划恢复与总结',
@@ -7192,6 +7200,114 @@ function buildHomeSummerSummary(plan, dailyPlans, completionDays, appUsageDays) 
   return { metrics, records, suggestions, completionRows, homePlans };
 }
 
+function dayHasAppActual(day) {
+  return isHomeSummerStageDate(day?.date || day?.id)
+    && (day?.apps || []).some((app) => String(app?.actual || '').trim());
+}
+
+function dayHasCompletionActual(day) {
+  return isHomeSummerStageDate(day?.date || day?.id)
+    && (day?.tasks || []).some((task) => (
+      String(task?.actual || '').trim()
+      || String(task?.note || '').trim()
+      || ['完成', '部分完成', '未完成', '不计入'].includes(task?.status)
+    ));
+}
+
+function mergeRecoveredAppDay(primaryDay, recoveryDay) {
+  if (!recoveryDay || !dayHasAppActual(recoveryDay)) return primaryDay;
+  const primaryApps = Array.isArray(primaryDay?.apps) ? primaryDay.apps : [];
+  const recoveryApps = Array.isArray(recoveryDay.apps) ? recoveryDay.apps : [];
+  const mergedApps = primaryApps.map((app, index) => {
+    const recovered = recoveryApps.find((item) => item.id === app.id || item.name === app.name) || recoveryApps[index];
+    if (!recovered || String(app.actual || '').trim()) return app;
+    return { ...app, actual: recovered.actual ?? app.actual };
+  });
+  const recoveredOnly = recoveryApps.filter((item) => (
+    String(item?.actual || '').trim()
+    && !mergedApps.some((app) => app.id === item.id || app.name === item.name)
+  ));
+  return { ...primaryDay, apps: [...mergedApps, ...recoveredOnly] };
+}
+
+function mergeRecoveredCompletionDay(primaryDay, recoveryDay) {
+  if (!recoveryDay || !dayHasCompletionActual(recoveryDay)) return primaryDay;
+  const primaryTasks = Array.isArray(primaryDay?.tasks) ? primaryDay.tasks : [];
+  const recoveryTasks = Array.isArray(recoveryDay.tasks) ? recoveryDay.tasks : [];
+  const mergedTasks = primaryTasks.map((task, index) => {
+    const recovered = recoveryTasks.find((item) => (
+      item.id === task.id
+      || item.planTaskId === task.planTaskId
+      || item.planned === task.planned
+    )) || recoveryTasks[index];
+    if (!recovered) return task;
+    const hasPrimaryData = String(task.actual || '').trim()
+      || String(task.note || '').trim()
+      || ['完成', '部分完成', '未完成', '不计入'].includes(task.status);
+    if (hasPrimaryData) return task;
+    return {
+      ...task,
+      actual: recovered.actual ?? task.actual,
+      status: completionStatusOptions.includes(recovered.status) ? recovered.status : task.status,
+      note: recovered.note ?? task.note
+    };
+  });
+  const recoveredOnly = recoveryTasks.filter((item) => (
+    (String(item?.actual || '').trim() || String(item?.note || '').trim())
+    && !mergedTasks.some((task) => task.id === item.id || task.planTaskId === item.planTaskId || task.planned === item.planned)
+  ));
+  return { ...primaryDay, tasks: [...mergedTasks, ...recoveredOnly] };
+}
+
+function recoverAppUsageDays(primaryDays, recoveryDays) {
+  const recoveryByDate = getStoredDayMap(recoveryDays);
+  const primaryDates = new Set((primaryDays || []).map((day) => day.date || day.id));
+  const merged = (primaryDays || []).map((day) => mergeRecoveredAppDay(day, recoveryByDate.get(day?.date || day?.id)));
+  const recoveredOnly = (Array.isArray(recoveryDays) ? recoveryDays : [])
+    .filter((day) => {
+      const key = day?.date || day?.id;
+      return key && !primaryDates.has(key) && dayHasAppActual(day);
+    });
+  return sortPlanDayRows([...merged, ...recoveredOnly]);
+}
+
+function recoverCompletionDays(primaryDays, recoveryDays) {
+  const recoveryByDate = getStoredDayMap(recoveryDays);
+  const primaryDates = new Set((primaryDays || []).map((day) => day.date || day.id));
+  const merged = (primaryDays || []).map((day) => mergeRecoveredCompletionDay(day, recoveryByDate.get(day?.date || day?.id)));
+  const recoveredOnly = (Array.isArray(recoveryDays) ? recoveryDays : [])
+    .filter((day) => {
+      const key = day?.date || day?.id;
+      return key && !primaryDates.has(key) && dayHasCompletionActual(day);
+    });
+  return sortPlanDayRows([...merged, ...recoveredOnly]);
+}
+
+function rowHasData(row, fields) {
+  return fields.some((field) => String(row?.[field] ?? '').trim());
+}
+
+function recoverHomeRows(primaryRows, recoveryRows, fields) {
+  const existingKeys = new Set((Array.isArray(primaryRows) ? primaryRows : []).map((row) => `${row?.id || ''}|${row?.date || ''}|${row?.item || row?.breakfast || row?.weight || row?.bed || ''}`));
+  const recoveredRows = (Array.isArray(recoveryRows) ? recoveryRows : [])
+    .filter((row) => isHomeSummerStageDate(row?.date) && rowHasData(row, fields))
+    .filter((row) => !existingKeys.has(`${row?.id || ''}|${row?.date || ''}|${row?.item || row?.breakfast || row?.weight || row?.bed || ''}`));
+  return recoveredRows.length ? sortDatedRows([...(primaryRows || []), ...recoveredRows]) : primaryRows;
+}
+
+function recoverMissingHomeStageData(primaryPlan, recoveryPlan) {
+  if (!recoveryPlan) return primaryPlan;
+  return {
+    ...primaryPlan,
+    appUsageDays: recoverAppUsageDays(primaryPlan.appUsageDays, recoveryPlan.appUsageDays),
+    completionDays: recoverCompletionDays(primaryPlan.completionDays, recoveryPlan.completionDays),
+    expenses: recoverHomeRows(primaryPlan.expenses, recoveryPlan.expenses, ['item', 'amount', 'note']),
+    meals: recoverHomeRows(primaryPlan.meals, recoveryPlan.meals, ['breakfast', 'lunch', 'dinner', 'snack']),
+    bodyMetrics: recoverHomeRows(primaryPlan.bodyMetrics, recoveryPlan.bodyMetrics, ['weight', 'exercise', 'mood']),
+    sleep: recoverHomeRows(primaryPlan.sleep, recoveryPlan.sleep, ['bed', 'wake', 'hours', 'quality'])
+  };
+}
+
 function normalizeSummerPlan(plan) {
   const dailyPlans = normalizeDailyPlans(plan);
   const appUsageDays = normalizeAppUsageDays(plan);
@@ -7231,6 +7347,7 @@ const summerPlanSections = [
 function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSection, sitePreferences }) {
   const canEdit = currentUser?.role === 'admin';
   const [plan, setPlan] = useState(() => normalizeSummerPlan(personalizedSummerPlan));
+  const [hasUnsavedPlanEdit, setHasUnsavedPlanEdit] = useState(false);
   const [selectedPlanDate, setSelectedPlanDate] = useState(personalizedDailyPlans[0].date);
   const [selectedAppDate, setSelectedAppDate] = useState(personalizedAppUsageDays[0].date);
   const [selectedCompletionDate, setSelectedCompletionDate] = useState(personalizedCompletionDays[0].date);
@@ -7260,13 +7377,25 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
         if (!response.ok) throw new Error('load failed');
         const payload = await response.json();
         if (!cancelled) {
-          setPlan(normalizeSummerPlan(payload));
-          setSaveMessage(canEdit ? '已连接数据库' : '登录管理员后可编辑保存');
+          const normalizedCloudPlan = normalizeSummerPlan(payload);
+          const localPlan = readStoredJson(SUMMER_PLAN_KEY, null);
+          const recoveryPlan = readStoredJson(SUMMER_PLAN_RECOVERY_KEY, null);
+          const recoveredFromCache = recoverMissingHomeStageData(
+            recoverMissingHomeStageData(normalizedCloudPlan, recoveryPlan ? normalizeSummerPlan(recoveryPlan) : null),
+            localPlan ? normalizeSummerPlan(localPlan) : null
+          );
+          const restoredFromCache = JSON.stringify(recoveredFromCache) !== JSON.stringify(normalizedCloudPlan);
+          setPlan(recoveredFromCache);
+          setHasUnsavedPlanEdit(restoredFromCache);
+          setSaveMessage(restoredFromCache ? '已从本地缓存找回部分历史记录，正在同步' : canEdit ? '已连接数据库' : '登录管理员后可编辑保存');
         }
       } catch {
         if (!cancelled) {
-          const localPlan = JSON.parse(localStorage.getItem(SUMMER_PLAN_KEY) || 'null');
-          setPlan(normalizeSummerPlan(localPlan || personalizedSummerPlan));
+          const localPlan = readStoredJson(SUMMER_PLAN_KEY, null);
+          const recoveryPlan = readStoredJson(SUMMER_PLAN_RECOVERY_KEY, null);
+          const normalizedLocalPlan = normalizeSummerPlan(localPlan || personalizedSummerPlan);
+          setPlan(recoverMissingHomeStageData(normalizedLocalPlan, recoveryPlan ? normalizeSummerPlan(recoveryPlan) : null));
+          setHasUnsavedPlanEdit(false);
           setSaveMessage('数据库暂不可用，显示本地模板');
         }
       } finally {
@@ -7281,7 +7410,12 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
   useEffect(() => {
     if (!hasLoadedPlan) return undefined;
-    localStorage.setItem(SUMMER_PLAN_KEY, JSON.stringify(plan));
+    if (!hasUnsavedPlanEdit) return undefined;
+    const previousLocalPlan = readStoredJson(SUMMER_PLAN_KEY, null);
+    if (previousLocalPlan) {
+      writeStoredJson(SUMMER_PLAN_RECOVERY_KEY, previousLocalPlan);
+    }
+    writeStoredJson(SUMMER_PLAN_KEY, plan);
     if (!canEdit) return undefined;
 
     setSaveMessage('正在保存到数据库');
@@ -7303,7 +7437,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
       }
     }, 550);
     return () => window.clearTimeout(timer);
-  }, [authToken, canEdit, hasLoadedPlan, plan]);
+  }, [authToken, canEdit, hasLoadedPlan, hasUnsavedPlanEdit, plan]);
 
   useEffect(() => {
     if (!dayPlans.some((day) => day.date === selectedPlanDate)) {
@@ -7323,9 +7457,14 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
     }
   }, [completionDays, selectedCompletionDate]);
 
+  function commitPlanChange(updater) {
+    setHasUnsavedPlanEdit(true);
+    setPlan(updater);
+  }
+
   function updateNested(section, field, value) {
     if (!canEdit) return;
-    setPlan((current) => ({
+    commitPlanChange((current) => ({
       ...current,
       [section]: { ...(current[section] || {}), [field]: value }
     }));
@@ -7333,7 +7472,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
   function updateRow(section, rowId, field, value) {
     if (!canEdit) return;
-    setPlan((current) => {
+    commitPlanChange((current) => {
       const rows = current[section].map((row) => {
         if (row.id !== rowId) return row;
         const nextRow = { ...row, [field]: value };
@@ -7356,7 +7495,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
   function addRow(section, row) {
     if (!canEdit) return;
     const nextRow = { ...row, id: `${section}-${Date.now()}` };
-    setPlan((current) => ({
+    commitPlanChange((current) => ({
       ...current,
       [section]: ['expenses', 'meals', 'bodyMetrics', 'sleep'].includes(section)
         ? sortDatedRows([...(current[section] || []), nextRow])
@@ -7366,7 +7505,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
   function deleteRow(section, rowId) {
     if (!canEdit) return;
-    setPlan((current) => ({
+    commitPlanChange((current) => ({
       ...current,
       [section]: ['expenses', 'meals', 'bodyMetrics', 'sleep'].includes(section)
         ? sortDatedRows(current[section].filter((row) => row.id !== rowId))
@@ -7386,7 +7525,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
   function updateDailyTask(dayDate, rowId, field, value) {
     if (!canEdit) return;
-    setPlan((current) => {
+    commitPlanChange((current) => {
       const dailyPlans = (current.dailyPlans || personalizedDailyPlans).map((day) => (
         day.date === dayDate
           ? { ...day, tasks: normalizeDailyTasks(day.tasks).map((row) => (row.id === rowId ? { ...row, [field]: value } : row)) }
@@ -7398,7 +7537,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
   function addDailyTask(dayDate, row) {
     if (!canEdit) return;
-    setPlan((current) => {
+    commitPlanChange((current) => {
       const dailyPlans = (current.dailyPlans || personalizedDailyPlans).map((day) => (
         day.date === dayDate
           ? { ...day, tasks: [...normalizeDailyTasks(day.tasks), { ...row, id: `${dayDate}-task-${Date.now()}` }] }
@@ -7410,7 +7549,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
   function deleteDailyTask(dayDate, rowId) {
     if (!canEdit) return;
-    setPlan((current) => {
+    commitPlanChange((current) => {
       const dailyPlans = (current.dailyPlans || personalizedDailyPlans).map((day) => (
         day.date === dayDate
           ? { ...day, tasks: normalizeDailyTasks(day.tasks).filter((row) => row.id !== rowId) }
@@ -7422,7 +7561,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
   function updateAppUsage(dayDate, rowId, field, value) {
     if (!canEdit) return;
-    setPlan((current) => {
+    commitPlanChange((current) => {
       const appUsageDays = (current.appUsageDays || personalizedAppUsageDays).map((day) => (
         day.date === dayDate
           ? { ...day, apps: day.apps.map((row) => (row.id === rowId ? { ...row, [field]: value } : row)) }
@@ -7434,7 +7573,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
   function addAppUsage(dayDate, row) {
     if (!canEdit) return;
-    setPlan((current) => {
+    commitPlanChange((current) => {
       const appUsageDays = (current.appUsageDays || personalizedAppUsageDays).map((day) => (
         day.date === dayDate
           ? { ...day, apps: [...(day.apps || []), { ...row, id: `${dayDate}-app-${Date.now()}` }] }
@@ -7446,7 +7585,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
   function deleteAppUsage(dayDate, rowId) {
     if (!canEdit) return;
-    setPlan((current) => {
+    commitPlanChange((current) => {
       const appUsageDays = (current.appUsageDays || personalizedAppUsageDays).map((day) => (
         day.date === dayDate
           ? { ...day, apps: (day.apps || []).filter((row) => row.id !== rowId) }
@@ -7459,7 +7598,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
   function updateCompletionTask(dayDate, rowId, field, value) {
     if (!canEdit) return;
     if (['type', 'planned', 'target'].includes(field)) return;
-    setPlan((current) => {
+    commitPlanChange((current) => {
       const dailyPlans = Array.isArray(current.dailyPlans) && current.dailyPlans.length
         ? current.dailyPlans
         : personalizedDailyPlans;
@@ -7476,7 +7615,7 @@ function SummerPlanWorkspace({ currentUser, authToken, planSection, setPlanSecti
 
   function resetPlan() {
     if (!canEdit) return;
-    setPlan(normalizeSummerPlan(personalizedSummerPlan));
+    commitPlanChange(normalizeSummerPlan(personalizedSummerPlan));
     setSelectedPlanDate(personalizedDailyPlans[0].date);
     setSelectedAppDate(personalizedAppUsageDays[0].date);
     setSelectedCompletionDate(personalizedCompletionDays[0].date);
