@@ -75,6 +75,11 @@ jobs:
           echo "--- OLD_BACKUP_COUNTS ---"
           backup=/opt/felixfu-blog/backups-from-old/postgres/felix_blog_20260902_184618.sql.gz
           if [ -r "$backup" ]; then
+            if gzip -t "$backup"; then
+              echo "backup_gzip_integrity=ok"
+            else
+              echo "backup_gzip_integrity=failed"
+            fi
             gzip -cd "$backup" | awk '
               /^COPY public\.(articles|reaction_counters|user_reactions|comments|schema_migrations) / {
                 table_name=$2
@@ -97,9 +102,35 @@ jobs:
             else
               echo "backup_has_reaction_reset_marker=no"
             fi
+
+            gzip -cd "$backup" | awk -F '\t' '
+              /^COPY public\.articles / { active=1; next }
+              active && $0 == "\\." { active=0; next }
+              active {
+                print "backup_article=" $1 " | " $2 " | status=" $8 " | views=" $14 " | date=" $6
+                total_views += $14
+              }
+              END { print "backup_total_views=" (total_views + 0) }
+            '
+
+            gzip -cd "$backup" | awk -F '\t' '
+              /^COPY public\.reaction_counters / { active=1; next }
+              active && $0 == "\\." { active=0; next }
+              active { reaction_total += $4 }
+              END { print "backup_reaction_total=" (reaction_total + 0) }
+            '
           else
             echo "old_backup_unreadable"
           fi
+
+          echo "--- OLD_BACKUP_INVENTORY ---"
+          find /opt/felixfu-blog/backups-from-old -maxdepth 5 -type f \
+            -printf '%TY-%Tm-%TdT%TH:%TM:%TS %s %p\n' 2>/dev/null | sort -r || true
+
+          echo "--- ACTIVE_VOLUME_USAGE ---"
+          du -sh /var/lib/docker/volumes/felixfu-blog_postgres_data/_data \
+            /var/lib/docker/volumes/felixfu-blog_uploads_data/_data \
+            /var/lib/docker/volumes/felixfu-blog_backend_data/_data 2>&1 || true
           REMOTE
 
           cat audit.txt
