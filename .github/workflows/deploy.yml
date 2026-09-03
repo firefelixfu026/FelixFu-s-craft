@@ -59,7 +59,7 @@ jobs:
           set -euo pipefail
           cd "$DEPLOY_PATH"
           for attempt in 1 2 3; do
-            if git -c http.version=HTTP/1.1 pull --ff-only; then
+            if git -c core.fileMode=false -c http.version=HTTP/1.1 pull --ff-only; then
               break
             fi
 
@@ -71,6 +71,5 @@ jobs:
             echo "git pull failed; retrying in $((attempt * 5)) seconds..." >&2
             sleep $((attempt * 5))
           done
-          chmod +x scripts/deploy-production.sh
-          SKIP_GIT_PULL=1 ./scripts/deploy-production.sh
+          SKIP_GIT_PULL=1 bash scripts/deploy-production.sh
           REMOTE

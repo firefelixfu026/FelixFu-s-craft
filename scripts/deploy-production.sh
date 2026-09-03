@@ -8,7 +8,7 @@ echo "Deploying FelixFu blog from $PROJECT_DIR"
 
 if [[ "${SKIP_GIT_PULL:-0}" != "1" ]]; then
   for attempt in 1 2 3; do
-    if git -c http.version=HTTP/1.1 pull --ff-only; then
+    if git -c core.fileMode=false -c http.version=HTTP/1.1 pull --ff-only; then
       break
     fi
 

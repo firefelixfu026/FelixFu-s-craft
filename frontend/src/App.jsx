@@ -550,6 +550,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.8.6',
+    title: '部署脚本权限修复',
+    date: '2026-09-03',
+    status: '已上线',
+    points: ['生产拉取忽略跨系统的脚本权限位差异', '自动部署直接通过 bash 执行脚本，不再留下本地权限修改']
+  },
+  {
     version: 'v6.8.5',
     title: '生产部署稳定性修复',
     date: '2026-09-03',
