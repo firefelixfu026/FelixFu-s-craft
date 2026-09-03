@@ -1,0 +1,92 @@
+name: Data recovery audit
+
+on:
+  push:
+    branches:
+      - codex/data-recovery-audit
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Read-only production data audit
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+
+    steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/felixfu_deploy_key
+          chmod 600 ~/.ssh/felixfu_deploy_key
+          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Inspect production without changing it
+        run: |
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
+            -i ~/.ssh/felixfu_deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "bash -s" > audit.txt <<'REMOTE'
+          set -u
+          echo "AUDIT_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "HOST=$(hostname)"
+
+          echo "--- ACTIVE_POSTGRES ---"
+          docker inspect felixfu_blog_postgres \
+            --format 'status={{.State.Status}} started={{.State.StartedAt}}{{range .Mounts}} mount={{.Name}}:{{.Destination}}{{end}}' 2>&1 || true
+
+          echo "--- DATABASE_COUNTS ---"
+          docker exec felixfu_blog_postgres psql -U felix_blog -d felix_blog -At -F '=' <<'SQL' 2>&1 || true
+          SELECT 'articles', COUNT(*)::text FROM articles;
+          SELECT 'published_articles', COUNT(*)::text FROM articles WHERE status = 'published';
+          SELECT 'draft_articles', COUNT(*)::text FROM articles WHERE status = 'draft';
+          SELECT 'total_views', COALESCE(SUM(view_count), 0)::text FROM articles;
+          SELECT 'latest_article_update', COALESCE(MAX(updated_at)::text, 'none') FROM articles;
+          SELECT 'reaction_rows', COUNT(*)::text FROM reaction_counters;
+          SELECT 'reaction_total', COALESCE(SUM(count), 0)::text FROM reaction_counters;
+          SELECT 'user_reactions', COUNT(*)::text FROM user_reactions;
+          SELECT 'comments', COUNT(*)::text FROM comments;
+          SELECT 'reaction_reset_marker', COUNT(*)::text FROM schema_migrations WHERE name = 'reset_reactions_v1_2_3';
+SQL
+
+          echo "--- LATEST_ARTICLES ---"
+          docker exec felixfu_blog_postgres psql -U felix_blog -d felix_blog -At -F ' | ' \
+            -c "SELECT id, slug, status, view_count, updated_at FROM articles ORDER BY updated_at DESC NULLS LAST LIMIT 12" 2>&1 || true
+
+          echo "--- RELATED_VOLUMES ---"
+          docker volume ls --format '{{.Name}}' | grep -Ei 'felix|blog|postgres|pgdata' || true
+
+          echo "--- VOLUME_DETAILS ---"
+          for volume in $(docker volume ls --format '{{.Name}}' | grep -Ei 'felix|blog|postgres|pgdata' || true); do
+            docker volume inspect "$volume" --format 'name={{.Name}} created={{.CreatedAt}} mountpoint={{.Mountpoint}}' 2>&1 || true
+          done
+
+          echo "--- POSSIBLE_BACKUPS ---"
+          find /opt -maxdepth 6 -type f \
+            \( -iname '*.sql' -o -iname '*.sql.gz' -o -iname '*backup*' -o -iname '*postgres*.tar*' -o -iname '*pgdata*.tar*' \) \
+            -printf '%TY-%Tm-%TdT%TH:%TM:%TS %s %p\n' 2>/dev/null | sort -r | head -n 40 || true
+          REMOTE
+
+          cat audit.txt
+          {
+            echo '## Read-only production data audit'
+            echo '```text'
+            cat audit.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          compact="$(tr '\n' ';' < audit.txt | cut -c1-6000)"
+          echo "::notice title=Production data audit::$compact"
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-data-audit
+          path: audit.txt
+          retention-days: 3
