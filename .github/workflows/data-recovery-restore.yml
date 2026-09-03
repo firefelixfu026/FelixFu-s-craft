@@ -56,14 +56,14 @@ jobs:
             set +e
             echo "RECOVERY_ERROR: restore failed; attempting automatic rollback"
             if [ "$restore_started" -eq 1 ] && [ -s "$safety_backup" ]; then
-              docker compose stop backend
+              docker compose stop backend </dev/null
               docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U felix_blog -d felix_blog \
-                -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+                -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" </dev/null
               gzip -cd "$safety_backup" | docker compose exec -T postgres \
                 psql -v ON_ERROR_STOP=1 -U felix_blog -d felix_blog
               echo "ROLLBACK_RESULT=restored_pre_recovery_database"
             fi
-            docker compose up -d backend
+            docker compose up -d backend </dev/null
             rm -f "$restore_log"
             exit "$status"
           }
@@ -75,16 +75,16 @@ jobs:
 
           echo "RECOVERY_SOURCE=$source_backup"
           echo "Creating pre-recovery safety backup..."
-          docker compose exec -T postgres pg_dump -U felix_blog -d felix_blog | gzip > "$safety_backup"
+          docker compose exec -T postgres pg_dump -U felix_blog -d felix_blog </dev/null | gzip > "$safety_backup"
           gzip -t "$safety_backup"
           echo "SAFETY_BACKUP=$safety_backup"
 
           echo "Stopping backend to prevent writes during recovery..."
-          docker compose stop backend
+          docker compose stop backend </dev/null
           restore_started=1
 
           docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U felix_blog -d felix_blog \
-            -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+            -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" </dev/null
 
           if ! gzip -cd "$source_backup" | docker compose exec -T postgres \
             psql -v ON_ERROR_STOP=1 -U felix_blog -d felix_blog >"$restore_log" 2>&1; then
@@ -100,7 +100,7 @@ jobs:
           UNION ALL SELECT 'comments=' || COUNT(*) FROM comments
           UNION ALL SELECT 'users=' || COUNT(*) FROM users
           UNION ALL SELECT 'reset_marker=' || COUNT(*) FROM schema_migrations WHERE name = 'reset_reactions_v1_2_3';
-          ")"
+          " </dev/null)"
           printf '%s\n' "$stats"
 
           for expected in \
@@ -114,7 +114,7 @@ jobs:
             grep -Fxq "$expected" <<<"$stats"
           done
 
-          docker compose up -d backend
+          docker compose up -d backend </dev/null
           for attempt in $(seq 1 30); do
             if curl -fsS --max-time 5 http://127.0.0.1:8000/api/health; then
               echo
