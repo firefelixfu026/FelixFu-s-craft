@@ -186,6 +186,8 @@ jobs:
 
           compact="$(tr '\n' ';' < audit.txt | cut -c1-6000)"
           echo "::notice title=Production data audit::$compact"
+          restore_check="$(sed -n '/--- TEMP_RESTORE_VALIDATION ---/,$p' audit.txt | tr '\n' ';' | cut -c1-6000)"
+          echo "::notice title=Temporary restore validation::$restore_check"
 
       - name: Upload audit report
         uses: actions/upload-artifact@v4
