@@ -550,6 +550,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.8.5',
+    title: '生产部署稳定性修复',
+    date: '2026-09-03',
+    status: '已上线',
+    points: ['修复 Linux 无法识别部署脚本的问题', '生产代码拉取增加网络重试并使用 HTTP/1.1', '自动部署不再重复拉取 GitHub 代码']
+  },
+  {
     version: 'v6.8.2',
     title: '计划数据防覆盖保护',
     date: '2026-08-26',

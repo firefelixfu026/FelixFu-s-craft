@@ -58,7 +58,19 @@ jobs:
             "DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'REMOTE'
           set -euo pipefail
           cd "$DEPLOY_PATH"
-          git pull --ff-only
+          for attempt in 1 2 3; do
+            if git -c http.version=HTTP/1.1 pull --ff-only; then
+              break
+            fi
+
+            if [ "$attempt" -eq 3 ]; then
+              echo "git pull failed after 3 attempts" >&2
+              exit 1
+            fi
+
+            echo "git pull failed; retrying in $((attempt * 5)) seconds..." >&2
+            sleep $((attempt * 5))
+          done
           chmod +x scripts/deploy-production.sh
-          ./scripts/deploy-production.sh
+          SKIP_GIT_PULL=1 ./scripts/deploy-production.sh
           REMOTE
