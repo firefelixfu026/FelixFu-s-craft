@@ -42,7 +42,7 @@ jobs:
             --format 'status={{.State.Status}} started={{.State.StartedAt}}{{range .Mounts}} mount={{.Name}}:{{.Destination}}{{end}}' 2>&1 || true
 
           echo "--- DATABASE_COUNTS ---"
-          docker exec felixfu_blog_postgres psql -U felix_blog -d felix_blog -At -F '=' <<'SQL' 2>&1 || true
+          docker exec -i felixfu_blog_postgres psql -U felix_blog -d felix_blog -At -F '=' <<'SQL' 2>&1 || true
           SELECT 'articles', COUNT(*)::text FROM articles;
           SELECT 'published_articles', COUNT(*)::text FROM articles WHERE status = 'published';
           SELECT 'draft_articles', COUNT(*)::text FROM articles WHERE status = 'draft';
@@ -57,7 +57,7 @@ jobs:
 
           echo "--- LATEST_ARTICLES ---"
           docker exec felixfu_blog_postgres psql -U felix_blog -d felix_blog -At -F ' | ' \
-            -c "SELECT id, slug, status, view_count, updated_at FROM articles ORDER BY updated_at DESC NULLS LAST LIMIT 12" 2>&1 || true
+            -c "SELECT id, title, status, view_count, date, updated_at FROM articles ORDER BY updated_at DESC NULLS LAST LIMIT 12" 2>&1 || true
 
           echo "--- RELATED_VOLUMES ---"
           docker volume ls --format '{{.Name}}' | grep -Ei 'felix|blog|postgres|pgdata' || true
@@ -71,6 +71,35 @@ jobs:
           find /opt -maxdepth 6 -type f \
             \( -iname '*.sql' -o -iname '*.sql.gz' -o -iname '*backup*' -o -iname '*postgres*.tar*' -o -iname '*pgdata*.tar*' \) \
             -printf '%TY-%Tm-%TdT%TH:%TM:%TS %s %p\n' 2>/dev/null | sort -r | head -n 40 || true
+
+          echo "--- OLD_BACKUP_COUNTS ---"
+          backup=/opt/felixfu-blog/backups-from-old/postgres/felix_blog_20260902_184618.sql.gz
+          if [ -r "$backup" ]; then
+            gzip -cd "$backup" | awk '
+              /^COPY public\.(articles|reaction_counters|user_reactions|comments|schema_migrations) / {
+                table_name=$2
+                sub(/^public\./, "", table_name)
+                active=table_name
+                next
+              }
+              active != "" && $0 == "\\." { active=""; next }
+              active != "" { counts[active]++ }
+              END {
+                print "backup_articles=" (counts["articles"] + 0)
+                print "backup_reaction_rows=" (counts["reaction_counters"] + 0)
+                print "backup_user_reactions=" (counts["user_reactions"] + 0)
+                print "backup_comments=" (counts["comments"] + 0)
+                print "backup_schema_migrations=" (counts["schema_migrations"] + 0)
+              }
+            '
+            if gzip -cd "$backup" | grep -q 'reset_reactions_v1_2_3'; then
+              echo "backup_has_reaction_reset_marker=yes"
+            else
+              echo "backup_has_reaction_reset_marker=no"
+            fi
+          else
+            echo "old_backup_unreadable"
+          fi
           REMOTE
 
           cat audit.txt
