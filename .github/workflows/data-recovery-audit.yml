@@ -131,6 +131,49 @@ jobs:
           du -sh /var/lib/docker/volumes/felixfu-blog_postgres_data/_data \
             /var/lib/docker/volumes/felixfu-blog_uploads_data/_data \
             /var/lib/docker/volumes/felixfu-blog_backend_data/_data 2>&1 || true
+
+          echo "--- TEMP_RESTORE_VALIDATION ---"
+          (
+            set -e
+            check_container="felixfu_restore_check_$$"
+            trap 'docker rm -f "$check_container" >/dev/null 2>&1 || true' EXIT
+            docker run --rm -d --name "$check_container" \
+              --tmpfs /var/lib/postgresql/data:rw,size=256m \
+              -e POSTGRES_USER=felix_blog \
+              -e POSTGRES_PASSWORD=recovery-check-only \
+              -e POSTGRES_DB=felix_blog \
+              postgres:16-alpine >/dev/null
+
+            for attempt in $(seq 1 30); do
+              if docker exec "$check_container" pg_isready -U felix_blog -d felix_blog >/dev/null 2>&1; then
+                break
+              fi
+              if [ "$attempt" -eq 30 ]; then
+                echo "temporary_postgres_not_ready"
+                exit 1
+              fi
+              sleep 1
+            done
+
+            gzip -cd "$backup" | docker exec -i "$check_container" \
+              psql -v ON_ERROR_STOP=1 -U felix_blog -d felix_blog >/dev/null
+            echo "temporary_restore=ok"
+            docker exec -i "$check_container" psql -U felix_blog -d felix_blog -At -F '=' <<'SQL_CHECK'
+          SELECT 'restored_articles', COUNT(*)::text FROM articles;
+          SELECT 'restored_published_articles', COUNT(*)::text FROM articles WHERE status = 'published';
+          SELECT 'restored_draft_articles', COUNT(*)::text FROM articles WHERE status = 'draft';
+          SELECT 'restored_total_views', COALESCE(SUM(view_count), 0)::text FROM articles;
+          SELECT 'restored_reaction_rows', COUNT(*)::text FROM reaction_counters;
+          SELECT 'restored_reaction_total', COALESCE(SUM(count), 0)::text FROM reaction_counters;
+          SELECT 'restored_user_reactions', COUNT(*)::text FROM user_reactions;
+          SELECT 'restored_comments', COUNT(*)::text FROM comments;
+          SELECT 'restored_users', COUNT(*)::text FROM users;
+          SELECT 'restored_reset_marker', COUNT(*)::text FROM schema_migrations WHERE name = 'reset_reactions_v1_2_3';
+          SQL_CHECK
+
+            docker exec "$check_container" psql -U felix_blog -d felix_blog -At -F ' | ' \
+              -c "SELECT id, title, status, view_count, date, updated_at FROM articles ORDER BY updated_at DESC NULLS LAST" 2>&1
+          ) 2>&1 || echo "temporary_restore=failed"
           REMOTE
 
           cat audit.txt
