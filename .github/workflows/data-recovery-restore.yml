@@ -1,0 +1,149 @@
+name: One-time production data recovery
+
+on:
+  push:
+    branches:
+      - codex/data-recovery-restore-20260904
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  restore:
+    name: Restore verified FelixFu database backup
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/felixfu-blog' }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+
+    steps:
+      - name: Configure SSH
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/felixfu_deploy_key
+          chmod 600 ~/.ssh/felixfu_deploy_key
+          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Back up current database and restore verified backup
+        run: |
+          set -o pipefail
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
+            -i ~/.ssh/felixfu_deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'REMOTE' | tee restore-result.txt
+          set -Eeuo pipefail
+          cd "$DEPLOY_PATH"
+
+          source_backup="$DEPLOY_PATH/backups-from-old/postgres/felix_blog_20260902_184618.sql.gz"
+          timestamp="$(date +%Y%m%d_%H%M%S)"
+          safety_backup="$DEPLOY_PATH/backups/postgres/pre_restore_current_${timestamp}.sql.gz"
+          restore_log="/tmp/felixfu_restore_${timestamp}.log"
+          restore_started=0
+
+          on_error() {
+            status=$?
+            trap - ERR
+            set +e
+            echo "RECOVERY_ERROR: restore failed; attempting automatic rollback"
+            if [ "$restore_started" -eq 1 ] && [ -s "$safety_backup" ]; then
+              docker compose stop backend
+              docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U felix_blog -d felix_blog \
+                -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+              gzip -cd "$safety_backup" | docker compose exec -T postgres \
+                psql -v ON_ERROR_STOP=1 -U felix_blog -d felix_blog
+              echo "ROLLBACK_RESULT=restored_pre_recovery_database"
+            fi
+            docker compose up -d backend
+            rm -f "$restore_log"
+            exit "$status"
+          }
+          trap on_error ERR
+
+          test -s "$source_backup"
+          gzip -t "$source_backup"
+          mkdir -p "$(dirname "$safety_backup")"
+
+          echo "RECOVERY_SOURCE=$source_backup"
+          echo "Creating pre-recovery safety backup..."
+          docker compose exec -T postgres pg_dump -U felix_blog -d felix_blog | gzip > "$safety_backup"
+          gzip -t "$safety_backup"
+          echo "SAFETY_BACKUP=$safety_backup"
+
+          echo "Stopping backend to prevent writes during recovery..."
+          docker compose stop backend
+          restore_started=1
+
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U felix_blog -d felix_blog \
+            -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+
+          if ! gzip -cd "$source_backup" | docker compose exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U felix_blog -d felix_blog >"$restore_log" 2>&1; then
+            tail -n 80 "$restore_log"
+            false
+          fi
+
+          stats="$(docker compose exec -T postgres psql -U felix_blog -d felix_blog -At -c "
+          SELECT 'articles=' || COUNT(*) FROM articles
+          UNION ALL SELECT 'total_views=' || COALESCE(SUM(view_count), 0) FROM articles
+          UNION ALL SELECT 'reaction_total=' || COALESCE(SUM(count), 0) FROM reaction_counters
+          UNION ALL SELECT 'user_reactions=' || COUNT(*) FROM user_reactions
+          UNION ALL SELECT 'comments=' || COUNT(*) FROM comments
+          UNION ALL SELECT 'users=' || COUNT(*) FROM users
+          UNION ALL SELECT 'reset_marker=' || COUNT(*) FROM schema_migrations WHERE name = 'reset_reactions_v1_2_3';
+          ")"
+          printf '%s\n' "$stats"
+
+          for expected in \
+            articles=9 \
+            total_views=6874 \
+            reaction_total=21 \
+            user_reactions=21 \
+            comments=6 \
+            users=5 \
+            reset_marker=1; do
+            grep -Fxq "$expected" <<<"$stats"
+          done
+
+          docker compose up -d backend
+          for attempt in $(seq 1 30); do
+            if curl -fsS --max-time 5 http://127.0.0.1:8000/api/health; then
+              echo
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "Backend health check did not recover in time"
+              false
+            fi
+            sleep 2
+          done
+
+          public_count="$(curl -fsS --max-time 10 http://127.0.0.1:8000/api/health | grep -o '"articles":[0-9]*' | cut -d: -f2)"
+          test "$public_count" = "9"
+
+          restore_started=0
+          trap - ERR
+          rm -f "$restore_log"
+          echo "RECOVERY_RESULT=success"
+          echo "PUBLIC_ARTICLE_COUNT=$public_count"
+          REMOTE
+
+          compact="$(tr '\n' ';' < restore-result.txt | cut -c1-6000)"
+          echo "::notice title=FelixFu data recovery::$compact"
+
+      - name: Upload recovery report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: felixfu-data-recovery-report
+          path: restore-result.txt
+          retention-days: 14
