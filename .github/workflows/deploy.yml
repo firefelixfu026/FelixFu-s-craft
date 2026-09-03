@@ -44,9 +44,17 @@ jobs:
           chmod 600 ~/.ssh/felixfu_deploy_key
           ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
 
+      - name: Check SSH connection
+        run: |
+          nc -vz -w 10 "$DEPLOY_HOST" "$DEPLOY_PORT"
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
+            -i ~/.ssh/felixfu_deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "echo ssh-ok"
+
       - name: Deploy on server
         run: |
-          ssh -i ~/.ssh/felixfu_deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
+            -i ~/.ssh/felixfu_deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
             "DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'REMOTE'
           set -euo pipefail
           cd "$DEPLOY_PATH"
