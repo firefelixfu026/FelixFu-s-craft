@@ -560,7 +560,7 @@ const releaseRoadmap = [
     version: 'v6.9.0',
     title: '写作台代码模式',
     date: '2026-09-04',
-    status: '待上线',
+    status: '已上线',
     points: ['Tab 统一为 4 个空格，并支持多行缩进与反缩进', '代码块内提供智能回车缩进和括号、引号自动补全', '正文预览可关闭自动渲染并切换为 Markdown 源码视图']
   },
   {

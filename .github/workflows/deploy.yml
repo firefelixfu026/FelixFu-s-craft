@@ -28,13 +28,26 @@ jobs:
       DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
       DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/felixfu-blog' }}
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
     steps:
+      - name: Checkout deployment revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          fetch-depth: 0
+
       - name: Validate deployment secrets
         run: |
           test -n "$DEPLOY_HOST" || (echo "DEPLOY_HOST is required" && exit 1)
           test -n "$DEPLOY_USER" || (echo "DEPLOY_USER is required" && exit 1)
           test -n "$DEPLOY_SSH_KEY" || (echo "DEPLOY_SSH_KEY is required" && exit 1)
+
+      - name: Build deployment bundle
+        run: |
+          git branch -f codex-deploy-source "$DEPLOY_SHA"
+          git bundle create felixfu-main.bundle refs/heads/codex-deploy-source
+          git bundle verify felixfu-main.bundle
 
       - name: Configure SSH
         run: |
@@ -53,23 +66,24 @@ jobs:
 
       - name: Deploy on server
         run: |
+          bundle_path="/tmp/felixfu-main-${DEPLOY_SHA}.bundle"
+          scp -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
+            -i ~/.ssh/felixfu_deploy_key -P "$DEPLOY_PORT" felixfu-main.bundle \
+            "$DEPLOY_USER@$DEPLOY_HOST:$bundle_path"
+
           ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
             -i ~/.ssh/felixfu_deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'REMOTE'
+            "DEPLOY_PATH='$DEPLOY_PATH' BUNDLE_PATH='$bundle_path' bash -s" <<'REMOTE'
           set -euo pipefail
+          trap 'rm -f "$BUNDLE_PATH"' EXIT
           cd "$DEPLOY_PATH"
-          for attempt in 1 2 3; do
-            if git -c core.fileMode=false -c http.version=HTTP/1.1 pull --ff-only; then
-              break
-            fi
 
-            if [ "$attempt" -eq 3 ]; then
-              echo "git pull failed after 3 attempts" >&2
-              exit 1
-            fi
+          if [ -n "$(git -c core.fileMode=false status --porcelain --untracked-files=no)" ]; then
+            echo "Tracked files on the server contain local changes; refusing to overwrite them." >&2
+            exit 1
+          fi
 
-            echo "git pull failed; retrying in $((attempt * 5)) seconds..." >&2
-            sleep $((attempt * 5))
-          done
+          git -c core.fileMode=false fetch "$BUNDLE_PATH" refs/heads/codex-deploy-source
+          git -c core.fileMode=false merge --ff-only FETCH_HEAD
           SKIP_GIT_PULL=1 bash scripts/deploy-production.sh
           REMOTE
