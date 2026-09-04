@@ -57,6 +57,7 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import changelogText from '../../CHANGELOG.md?raw';
 import { aiNews as fallbackNews, articles as fallbackArticles, gameModule, profile as fallbackProfile } from './data.js';
+import { applyCodeEditorKey, applyTabIndent } from './editorUtils.js';
 const ProjectOpsPanel = React.lazy(() => import('./ProjectOpsPanel.jsx'));
 
 const createEmptyArticleForm = () => ({
@@ -191,6 +192,7 @@ const ALLOWED_AUDIO_UPLOAD_TYPES = new Set(['audio/mpeg', 'audio/mp3', 'audio/wa
 const TECH_NOTE_KEYWORDS = ['技术', '笔记', '学习', 'React', '前端', '后端', 'FastAPI', 'Git', '网络', '算法', '数据结构', '计算机', '代码', '项目文档'];
 const ARTICLE_DRAFT_KEY = 'felix_blog_article_form_draft';
 const ARTICLE_DRAFT_HISTORY_KEY = 'felix_blog_article_draft_history';
+const ARTICLE_AUTO_RENDER_KEY = 'felix_blog_article_auto_render';
 const FRONTEND_ERROR_LOG_KEY = 'felix_blog_frontend_error_logs';
 const BACKUP_CENTER_KEY = 'felix_blog_backup_records';
 const BOT_CORPUS_KEY = 'felix_blog_bot_corpus_samples';
@@ -345,6 +347,11 @@ function readStoredAdminPage() {
   const storedPage = localStorage.getItem(ADMIN_PAGE_KEY) || 'overview';
   const knownPages = new Set(['overview', 'health', 'ops', 'releases', 'editor', 'notes', 'articles', 'music', 'toolbox', 'comments', 'visual', 'security', 'backups', 'corpus', 'study']);
   return knownPages.has(storedPage) ? storedPage : 'overview';
+}
+
+function readStoredArticleAutoRender() {
+  if (typeof localStorage === 'undefined') return true;
+  return localStorage.getItem(ARTICLE_AUTO_RENDER_KEY) !== 'false';
 }
 
 function readStoredJson(key, fallback) {
@@ -549,6 +556,13 @@ const writingTemplates = [
 ];
 
 const releaseRoadmap = [
+  {
+    version: 'v6.9.0',
+    title: '写作台代码模式',
+    date: '2026-09-04',
+    status: '待上线',
+    points: ['Tab 统一为 4 个空格，并支持多行缩进与反缩进', '代码块内提供智能回车缩进和括号、引号自动补全', '正文预览可关闭自动渲染并切换为 Markdown 源码视图']
+  },
   {
     version: 'v6.8.6',
     title: '部署脚本权限修复',
@@ -11156,6 +11170,7 @@ function AdminWorkspace({
   ];
   const contentTextareaRef = useRef(null);
   const previewScrollRef = useRef(null);
+  const [autoRenderPreview, setAutoRenderPreview] = useState(readStoredArticleAutoRender);
   const [aiInsertMode, setAiInsertMode] = useState('append');
   const [activeAdminPage, setActiveAdminPage] = useState(readStoredAdminPage);
   const [adminStatsRange, setAdminStatsRange] = useState('7d');
@@ -11246,6 +11261,10 @@ function AdminWorkspace({
   useEffect(() => {
     localStorage.setItem(ADMIN_PAGE_KEY, activeAdminPage);
   }, [activeAdminPage]);
+
+  useEffect(() => {
+    localStorage.setItem(ARTICLE_AUTO_RENDER_KEY, String(autoRenderPreview));
+  }, [autoRenderPreview]);
 
   useEffect(() => {
     if (!visibleAdminPageIds.has(activeAdminPage)) {
@@ -11425,41 +11444,36 @@ function AdminWorkspace({
     insertContentSnippet(`![${altText}](${url})`);
   }
 
+  function applyEditorChange(change) {
+    if (!change) return false;
+    updateArticleForm('content', change.content);
+    window.setTimeout(() => {
+      const textarea = contentTextareaRef.current;
+      textarea?.focus();
+      textarea?.setSelectionRange(change.selectionStart, change.selectionEnd);
+    }, 0);
+    return true;
+  }
+
   function handleEditorShortcut(event) {
+    const textarea = contentTextareaRef.current;
+    const content = articleForm.content || '';
+    const start = textarea?.selectionStart ?? 0;
+    const end = textarea?.selectionEnd ?? start;
+
     if (event.key === 'Tab') {
       event.preventDefault();
-      const textarea = contentTextareaRef.current;
-      const content = articleForm.content || '';
-      const start = textarea?.selectionStart ?? 0;
-      const end = textarea?.selectionEnd ?? start;
-      const lineStart = content.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
-      const lineEndIndex = content.indexOf('\n', end);
-      const lineEnd = lineEndIndex === -1 ? content.length : lineEndIndex;
-      const selectedBlock = content.slice(lineStart, lineEnd);
-      const lines = selectedBlock.split('\n');
-      const indent = '  ';
-      const nextLines = event.shiftKey
-        ? lines.map((line) => line.startsWith(indent) ? line.slice(indent.length) : line.replace(/^\t/, ''))
-        : lines.map((line) => `${indent}${line}`);
-      const nextBlock = nextLines.join('\n');
-      const nextContent = `${content.slice(0, lineStart)}${nextBlock}${content.slice(lineEnd)}`;
-      const startDelta = event.shiftKey
-        ? Math.min(start - lineStart, lines[0].startsWith(indent) ? indent.length : lines[0].startsWith('\t') ? 1 : 0)
-        : indent.length;
-      const removedBeforeEnd = event.shiftKey
-        ? lines.reduce((sum, line) => sum + (line.startsWith(indent) ? indent.length : line.startsWith('\t') ? 1 : 0), 0)
-        : 0;
-      const addedBeforeEnd = event.shiftKey ? 0 : indent.length * lines.length;
-      updateArticleForm('content', nextContent);
-      window.setTimeout(() => {
-        textarea?.focus();
-        const nextStart = event.shiftKey ? Math.max(lineStart, start - startDelta) : start + startDelta;
-        const nextEnd = start === end
-          ? nextStart
-          : Math.max(nextStart, end + addedBeforeEnd - removedBeforeEnd);
-        textarea?.setSelectionRange(nextStart, nextEnd);
-      }, 0);
+      applyEditorChange(applyTabIndent(content, start, end, event.shiftKey));
       return;
+    }
+
+    if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.isComposing) {
+      const codeEditorChange = applyCodeEditorKey(content, start, end, event.key);
+      if (codeEditorChange) {
+        event.preventDefault();
+        applyEditorChange(codeEditorChange);
+        return;
+      }
     }
 
     if (!(event.ctrlKey || event.metaKey)) return;
@@ -12722,6 +12736,7 @@ function AdminWorkspace({
               <span>Ctrl/⌘ + K 链接</span>
               <span>Ctrl/⌘ + Shift + 7 列表</span>
               <span>Ctrl/⌘ + Shift + 8 待办</span>
+              <span>Tab = 4 空格 · 代码块智能补全</span>
             </div>
             <div className="editor-compose-grid">
               <div className="editor-source-pane">
@@ -12803,16 +12818,33 @@ function AdminWorkspace({
                   required
                 />
               </div>
-              <section className="article-preview-panel editor-inline-preview" aria-label="正文预览">
+              <section
+                className="article-preview-panel editor-inline-preview"
+                aria-label={autoRenderPreview ? '正文预览' : 'Markdown 源码预览'}
+              >
                 <div className="admin-panel-heading">
-                  <h3>正文预览</h3>
-                  <span>跟随正文</span>
+                  <h3>{autoRenderPreview ? '正文预览' : '源码预览'}</h3>
+                  <label className="switch-control compact editor-render-switch" title="关闭后显示 Markdown 源代码，不再实时渲染正文">
+                    <input
+                      type="checkbox"
+                      checked={autoRenderPreview}
+                      onChange={(event) => setAutoRenderPreview(event.target.checked)}
+                    />
+                    <span>{autoRenderPreview ? '自动渲染' : '显示源码'}</span>
+                  </label>
                 </div>
-                <div className="editor-preview-scroll" ref={previewScrollRef}>
-                  {deferredArticleContent.trim() ? (
+                <div
+                  className={`editor-preview-scroll${autoRenderPreview ? '' : ' is-source-mode'}`}
+                  ref={previewScrollRef}
+                >
+                  {autoRenderPreview && deferredArticleContent.trim() ? (
                     <MarkdownContent content={deferredArticleContent} title={articleForm.title || '文章预览'} />
+                  ) : !autoRenderPreview && articleForm.content ? (
+                    <pre className="editor-raw-preview"><code>{articleForm.content}</code></pre>
                   ) : (
-                    <p className="empty-state">左侧开始写正文后，这里会实时预览。</p>
+                    <p className="empty-state">
+                      {autoRenderPreview ? '左侧开始写正文后，这里会实时预览。' : '左侧开始写正文后，这里会显示 Markdown 源代码。'}
+                    </p>
                   )}
                 </div>
               </section>
