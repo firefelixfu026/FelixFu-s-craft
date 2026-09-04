@@ -1,0 +1,61 @@
+name: Writing desk deploy diagnostic
+
+on:
+  push:
+    branches:
+      - codex/writing-desk-deploy-diagnostic
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Read-only production deploy diagnostic
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/felixfu-blog' }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+
+    steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/felixfu_deploy_key
+          chmod 600 ~/.ssh/felixfu_deploy_key
+          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Inspect server state without changing it
+        run: |
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
+            -i ~/.ssh/felixfu_deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' bash -s" > diagnostic.txt <<'REMOTE'
+          set -u
+          cd "$DEPLOY_PATH"
+          echo "--- GIT ---"
+          echo "head=$(git rev-parse --short HEAD 2>&1)"
+          echo "branch=$(git branch --show-current 2>&1)"
+          git status --short 2>&1 || true
+          echo "--- RESOURCES ---"
+          free -m 2>&1 || true
+          df -h / /var/lib/docker 2>&1 || true
+          docker system df 2>&1 || true
+          echo "--- COMPOSE ---"
+          docker compose ps 2>&1 || true
+          echo "--- IMAGES ---"
+          docker images --format '{{.Repository}} | {{.Tag}} | {{.CreatedSince}} | {{.Size}}' \
+            | grep -E 'felixfu|postgres|nginx' | head -n 30 || true
+          echo "--- OOM ---"
+          journalctl -k --since '20 minutes ago' --no-pager 2>/dev/null \
+            | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 30 || true
+          echo "--- CONTAINERS ---"
+          docker ps -a --format '{{.Names}} | {{.Status}} | {{.Image}}' \
+            | grep -E 'felixfu_blog|felixfu-blog' || true
+          REMOTE
+
+          cat diagnostic.txt
+          compact="$(tr '\n' ';' < diagnostic.txt | cut -c1-6000)"
+          echo "::notice title=Writing desk deploy diagnostic::$compact"
