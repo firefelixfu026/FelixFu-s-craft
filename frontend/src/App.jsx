@@ -557,11 +557,11 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
-    version: 'v6.9.0',
-    title: '写作台代码模式',
-    date: '2026-09-04',
+    version: 'v6.9.1',
+    title: '写作台实时渲染与围栏修复',
+    date: '2026-09-05',
     status: '已上线',
-    points: ['Tab 统一为 4 个空格，并支持多行缩进与反缩进', '代码块内提供智能回车缩进和括号、引号自动补全', '正文预览可关闭自动渲染并切换为 Markdown 源码视图']
+    points: ['代码模式只在成对围栏之间启用，并自动补齐结束围栏', '自动渲染时左侧显示实时正文、右侧编辑 Markdown 源码', '支持 Ctrl/⌘ + Z 撤回、重做与 Ctrl/⌘ + S 直接保存']
   },
   {
     version: 'v6.8.6',
@@ -11170,7 +11170,9 @@ function AdminWorkspace({
   ];
   const contentTextareaRef = useRef(null);
   const previewScrollRef = useRef(null);
-  const [autoRenderPreview, setAutoRenderPreview] = useState(readStoredArticleAutoRender);
+  const editorUndoStackRef = useRef([]);
+  const editorRedoStackRef = useRef([]);
+  const [autoRenderEditor, setAutoRenderEditor] = useState(readStoredArticleAutoRender);
   const [aiInsertMode, setAiInsertMode] = useState('append');
   const [activeAdminPage, setActiveAdminPage] = useState(readStoredAdminPage);
   const [adminStatsRange, setAdminStatsRange] = useState('7d');
@@ -11263,8 +11265,8 @@ function AdminWorkspace({
   }, [activeAdminPage]);
 
   useEffect(() => {
-    localStorage.setItem(ARTICLE_AUTO_RENDER_KEY, String(autoRenderPreview));
-  }, [autoRenderPreview]);
+    localStorage.setItem(ARTICLE_AUTO_RENDER_KEY, String(autoRenderEditor));
+  }, [autoRenderEditor]);
 
   useEffect(() => {
     if (!visibleAdminPageIds.has(activeAdminPage)) {
@@ -11409,6 +11411,92 @@ function AdminWorkspace({
     }
   ];
 
+  function rememberEditorState(content, selectionStart, selectionEnd = selectionStart) {
+    const snapshot = {
+      documentKey: editingArticleId || '__new__',
+      content,
+      selectionStart,
+      selectionEnd
+    };
+    const stack = editorUndoStackRef.current;
+    const latest = stack[stack.length - 1];
+    if (!latest || latest.documentKey !== snapshot.documentKey || latest.content !== snapshot.content) {
+      editorUndoStackRef.current = [...stack.slice(-99), snapshot];
+    }
+    editorRedoStackRef.current = [];
+  }
+
+  function restoreEditorSnapshot(snapshot) {
+    updateArticleForm('content', snapshot.content);
+    window.setTimeout(() => {
+      const textarea = contentTextareaRef.current;
+      textarea?.focus();
+      textarea?.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
+    }, 0);
+  }
+
+  function undoEditorChange() {
+    const documentKey = editingArticleId || '__new__';
+    const stack = editorUndoStackRef.current;
+    const previous = stack[stack.length - 1];
+    if (!previous || previous.documentKey !== documentKey) return false;
+
+    const textarea = contentTextareaRef.current;
+    editorUndoStackRef.current = stack.slice(0, -1);
+    editorRedoStackRef.current = [
+      ...editorRedoStackRef.current.slice(-99),
+      {
+        documentKey,
+        content: articleForm.content || '',
+        selectionStart: textarea?.selectionStart ?? 0,
+        selectionEnd: textarea?.selectionEnd ?? 0
+      }
+    ];
+    restoreEditorSnapshot(previous);
+    return true;
+  }
+
+  function redoEditorChange() {
+    const documentKey = editingArticleId || '__new__';
+    const stack = editorRedoStackRef.current;
+    const next = stack[stack.length - 1];
+    if (!next || next.documentKey !== documentKey) return false;
+
+    const textarea = contentTextareaRef.current;
+    editorRedoStackRef.current = stack.slice(0, -1);
+    editorUndoStackRef.current = [
+      ...editorUndoStackRef.current.slice(-99),
+      {
+        documentKey,
+        content: articleForm.content || '',
+        selectionStart: textarea?.selectionStart ?? 0,
+        selectionEnd: textarea?.selectionEnd ?? 0
+      }
+    ];
+    restoreEditorSnapshot(next);
+    return true;
+  }
+
+  function handleArticleContentChange(event) {
+    const nextContent = event.currentTarget.value;
+    const nextCursor = event.currentTarget.selectionStart;
+    const previousCursor = Math.max(0, Math.min((articleForm.content || '').length, nextCursor - (nextContent.length - (articleForm.content || '').length)));
+    rememberEditorState(articleForm.content || '', previousCursor, previousCursor);
+    updateArticleForm('content', nextContent);
+  }
+
+  function handleAutoRenderToggle(nextValue) {
+    const textarea = contentTextareaRef.current;
+    const selectionStart = textarea?.selectionStart ?? 0;
+    const selectionEnd = textarea?.selectionEnd ?? selectionStart;
+    setAutoRenderEditor(nextValue);
+    window.setTimeout(() => {
+      const nextTextarea = contentTextareaRef.current;
+      nextTextarea?.focus();
+      nextTextarea?.setSelectionRange(selectionStart, selectionEnd);
+    }, 0);
+  }
+
   function insertIntoContent(prefix, suffix = '', placeholder = '文本') {
     const textarea = contentTextareaRef.current;
     const content = articleForm.content || '';
@@ -11417,6 +11505,7 @@ function AdminWorkspace({
     const selected = content.slice(start, end) || placeholder;
     const nextText = `${prefix}${selected}${suffix}`;
     const nextContent = `${content.slice(0, start)}${nextText}${content.slice(end)}`;
+    rememberEditorState(content, start, end);
     updateArticleForm('content', nextContent);
     window.setTimeout(() => {
       textarea?.focus();
@@ -11431,6 +11520,7 @@ function AdminWorkspace({
     const start = textarea?.selectionStart ?? content.length;
     const end = textarea?.selectionEnd ?? start;
     const nextContent = `${content.slice(0, start)}${snippet}${content.slice(end)}`;
+    rememberEditorState(content, start, end);
     updateArticleForm('content', nextContent);
     window.setTimeout(() => {
       textarea?.focus();
@@ -11446,6 +11536,8 @@ function AdminWorkspace({
 
   function applyEditorChange(change) {
     if (!change) return false;
+    const textarea = contentTextareaRef.current;
+    rememberEditorState(articleForm.content || '', textarea?.selectionStart ?? 0, textarea?.selectionEnd ?? 0);
     updateArticleForm('content', change.content);
     window.setTimeout(() => {
       const textarea = contentTextareaRef.current;
@@ -11478,9 +11570,13 @@ function AdminWorkspace({
 
     if (!(event.ctrlKey || event.metaKey)) return;
     const key = event.key.toLowerCase();
-    if (key === 's') {
-      event.preventDefault();
-      saveDraftSnapshot('快捷键快照');
+    if (key === 'z') {
+      const changed = event.shiftKey ? redoEditorChange() : undoEditorChange();
+      if (changed) event.preventDefault();
+      return;
+    }
+    if (key === 'y') {
+      if (redoEditorChange()) event.preventDefault();
       return;
     }
     if (key === 'b') {
@@ -11504,6 +11600,12 @@ function AdminWorkspace({
     }
   }
 
+  function handleArticleFormShortcut(event) {
+    if (event.defaultPrevented || !(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 's') return;
+    event.preventDefault();
+    event.currentTarget.requestSubmit();
+  }
+
   async function uploadDroppedArticleImage(file) {
     if (!file?.type?.startsWith('image/')) return false;
     const textarea = contentTextareaRef.current;
@@ -11518,6 +11620,36 @@ function AdminWorkspace({
     const sourceRange = source.scrollHeight - source.clientHeight;
     const targetRange = target.scrollHeight - target.clientHeight;
     target.scrollTop = sourceRange > 0 ? (source.scrollTop / sourceRange) * Math.max(0, targetRange) : 0;
+  }
+
+  function renderArticleContentEditor(className = '') {
+    return (
+      <textarea
+        className={className || undefined}
+        ref={contentTextareaRef}
+        value={articleForm.content}
+        onChange={handleArticleContentChange}
+        onKeyDown={handleEditorShortcut}
+        onScroll={syncPreviewScroll}
+        onDragOver={(event) => {
+          if ([...event.dataTransfer.items].some((item) => item.type.startsWith('image/'))) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+          }
+        }}
+        onDrop={async (event) => {
+          const imageFile = [...event.dataTransfer.files].find((file) => file.type.startsWith('image/'));
+          if (!imageFile) return;
+          event.preventDefault();
+          await uploadDroppedArticleImage(imageFile);
+        }}
+        placeholder={autoRenderEditor
+          ? '在这里写 Markdown，左侧正文会自动渲染'
+          : '在这里写 Markdown，右侧会实时预览'}
+        rows={18}
+        required
+      />
+    );
   }
 
   function handleRunArticleAiTask(task) {
@@ -12621,7 +12753,7 @@ function AdminWorkspace({
       {shouldShowAdminLayout && (
       <div className={activeAdminPage === 'editor' ? 'admin-layout editor-layout' : 'admin-layout admin-layout-single'}>
         {activeAdminPage === 'editor' && (
-        <form className="admin-panel admin-form" onSubmit={submitArticleForm}>
+        <form className="admin-panel admin-form" onSubmit={submitArticleForm} onKeyDown={handleArticleFormShortcut}>
           <div className="admin-panel-heading">
             <h2>{editingArticleId ? '编辑文章' : '发布文章'}</h2>
             {editingArticleId && (
@@ -12731,7 +12863,8 @@ function AdminWorkspace({
               </div>
             </div>
             <div className="editor-shortcut-hints" aria-label="编辑器快捷键">
-              <span>Ctrl/⌘ + S 快照</span>
+              <span>Ctrl/⌘ + S 保存</span>
+              <span>Ctrl/⌘ + Z 撤回</span>
               <span>Ctrl/⌘ + B 加粗</span>
               <span>Ctrl/⌘ + K 链接</span>
               <span>Ctrl/⌘ + Shift + 7 列表</span>
@@ -12795,56 +12928,41 @@ function AdminWorkspace({
                     <Code2 size={16} />
                   </button>
                 </div>
-                <textarea
-                  ref={contentTextareaRef}
-                  value={articleForm.content}
-                  onChange={(event) => updateArticleForm('content', event.target.value)}
-                  onKeyDown={handleEditorShortcut}
-                  onScroll={syncPreviewScroll}
-                  onDragOver={(event) => {
-                    if ([...event.dataTransfer.items].some((item) => item.type.startsWith('image/'))) {
-                      event.preventDefault();
-                      event.dataTransfer.dropEffect = 'copy';
-                    }
-                  }}
-                  onDrop={async (event) => {
-                    const imageFile = [...event.dataTransfer.files].find((file) => file.type.startsWith('image/'));
-                    if (!imageFile) return;
-                    event.preventDefault();
-                    await uploadDroppedArticleImage(imageFile);
-                  }}
-                  placeholder="在这里写 Markdown，右侧会像 VS Code 预览一样同步显示"
-                  rows={18}
-                  required
-                />
+                {autoRenderEditor ? (
+                  <div className="editor-live-preview editor-preview-scroll" ref={previewScrollRef}>
+                    {deferredArticleContent.trim() ? (
+                      <MarkdownContent content={deferredArticleContent} title={articleForm.title || '文章正文'} />
+                    ) : (
+                      <p className="empty-state">在右侧开始写 Markdown 后，这里会像 Obsidian 一样自动渲染正文。</p>
+                    )}
+                  </div>
+                ) : renderArticleContentEditor()}
               </div>
               <section
                 className="article-preview-panel editor-inline-preview"
-                aria-label={autoRenderPreview ? '正文预览' : 'Markdown 源码预览'}
+                aria-label={autoRenderEditor ? 'Markdown 源码编辑' : '正文预览'}
               >
                 <div className="admin-panel-heading">
-                  <h3>{autoRenderPreview ? '正文预览' : '源码预览'}</h3>
-                  <label className="switch-control compact editor-render-switch" title="关闭后显示 Markdown 源代码，不再实时渲染正文">
+                  <h3>{autoRenderEditor ? '源码编辑' : '正文预览'}</h3>
+                  <label className="switch-control compact editor-render-switch" title="开启后左侧自动渲染正文，右侧切换为 Markdown 源码编辑">
                     <input
                       type="checkbox"
-                      checked={autoRenderPreview}
-                      onChange={(event) => setAutoRenderPreview(event.target.checked)}
+                      checked={autoRenderEditor}
+                      onChange={(event) => handleAutoRenderToggle(event.target.checked)}
                     />
-                    <span>{autoRenderPreview ? '自动渲染' : '显示源码'}</span>
+                    <span>{autoRenderEditor ? '自动渲染' : '开启自动渲染'}</span>
                   </label>
                 </div>
                 <div
-                  className={`editor-preview-scroll${autoRenderPreview ? '' : ' is-source-mode'}`}
-                  ref={previewScrollRef}
+                  className={`editor-preview-scroll${autoRenderEditor ? ' is-source-mode' : ''}`}
+                  ref={autoRenderEditor ? null : previewScrollRef}
                 >
-                  {autoRenderPreview && deferredArticleContent.trim() ? (
+                  {autoRenderEditor ? (
+                    renderArticleContentEditor('editor-source-textarea')
+                  ) : deferredArticleContent.trim() ? (
                     <MarkdownContent content={deferredArticleContent} title={articleForm.title || '文章预览'} />
-                  ) : !autoRenderPreview && articleForm.content ? (
-                    <pre className="editor-raw-preview"><code>{articleForm.content}</code></pre>
                   ) : (
-                    <p className="empty-state">
-                      {autoRenderPreview ? '左侧开始写正文后，这里会实时预览。' : '左侧开始写正文后，这里会显示 Markdown 源代码。'}
-                    </p>
+                    <p className="empty-state">左侧开始写正文后，这里会实时预览。</p>
                   )}
                 </div>
               </section>

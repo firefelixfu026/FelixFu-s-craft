@@ -22,13 +22,23 @@ function leadingIndentRemoval(line) {
 }
 
 export function getFencedCodeContext(content = '', cursor = 0) {
-  const beforeCursor = content.slice(0, clampSelection(content, cursor));
-  const lines = beforeCursor.split('\n');
+  const targetCursor = clampSelection(content, cursor);
+  const lines = content.split('\n');
   let openFence = null;
+  let offset = 0;
 
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index];
+    const line = rawLine.replace(/\r$/, '');
+    const lineStart = offset;
+    const lineEnd = lineStart + rawLine.length;
+    const nextLineStart = lineEnd + (index < lines.length - 1 ? 1 : 0);
     const match = line.match(/^\s*(`{3,}|~{3,})(.*)$/);
-    if (!match) continue;
+
+    if (!match) {
+      offset = nextLineStart;
+      continue;
+    }
 
     const marker = match[1];
     const remainder = match[2].trim();
@@ -36,17 +46,20 @@ export function getFencedCodeContext(content = '', cursor = 0) {
       openFence = {
         character: marker[0],
         length: marker.length,
-        language: remainder.split(/\s+/)[0]?.toLowerCase() || ''
+        language: remainder.split(/\s+/)[0]?.toLowerCase() || '',
+        contentStart: nextLineStart
       };
-      continue;
-    }
-
-    if (marker[0] === openFence.character && marker.length >= openFence.length && !remainder) {
+    } else if (marker[0] === openFence.character && marker.length >= openFence.length && !remainder) {
+      if (targetCursor >= openFence.contentStart && targetCursor <= lineStart) {
+        return openFence;
+      }
       openFence = null;
     }
+
+    offset = nextLineStart;
   }
 
-  return openFence;
+  return null;
 }
 
 export function applyTabIndent(content = '', selectionStart = 0, selectionEnd = selectionStart, shouldUnindent = false) {
@@ -93,6 +106,26 @@ export function applyCodeEditorKey(content = '', selectionStart = 0, selectionEn
   const start = clampSelection(content, selectionStart);
   const end = Math.max(start, clampSelection(content, selectionEnd));
   const codeContext = getFencedCodeContext(content, start);
+
+  if (!codeContext && key === '`' && start === end) {
+    const lineStart = content.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+    const lineEnd = content.indexOf('\n', start);
+    const beforeCursor = content.slice(lineStart, start);
+    const afterCursor = content.slice(start, lineEnd === -1 ? content.length : lineEnd);
+    const openingMatch = beforeCursor.match(/^(\s{0,3})``$/);
+
+    if (openingMatch && !afterCursor.trim()) {
+      const indent = openingMatch[1];
+      const inserted = `\`\n${indent}\n${indent}\`\`\``;
+      const cursor = start + 2 + indent.length;
+      return {
+        content: `${content.slice(0, start)}${inserted}${content.slice(end)}`,
+        selectionStart: cursor,
+        selectionEnd: cursor
+      };
+    }
+  }
+
   if (!codeContext) return null;
 
   if (key === 'Enter') {
