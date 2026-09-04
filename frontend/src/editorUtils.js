@@ -12,6 +12,14 @@ const AUTO_PAIRS = Object.freeze({
 const CLOSING_CHARACTERS = new Set(Object.values(AUTO_PAIRS));
 const COLON_INDENT_LANGUAGES = new Set(['python', 'py', 'yaml', 'yml', 'ruby', 'rb']);
 
+export function getMarkdownListShortcut(event = {}) {
+  if (!(event.ctrlKey || event.metaKey) || !event.shiftKey) return null;
+  const key = String(event.key || '').toLowerCase();
+  if (event.code === 'Digit7' || key === '&') return 'list';
+  if (event.code === 'Digit8' || key === '*') return 'todo';
+  return null;
+}
+
 function clampSelection(content, value) {
   return Math.max(0, Math.min(content.length, Number.isFinite(value) ? value : 0));
 }

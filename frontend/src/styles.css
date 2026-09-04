@@ -6949,15 +6949,99 @@ h3 {
   min-width: 0;
 }
 
-.editor-source-pane textarea,
-.editor-source-textarea {
-  height: min(68vh, 760px);
-  min-height: 560px;
-  resize: none;
-  tab-size: 4;
-  font-family: "Cascadia Code", "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: 14px;
+.live-markdown-editor {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #d8e0e9;
+  border-radius: 16px;
+  background: #fff;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
+
+.live-markdown-editor-loading {
+  display: grid;
+  min-height: 560px;
+  place-items: center;
+  border: 1px solid #d8e0e9;
+  border-radius: 16px;
+  color: #64748b;
+  background: #fff;
+}
+
+.live-markdown-editor:focus-within {
+  border-color: rgba(47, 143, 131, 0.72);
+  box-shadow: 0 0 0 3px rgba(47, 143, 131, 0.12);
+}
+
+.live-markdown-editor .cm-editor,
+.live-markdown-editor .cm-scroller {
+  background: transparent;
+}
+
+.live-markdown-editor .cm-gutters {
+  display: none;
+}
+
+.live-markdown-editor.is-live-preview .cm-scroller {
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.live-markdown-editor .cm-activeLine {
+  background: rgba(47, 143, 131, 0.045);
+}
+
+.live-markdown-editor .cm-selectionBackground,
+.live-markdown-editor .cm-content ::selection {
+  background: rgba(47, 143, 131, 0.2) !important;
+}
+
+.cm-live-math {
+  max-width: 100%;
+  color: #172033;
+  vertical-align: middle;
+}
+
+.cm-live-math-inline {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.7em;
+  padding: 0 3px;
+}
+
+.cm-live-math-block {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(47, 143, 131, 0.055);
+}
+
+.cm-live-heading {
+  color: #152238;
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-weight: 850;
+}
+
+.cm-live-heading-1 { font-size: 1.9em; }
+.cm-live-heading-2 { font-size: 1.55em; }
+.cm-live-heading-3 { font-size: 1.3em; }
+.cm-live-heading-4 { font-size: 1.14em; }
+.cm-live-heading-5,
+.cm-live-heading-6 { font-size: 1.02em; }
+
+.cm-live-strong { font-weight: 850; }
+.cm-live-strike { text-decoration: line-through; opacity: 0.68; }
+.cm-live-highlight { padding: 0 2px; border-radius: 3px; background: rgba(250, 204, 21, 0.34); }
+.cm-live-inline-code {
+  padding: 2px 5px;
+  border-radius: 5px;
+  color: #be123c;
+  background: #f1f5f9;
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+}
+.cm-live-link { color: #087f71; text-decoration: underline; text-underline-offset: 3px; }
 
 .editor-inline-preview {
   grid-template-rows: auto minmax(0, 1fr);
@@ -6999,37 +7083,9 @@ h3 {
   box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
 }
 
-.editor-live-preview {
-  border: 1px solid #d8e0e9;
-  border-radius: 16px;
-}
-
 .editor-preview-scroll.is-source-mode {
   padding: 0;
   background: #111827;
-}
-
-.editor-source-textarea {
-  width: 100%;
-  height: 100%;
-  min-height: 100%;
-  margin: 0;
-  padding: 20px;
-  resize: none;
-  border: 0;
-  border-radius: 0;
-  outline: 0;
-  color: #dce7f5;
-  background: #111827;
-  caret-color: #6ee7d2;
-  font-family: "Cascadia Code", "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: 14px;
-  line-height: 1.7;
-  tab-size: 4;
-}
-
-.editor-source-textarea:focus {
-  box-shadow: inset 0 0 0 2px rgba(110, 231, 210, 0.34);
 }
 
 .editor-raw-preview {
@@ -9353,6 +9409,43 @@ h3 {
 
 :root[data-theme='dark'] .editor-preview-scroll .markdown-content {
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.25);
+}
+
+:root[data-theme='dark'] .live-markdown-editor {
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(5, 10, 22, 0.82);
+}
+
+:root[data-theme='dark'] .live-markdown-editor:focus-within {
+  border-color: rgba(52, 211, 153, 0.56);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.11);
+}
+
+:root[data-theme='dark'] .live-markdown-editor .cm-content,
+:root[data-theme='dark'] .live-markdown-editor .cm-line {
+  color: #dce7f5;
+}
+
+:root[data-theme='dark'] .live-markdown-editor .cm-activeLine {
+  background: rgba(52, 211, 153, 0.055);
+}
+
+:root[data-theme='dark'] .cm-live-math,
+:root[data-theme='dark'] .cm-live-heading {
+  color: #edf7ff;
+}
+
+:root[data-theme='dark'] .cm-live-math-block {
+  background: rgba(52, 211, 153, 0.08);
+}
+
+:root[data-theme='dark'] .cm-live-inline-code {
+  color: #fda4af;
+  background: rgba(30, 41, 59, 0.92);
+}
+
+:root[data-theme='dark'] .cm-live-link {
+  color: #5eead4;
 }
 
 :root[data-theme='dark'] .editor-render-switch {

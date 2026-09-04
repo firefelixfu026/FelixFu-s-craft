@@ -5,8 +5,15 @@ import {
   EDITOR_INDENT,
   applyCodeEditorKey,
   applyTabIndent,
-  getFencedCodeContext
+  getFencedCodeContext,
+  getMarkdownListShortcut
 } from './editorUtils.js';
+
+test('Ctrl/Command Shift 7 and 8 use physical number-row keys', () => {
+  assert.equal(getMarkdownListShortcut({ ctrlKey: true, shiftKey: true, code: 'Digit7', key: '&' }), 'list');
+  assert.equal(getMarkdownListShortcut({ metaKey: true, shiftKey: true, code: 'Digit8', key: '*' }), 'todo');
+  assert.equal(getMarkdownListShortcut({ ctrlKey: true, shiftKey: false, code: 'Digit7', key: '7' }), null);
+});
 
 test('Tab inserts four spaces at the cursor', () => {
   const result = applyTabIndent('const value = 1;', 6, 6);
