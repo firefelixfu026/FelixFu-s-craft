@@ -12,14 +12,16 @@ import {
   drawSelection,
   dropCursor,
   highlightActiveLine,
+  highlightActiveLineGutter,
   highlightSpecialChars,
   keymap,
+  lineNumbers,
   placeholder
 } from '@codemirror/view';
 import katex from 'katex';
 
 import { applyCodeEditorKey, applyTabIndent } from './editorUtils.js';
-import { collectCodeRanges, findMathTokens, isInsideRange } from './liveMarkdownUtils.js';
+import { collectCodeRanges, findMathTokens, findTableTokens, isInsideRange } from './liveMarkdownUtils.js';
 
 class MathPreviewWidget extends WidgetType {
   constructor(expression, displayMode, sourcePosition) {
@@ -63,30 +65,204 @@ class MathPreviewWidget extends WidgetType {
 }
 
 class BulletWidget extends WidgetType {
-  toDOM() {
+  constructor(sourcePosition) {
+    super();
+    this.sourcePosition = sourcePosition;
+  }
+
+  eq(other) {
+    return other.sourcePosition === this.sourcePosition;
+  }
+
+  toDOM(view) {
     const element = document.createElement('span');
     element.className = 'cm-live-list-bullet';
     element.textContent = '•';
+    element.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      view.dispatch({ selection: EditorSelection.cursor(this.sourcePosition) });
+      view.focus();
+    });
     return element;
+  }
+
+  ignoreEvent(event) {
+    return event.type === 'mousedown';
   }
 }
 
 class TaskWidget extends WidgetType {
-  constructor(checked) {
+  constructor(checked, from, to) {
     super();
     this.checked = checked;
+    this.from = from;
+    this.to = to;
   }
 
   eq(other) {
-    return other.checked === this.checked;
+    return other.checked === this.checked && other.from === this.from && other.to === this.to;
   }
 
-  toDOM() {
+  toDOM(view) {
     const element = document.createElement('span');
     element.className = `cm-live-task${this.checked ? ' is-checked' : ''}`;
-    element.setAttribute('aria-hidden', 'true');
+    element.setAttribute('role', 'checkbox');
+    element.setAttribute('aria-checked', String(this.checked));
+    element.setAttribute('aria-label', this.checked ? '标记任务为未完成' : '标记任务为已完成');
     element.textContent = this.checked ? '✓' : '';
+    element.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      view.dispatch({
+        changes: { from: this.from, to: this.to, insert: this.checked ? '[ ]' : '[x]' },
+        selection: EditorSelection.cursor(this.to)
+      });
+      view.focus();
+    });
     return element;
+  }
+
+  ignoreEvent(event) {
+    return event.type === 'mousedown';
+  }
+}
+
+class OrderedListWidget extends WidgetType {
+  constructor(label, sourcePosition) {
+    super();
+    this.label = label;
+    this.sourcePosition = sourcePosition;
+  }
+
+  eq(other) {
+    return other.label === this.label && other.sourcePosition === this.sourcePosition;
+  }
+
+  toDOM(view) {
+    const element = document.createElement('span');
+    element.className = 'cm-live-ordered-marker';
+    element.textContent = this.label;
+    element.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      view.dispatch({ selection: EditorSelection.cursor(this.sourcePosition) });
+      view.focus();
+    });
+    return element;
+  }
+
+  ignoreEvent(event) {
+    return event.type === 'mousedown';
+  }
+}
+
+class CalloutWidget extends WidgetType {
+  constructor(type, sourcePosition) {
+    super();
+    this.type = type;
+    this.sourcePosition = sourcePosition;
+  }
+
+  eq(other) {
+    return other.type === this.type && other.sourcePosition === this.sourcePosition;
+  }
+
+  toDOM(view) {
+    const element = document.createElement('span');
+    element.className = `cm-live-callout-marker cm-live-callout-marker-${this.type.toLowerCase()}`;
+    element.textContent = `◆ ${this.type.toUpperCase()}`;
+    element.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      view.dispatch({ selection: EditorSelection.cursor(this.sourcePosition) });
+      view.focus();
+    });
+    return element;
+  }
+
+  ignoreEvent(event) {
+    return event.type === 'mousedown';
+  }
+}
+
+class WikiLinkWidget extends WidgetType {
+  constructor(label, sourcePosition) {
+    super();
+    this.label = label;
+    this.sourcePosition = sourcePosition;
+  }
+
+  eq(other) {
+    return other.label === this.label && other.sourcePosition === this.sourcePosition;
+  }
+
+  toDOM(view) {
+    const element = document.createElement('span');
+    element.className = 'cm-live-wiki-link';
+    element.textContent = this.label;
+    element.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      view.dispatch({ selection: EditorSelection.cursor(this.sourcePosition) });
+      view.focus();
+    });
+    return element;
+  }
+
+  ignoreEvent(event) {
+    return event.type === 'mousedown';
+  }
+}
+
+class TablePreviewWidget extends WidgetType {
+  constructor(token) {
+    super();
+    this.token = token;
+  }
+
+  eq(other) {
+    return JSON.stringify(other.token) === JSON.stringify(this.token);
+  }
+
+  toDOM(view) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'cm-live-table-wrap';
+    wrapper.setAttribute('role', 'button');
+    wrapper.setAttribute('aria-label', '编辑表格源码');
+    wrapper.title = '点击编辑表格源码';
+    const table = document.createElement('table');
+    const head = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    this.token.header.forEach((value, index) => {
+      const cell = document.createElement('th');
+      cell.textContent = value;
+      cell.style.textAlign = this.token.alignments[index] || 'left';
+      headerRow.appendChild(cell);
+    });
+    head.appendChild(headerRow);
+    table.appendChild(head);
+    const body = document.createElement('tbody');
+    this.token.rows.forEach((row) => {
+      const tableRow = document.createElement('tr');
+      this.token.header.forEach((_, index) => {
+        const cell = document.createElement('td');
+        cell.textContent = row[index] || '';
+        cell.style.textAlign = this.token.alignments[index] || 'left';
+        tableRow.appendChild(cell);
+      });
+      body.appendChild(tableRow);
+    });
+    table.appendChild(body);
+    wrapper.appendChild(table);
+    wrapper.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      view.dispatch({
+        selection: EditorSelection.cursor(Math.min(this.token.from + 1, this.token.to)),
+        scrollIntoView: true
+      });
+      view.focus();
+    });
+    return wrapper;
+  }
+
+  ignoreEvent(event) {
+    return event.type === 'mousedown';
   }
 }
 
@@ -127,13 +303,15 @@ function buildSyntaxDecorations(view) {
   const decorations = [];
   const visited = new Set();
   const decoratedCodeLines = new Set();
+  const decoratedBlockLines = new Set();
+  const decoratedCalloutHeaders = new Set();
 
   for (const visibleRange of view.visibleRanges) {
     syntaxTree(state).iterate({
       from: visibleRange.from,
       to: visibleRange.to,
       enter(node) {
-        const key = node.name === 'FencedCode'
+        const key = node.name === 'FencedCode' || node.name === 'Blockquote' || node.name === 'Table'
           ? `${node.name}:${node.from}:${node.to}:${visibleRange.from}:${visibleRange.to}`
           : `${node.name}:${node.from}:${node.to}`;
         if (visited.has(key)) return undefined;
@@ -151,6 +329,71 @@ function buildSyntaxDecorations(view) {
           return undefined;
         }
 
+        if (node.name === 'HorizontalRule') {
+          const line = state.doc.lineAt(node.from);
+          if (!sharesActiveLine(state, node.from, node.to)) {
+            hideRange(decorations, node.from, node.to);
+            if (!decoratedBlockLines.has(`rule:${line.from}`)) {
+              decoratedBlockLines.add(`rule:${line.from}`);
+              decorations.push(Decoration.line({ class: 'cm-live-horizontal-rule-line' }).range(line.from));
+            }
+          }
+          return false;
+        }
+
+        if (node.name === 'Blockquote') {
+          const firstLine = state.doc.lineAt(node.from);
+          const calloutMatch = firstLine.text.match(/^(\s*)>\s*\[!([A-Za-z0-9_-]+)\](?:[+-])?\s*/);
+          const calloutType = calloutMatch?.[2]?.toLowerCase() || '';
+          let line = state.doc.lineAt(Math.max(node.from, visibleRange.from));
+          const finalLine = state.doc.lineAt(Math.max(
+            node.from,
+            Math.min(node.to - 1, visibleRange.to)
+          )).number;
+          while (line.number <= finalLine) {
+            const lineKey = `quote:${line.from}`;
+            if (!decoratedBlockLines.has(lineKey)) {
+              decoratedBlockLines.add(lineKey);
+              const classes = calloutType
+                ? `cm-live-blockquote-line cm-live-callout-line cm-live-callout-${calloutType}`
+                : 'cm-live-blockquote-line';
+              decorations.push(Decoration.line({ class: classes }).range(line.from));
+            }
+            if (line.number === finalLine) break;
+            line = state.doc.line(line.number + 1);
+          }
+          if (calloutMatch && !sharesActiveLine(state, firstLine.from, firstLine.to)) {
+            const prefixFrom = firstLine.from + calloutMatch[1].length;
+            const prefixTo = firstLine.from + calloutMatch[0].length;
+            decoratedCalloutHeaders.add(firstLine.from);
+            decorations.push(Decoration.replace({
+              widget: new CalloutWidget(calloutType, Math.min(prefixFrom + 2, prefixTo)),
+              inclusive: false
+            }).range(prefixFrom, prefixTo));
+          }
+          return undefined;
+        }
+
+        if (node.name === 'Table') {
+          if (rangeContainsSelection(state, node.from, node.to)) {
+            let line = state.doc.lineAt(Math.max(node.from, visibleRange.from));
+            const finalLine = state.doc.lineAt(Math.max(
+              node.from,
+              Math.min(node.to - 1, visibleRange.to)
+            )).number;
+            while (line.number <= finalLine) {
+              const lineKey = `table:${line.from}`;
+              if (!decoratedBlockLines.has(lineKey)) {
+                decoratedBlockLines.add(lineKey);
+                decorations.push(Decoration.line({ class: 'cm-live-table-source-line' }).range(line.from));
+              }
+              if (line.number === finalLine) break;
+              line = state.doc.line(line.number + 1);
+            }
+          }
+          return false;
+        }
+
         if (node.name === 'StrongEmphasis') {
           decorateDelimitedNode(decorations, state, node, 'cm-live-strong', 2);
         } else if (node.name === 'Emphasis') {
@@ -161,6 +404,10 @@ function buildSyntaxDecorations(view) {
           decorateDelimitedNode(decorations, state, node, 'cm-live-inline-code', 1);
           return false;
         } else if (node.name === 'Link') {
+          if (state.doc.sliceString(Math.max(0, node.from - 1), node.from) === '['
+            && state.doc.sliceString(node.to, Math.min(state.doc.length, node.to + 1)) === ']') {
+            return false;
+          }
           const source = state.doc.sliceString(node.from, node.to);
           const match = source.match(/^\[([^\]\n]+)\]\(([^)\n]+)\)$/);
           if (match) {
@@ -173,12 +420,35 @@ function buildSyntaxDecorations(view) {
             }
           }
           return false;
-        } else if (node.name === 'ListMark' && !sharesActiveLine(state, node.from, node.to)) {
-          if (node.node.parent?.getChild('Task')) hideRange(decorations, node.from, Math.min(node.to + 1, state.doc.length));
-          else decorations.push(Decoration.replace({ widget: new BulletWidget(), inclusive: false }).range(node.from, node.to));
+        } else if (node.name === 'QuoteMark') {
+          const line = state.doc.lineAt(node.from);
+          if (!sharesActiveLine(state, line.from, line.to) && !decoratedCalloutHeaders.has(line.from)) {
+            const afterMarker = state.doc.sliceString(node.to, Math.min(node.to + 1, state.doc.length));
+            hideRange(decorations, node.from, node.to + (afterMarker === ' ' ? 1 : 0));
+          }
+        } else if (node.name === 'ListMark') {
+          const line = state.doc.lineAt(node.from);
+          const lineKey = `list:${line.from}`;
+          if (!decoratedBlockLines.has(lineKey)) {
+            decoratedBlockLines.add(lineKey);
+            decorations.push(Decoration.line({ class: 'cm-live-list-line' }).range(line.from));
+          }
+          if (sharesActiveLine(state, node.from, node.to)) return undefined;
+          if (node.node.parent?.getChild('Task')) {
+            hideRange(decorations, node.from, Math.min(node.to + 1, state.doc.length));
+          } else {
+            const marker = state.doc.sliceString(node.from, node.to);
+            const widget = /^\d+[.)]$/.test(marker)
+              ? new OrderedListWidget(marker, node.from)
+              : new BulletWidget(node.from);
+            decorations.push(Decoration.replace({ widget, inclusive: false }).range(node.from, node.to));
+          }
         } else if (node.name === 'TaskMarker' && !sharesActiveLine(state, node.from, node.to)) {
           const checked = /x/i.test(state.doc.sliceString(node.from, node.to));
-          decorations.push(Decoration.replace({ widget: new TaskWidget(checked), inclusive: false }).range(node.from, node.to));
+          decorations.push(Decoration.replace({
+            widget: new TaskWidget(checked, node.from, node.to),
+            inclusive: false
+          }).range(node.from, node.to));
         } else if (node.name === 'FencedCode') {
           let line = state.doc.lineAt(Math.max(node.from, visibleRange.from));
           const finalLine = state.doc.lineAt(Math.max(
@@ -201,12 +471,13 @@ function buildSyntaxDecorations(view) {
   }
 
   const codeRanges = collectCodeRanges(state);
+  const tableRanges = findTableTokens(state).map(({ from, to }) => ({ from, to }));
   for (const visibleRange of view.visibleRanges) {
     const visibleText = state.doc.sliceString(visibleRange.from, visibleRange.to);
     for (const match of visibleText.matchAll(/==([^=\n]+)==/g)) {
       const from = visibleRange.from + match.index;
       const to = from + match[0].length;
-      if (isInsideRange(codeRanges, from, to)) continue;
+      if (isInsideRange(codeRanges, from, to) || isInsideRange(tableRanges, from, to)) continue;
       const contentFrom = from + 2;
       const contentTo = to - 2;
       decorations.push(Decoration.mark({ class: 'cm-live-highlight' }).range(contentFrom, contentTo));
@@ -214,6 +485,21 @@ function buildSyntaxDecorations(view) {
         hideRange(decorations, from, contentFrom);
         hideRange(decorations, contentTo, to);
       }
+    }
+
+    for (const match of visibleText.matchAll(/\[\[([^\]|\n]+)(?:\|([^\]\n]+))?\]\]/g)) {
+      const from = visibleRange.from + match.index;
+      const to = from + match[0].length;
+      if (
+        sharesActiveLine(state, from, to)
+        || isInsideRange(codeRanges, from, to)
+        || isInsideRange(tableRanges, from, to)
+      ) continue;
+      const label = (match[2] || match[1]).trim();
+      decorations.push(Decoration.replace({
+        widget: new WikiLinkWidget(label, Math.min(from + 2, to)),
+        inclusive: false
+      }).range(from, to));
     }
   }
 
@@ -258,7 +544,29 @@ const mathPreviewField = StateField.define({
   provide: (field) => EditorView.decorations.from(field)
 });
 
-const livePreviewExtensions = [syntaxPreviewPlugin, mathPreviewField];
+function buildTableDecorations(state) {
+  const decorations = [];
+  for (const token of findTableTokens(state)) {
+    if (sharesActiveLine(state, token.from, token.to)) continue;
+    decorations.push(Decoration.replace({
+      widget: new TablePreviewWidget(token),
+      inclusive: false,
+      block: true
+    }).range(token.from, token.to));
+  }
+  return Decoration.set(decorations, true);
+}
+
+const tablePreviewField = StateField.define({
+  create: buildTableDecorations,
+  update(decorations, transaction) {
+    if (transaction.docChanged || transaction.selection) return buildTableDecorations(transaction.state);
+    return decorations;
+  },
+  provide: (field) => EditorView.decorations.from(field)
+});
+
+const livePreviewExtensions = [syntaxPreviewPlugin, mathPreviewField, tablePreviewField];
 
 function dispatchWholeDocumentChange(view, change) {
   const current = view.state.doc.toString();
@@ -400,6 +708,8 @@ const LiveMarkdownEditor = forwardRef(function LiveMarkdownEditor({
         highlightSpecialChars(),
         drawSelection(),
         dropCursor(),
+        lineNumbers(),
+        highlightActiveLineGutter(),
         highlightActiveLine(),
         markdown({ extensions: GFM }),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),

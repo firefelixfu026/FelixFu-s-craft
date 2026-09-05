@@ -558,6 +558,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.9.4',
+    title: '块级 Markdown 实时预览',
+    date: '2026-09-05',
+    status: '已上线',
+    points: ['补齐分割线、引用、Callout、各类列表、表格和 Wiki 链接实时渲染', '表格和 Wiki 链接点击后可直接回到源码编辑', '写作区新增行号并高亮当前行，任务框可直接点击切换']
+  },
+  {
     version: 'v6.9.3',
     title: 'Live Preview 编辑手感重构',
     date: '2026-09-05',

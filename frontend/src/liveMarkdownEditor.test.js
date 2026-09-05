@@ -5,7 +5,7 @@ import { markdown } from '@codemirror/lang-markdown';
 import { EditorState } from '@codemirror/state';
 import { GFM } from '@lezer/markdown';
 
-import { findMathTokens } from './liveMarkdownUtils.js';
+import { findMathTokens, findTableTokens, splitMarkdownTableRow } from './liveMarkdownUtils.js';
 
 function createMarkdownState(doc) {
   return EditorState.create({ doc, extensions: [markdown({ extensions: GFM })] });
@@ -40,4 +40,33 @@ test('findMathTokens ignores dollar delimiters inside code', () => {
   ].join('\n'));
 
   assert.deepEqual(findMathTokens(state).map(({ expression }) => expression), ['actualMath']);
+});
+
+test('findTableTokens parses rows, escaped pipes, and alignment', () => {
+  const state = createMarkdownState([
+    '| 项目 | 说明 | 数量 |',
+    '| :--- | :---: | ---: |',
+    '| A | 含有\\|竖线 | 2 |'
+  ].join('\n'));
+  const [table] = findTableTokens(state);
+
+  assert.deepEqual(table.header, ['项目', '说明', '数量']);
+  assert.deepEqual(table.alignments, ['left', 'center', 'right']);
+  assert.deepEqual(table.rows, [['A', '含有|竖线', '2']]);
+});
+
+test('math inside a rendered table is not decorated twice', () => {
+  const state = createMarkdownState([
+    '| 公式 |',
+    '| --- |',
+    '| $x$ |',
+    '',
+    '$outside$'
+  ].join('\n'));
+
+  assert.deepEqual(findMathTokens(state).map(({ expression }) => expression), ['outside']);
+});
+
+test('splitMarkdownTableRow supports rows without outer pipes', () => {
+  assert.deepEqual(splitMarkdownTableRow('A | B | C'), ['A', 'B', 'C']);
 });
