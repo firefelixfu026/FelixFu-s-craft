@@ -6999,6 +6999,7 @@ h3 {
   max-width: 100%;
   color: #172033;
   vertical-align: middle;
+  cursor: text;
 }
 
 .cm-live-math-inline {
@@ -7012,7 +7013,9 @@ h3 {
   display: flex;
   justify-content: center;
   overflow-x: auto;
-  margin: 8px 0;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 6px 0;
   padding: 10px 12px;
   border-radius: 10px;
   background: rgba(47, 143, 131, 0.055);
@@ -7032,6 +7035,7 @@ h3 {
 .cm-live-heading-6 { font-size: 1.02em; }
 
 .cm-live-strong { font-weight: 850; }
+.cm-live-emphasis { font-style: italic; }
 .cm-live-strike { text-decoration: line-through; opacity: 0.68; }
 .cm-live-highlight { padding: 0 2px; border-radius: 3px; background: rgba(250, 204, 21, 0.34); }
 .cm-live-inline-code {
@@ -7042,6 +7046,41 @@ h3 {
   font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
 }
 .cm-live-link { color: #087f71; text-decoration: underline; text-underline-offset: 3px; }
+
+.cm-live-list-bullet {
+  display: inline-grid;
+  width: 1ch;
+  place-items: center;
+  color: #2f8f83;
+  font-size: 1.15em;
+  font-weight: 900;
+}
+
+.cm-live-task {
+  display: inline-grid;
+  box-sizing: border-box;
+  width: 1.05em;
+  height: 1.05em;
+  margin: 0 2px;
+  place-items: center;
+  border: 1.5px solid #94a3b8;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.78em;
+  line-height: 1;
+  vertical-align: -0.08em;
+}
+
+.cm-live-task.is-checked {
+  border-color: #2f8f83;
+  background: #2f8f83;
+}
+
+.cm-live-code-line {
+  padding-inline: 12px !important;
+  background: #f6f8fb;
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+}
 
 .editor-inline-preview {
   grid-template-rows: auto minmax(0, 1fr);
@@ -9446,6 +9485,23 @@ h3 {
 
 :root[data-theme='dark'] .cm-live-link {
   color: #5eead4;
+}
+
+:root[data-theme='dark'] .cm-live-list-bullet {
+  color: #5eead4;
+}
+
+:root[data-theme='dark'] .cm-live-task {
+  border-color: #64748b;
+}
+
+:root[data-theme='dark'] .cm-live-task.is-checked {
+  border-color: #34d399;
+  background: #34d399;
+}
+
+:root[data-theme='dark'] .cm-live-code-line {
+  background: rgba(30, 41, 59, 0.72);
 }
 
 :root[data-theme='dark'] .editor-render-switch {

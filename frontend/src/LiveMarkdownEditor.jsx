@@ -1,8 +1,9 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { defaultHighlightStyle, indentUnit, syntaxHighlighting } from '@codemirror/language';
+import { defaultHighlightStyle, indentUnit, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { markdown } from '@codemirror/lang-markdown';
-import { Compartment, EditorSelection, EditorState, Transaction } from '@codemirror/state';
+import { GFM } from '@lezer/markdown';
+import { Compartment, EditorSelection, EditorState, StateField, Transaction } from '@codemirror/state';
 import {
   Decoration,
   EditorView,
@@ -18,31 +19,74 @@ import {
 import katex from 'katex';
 
 import { applyCodeEditorKey, applyTabIndent } from './editorUtils.js';
+import { collectCodeRanges, findMathTokens, isInsideRange } from './liveMarkdownUtils.js';
 
 class MathPreviewWidget extends WidgetType {
-  constructor(expression, displayMode) {
+  constructor(expression, displayMode, sourcePosition) {
     super();
     this.expression = expression;
     this.displayMode = displayMode;
+    this.sourcePosition = sourcePosition;
   }
 
   eq(other) {
-    return other.expression === this.expression && other.displayMode === this.displayMode;
+    return other.expression === this.expression
+      && other.displayMode === this.displayMode
+      && other.sourcePosition === this.sourcePosition;
   }
 
-  toDOM() {
+  toDOM(view) {
     const element = document.createElement(this.displayMode ? 'div' : 'span');
     element.className = this.displayMode ? 'cm-live-math cm-live-math-block' : 'cm-live-math cm-live-math-inline';
+    element.setAttribute('role', 'button');
+    element.setAttribute('aria-label', '编辑公式源码');
+    element.title = '点击编辑公式源码';
     katex.render(this.expression, element, {
       displayMode: this.displayMode,
       throwOnError: false,
       strict: false
     });
+    element.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      view.dispatch({
+        selection: EditorSelection.cursor(this.sourcePosition),
+        scrollIntoView: true
+      });
+      view.focus();
+    });
     return element;
   }
 
-  ignoreEvent() {
-    return false;
+  ignoreEvent(event) {
+    return event.type === 'mousedown';
+  }
+}
+
+class BulletWidget extends WidgetType {
+  toDOM() {
+    const element = document.createElement('span');
+    element.className = 'cm-live-list-bullet';
+    element.textContent = '•';
+    return element;
+  }
+}
+
+class TaskWidget extends WidgetType {
+  constructor(checked) {
+    super();
+    this.checked = checked;
+  }
+
+  eq(other) {
+    return other.checked === this.checked;
+  }
+
+  toDOM() {
+    const element = document.createElement('span');
+    element.className = `cm-live-task${this.checked ? ' is-checked' : ''}`;
+    element.setAttribute('aria-hidden', 'true');
+    element.textContent = this.checked ? '✓' : '';
+    return element;
   }
 }
 
@@ -54,128 +98,167 @@ function rangeContainsSelection(state, from, to) {
   ));
 }
 
-function collectFencedRanges(content) {
-  const ranges = [];
-  const lines = content.split('\n');
-  let offset = 0;
-  let opening = null;
+function sharesActiveLine(state, from, to) {
+  const firstLine = state.doc.lineAt(from).number;
+  const lastLine = state.doc.lineAt(Math.max(from, to - 1)).number;
+  return state.selection.ranges.some((range) => {
+    const headLine = state.doc.lineAt(range.head).number;
+    return headLine >= firstLine && headLine <= lastLine;
+  });
+}
 
-  lines.forEach((rawLine, index) => {
-    const line = rawLine.replace(/\r$/, '');
-    const from = offset;
-    const to = from + rawLine.length;
-    const next = to + (index < lines.length - 1 ? 1 : 0);
-    const match = line.match(/^\s*(`{3,}|~{3,})(.*)$/);
+function hideRange(decorations, from, to) {
+  if (from < to) decorations.push(Decoration.replace({ inclusive: false }).range(from, to));
+}
 
-    if (match) {
-      const marker = match[1];
-      const remainder = match[2].trim();
-      if (!opening) {
-        opening = { from, character: marker[0], length: marker.length };
-      } else if (marker[0] === opening.character && marker.length >= opening.length && !remainder) {
-        ranges.push({ from: opening.from, to });
-        opening = null;
+function decorateDelimitedNode(decorations, state, node, className, markerLength) {
+  const contentFrom = node.from + markerLength;
+  const contentTo = node.to - markerLength;
+  if (contentFrom >= contentTo) return;
+  decorations.push(Decoration.mark({ class: className }).range(contentFrom, contentTo));
+  if (!sharesActiveLine(state, node.from, node.to)) {
+    hideRange(decorations, node.from, contentFrom);
+    hideRange(decorations, contentTo, node.to);
+  }
+}
+
+function buildSyntaxDecorations(view) {
+  const { state } = view;
+  const decorations = [];
+  const visited = new Set();
+  const decoratedCodeLines = new Set();
+
+  for (const visibleRange of view.visibleRanges) {
+    syntaxTree(state).iterate({
+      from: visibleRange.from,
+      to: visibleRange.to,
+      enter(node) {
+        const key = node.name === 'FencedCode'
+          ? `${node.name}:${node.from}:${node.to}:${visibleRange.from}:${visibleRange.to}`
+          : `${node.name}:${node.from}:${node.to}`;
+        if (visited.has(key)) return undefined;
+        visited.add(key);
+
+        if (/^ATXHeading[1-6]$/.test(node.name)) {
+          const level = Number(node.name.slice(-1));
+          const source = state.doc.sliceString(node.from, node.to);
+          const marker = source.match(/^#{1,6}\s+/)?.[0] || '';
+          const contentFrom = node.from + marker.length;
+          if (contentFrom < node.to) {
+            decorations.push(Decoration.mark({ class: `cm-live-heading cm-live-heading-${level}` }).range(contentFrom, node.to));
+            if (!sharesActiveLine(state, node.from, node.to)) hideRange(decorations, node.from, contentFrom);
+          }
+          return undefined;
+        }
+
+        if (node.name === 'StrongEmphasis') {
+          decorateDelimitedNode(decorations, state, node, 'cm-live-strong', 2);
+        } else if (node.name === 'Emphasis') {
+          decorateDelimitedNode(decorations, state, node, 'cm-live-emphasis', 1);
+        } else if (node.name === 'Strikethrough') {
+          decorateDelimitedNode(decorations, state, node, 'cm-live-strike', 2);
+        } else if (node.name === 'InlineCode') {
+          decorateDelimitedNode(decorations, state, node, 'cm-live-inline-code', 1);
+          return false;
+        } else if (node.name === 'Link') {
+          const source = state.doc.sliceString(node.from, node.to);
+          const match = source.match(/^\[([^\]\n]+)\]\(([^)\n]+)\)$/);
+          if (match) {
+            const labelFrom = node.from + 1;
+            const labelTo = labelFrom + match[1].length;
+            decorations.push(Decoration.mark({ class: 'cm-live-link' }).range(labelFrom, labelTo));
+            if (!sharesActiveLine(state, node.from, node.to)) {
+              hideRange(decorations, node.from, labelFrom);
+              hideRange(decorations, labelTo, node.to);
+            }
+          }
+          return false;
+        } else if (node.name === 'ListMark' && !sharesActiveLine(state, node.from, node.to)) {
+          if (node.node.parent?.getChild('Task')) hideRange(decorations, node.from, Math.min(node.to + 1, state.doc.length));
+          else decorations.push(Decoration.replace({ widget: new BulletWidget(), inclusive: false }).range(node.from, node.to));
+        } else if (node.name === 'TaskMarker' && !sharesActiveLine(state, node.from, node.to)) {
+          const checked = /x/i.test(state.doc.sliceString(node.from, node.to));
+          decorations.push(Decoration.replace({ widget: new TaskWidget(checked), inclusive: false }).range(node.from, node.to));
+        } else if (node.name === 'FencedCode') {
+          let line = state.doc.lineAt(Math.max(node.from, visibleRange.from));
+          const finalLine = state.doc.lineAt(Math.max(
+            node.from,
+            Math.min(node.to - 1, visibleRange.to)
+          )).number;
+          while (line.number <= finalLine) {
+            if (!decoratedCodeLines.has(line.from)) {
+              decoratedCodeLines.add(line.from);
+              decorations.push(Decoration.line({ class: 'cm-live-code-line' }).range(line.from));
+            }
+            if (line.number === finalLine) break;
+            line = state.doc.line(line.number + 1);
+          }
+          return false;
+        }
+        return undefined;
+      }
+    });
+  }
+
+  const codeRanges = collectCodeRanges(state);
+  for (const visibleRange of view.visibleRanges) {
+    const visibleText = state.doc.sliceString(visibleRange.from, visibleRange.to);
+    for (const match of visibleText.matchAll(/==([^=\n]+)==/g)) {
+      const from = visibleRange.from + match.index;
+      const to = from + match[0].length;
+      if (isInsideRange(codeRanges, from, to)) continue;
+      const contentFrom = from + 2;
+      const contentTo = to - 2;
+      decorations.push(Decoration.mark({ class: 'cm-live-highlight' }).range(contentFrom, contentTo));
+      if (!sharesActiveLine(state, from, to)) {
+        hideRange(decorations, from, contentFrom);
+        hideRange(decorations, contentTo, to);
       }
     }
-    offset = next;
-  });
-
-  if (opening) ranges.push({ from: opening.from, to: content.length });
-  return ranges;
-}
-
-function isInsideRange(ranges, from, to) {
-  return ranges.some((range) => from >= range.from && to <= range.to);
-}
-
-function addMarkupDecorations(decorations, state, content, fencedRanges, pattern, className, prefixLength, suffixLength) {
-  for (const match of content.matchAll(pattern)) {
-    const from = match.index;
-    const to = from + match[0].length;
-    if (isInsideRange(fencedRanges, from, to) || rangeContainsSelection(state, from, to)) continue;
-
-    const contentFrom = from + prefixLength;
-    const contentTo = to - suffixLength;
-    if (contentFrom >= contentTo) continue;
-    decorations.push(Decoration.replace({ inclusive: false }).range(from, contentFrom));
-    decorations.push(Decoration.mark({ class: className }).range(contentFrom, contentTo));
-    decorations.push(Decoration.replace({ inclusive: false }).range(contentTo, to));
-  }
-}
-
-function buildLivePreviewDecorations(view) {
-  const state = view.state;
-  const content = state.doc.toString();
-  const fencedRanges = collectFencedRanges(content);
-  const decorations = [];
-  const occupied = [];
-
-  const addMath = (pattern, displayMode) => {
-    for (const match of content.matchAll(pattern)) {
-      const from = match.index;
-      const to = from + match[0].length;
-      if (
-        isInsideRange(fencedRanges, from, to)
-        || rangeContainsSelection(state, from, to)
-        || occupied.some((range) => from < range.to && to > range.from)
-      ) continue;
-
-      const expression = match[1].trim();
-      if (!expression) continue;
-      occupied.push({ from, to });
-      decorations.push(
-        Decoration.replace({
-          widget: new MathPreviewWidget(expression, displayMode),
-          inclusive: false
-        }).range(from, to)
-      );
-    }
-  };
-
-  addMath(/\$\$([^$\n]+?)\$\$/g, true);
-  addMath(/(?<!\\)(?<!\$)\$([^$\n]+?)\$(?!\$)/g, false);
-
-  for (const match of content.matchAll(/^(#{1,6})\s+(.+)$/gm)) {
-    const from = match.index;
-    const to = from + match[0].length;
-    if (isInsideRange(fencedRanges, from, to) || rangeContainsSelection(state, from, to)) continue;
-    const contentFrom = from + match[1].length + 1;
-    decorations.push(Decoration.replace({ inclusive: false }).range(from, contentFrom));
-    decorations.push(Decoration.mark({ class: `cm-live-heading cm-live-heading-${match[1].length}` }).range(contentFrom, to));
-  }
-
-  addMarkupDecorations(decorations, state, content, fencedRanges, /\*\*([^*\n]+)\*\*/g, 'cm-live-strong', 2, 2);
-  addMarkupDecorations(decorations, state, content, fencedRanges, /~~([^~\n]+)~~/g, 'cm-live-strike', 2, 2);
-  addMarkupDecorations(decorations, state, content, fencedRanges, /==([^=\n]+)==/g, 'cm-live-highlight', 2, 2);
-  addMarkupDecorations(decorations, state, content, fencedRanges, /`([^`\n]+)`/g, 'cm-live-inline-code', 1, 1);
-
-  for (const match of content.matchAll(/\[([^\]\n]+)\]\(([^)\n]+)\)/g)) {
-    const from = match.index;
-    const to = from + match[0].length;
-    if (isInsideRange(fencedRanges, from, to) || rangeContainsSelection(state, from, to)) continue;
-    const labelFrom = from + 1;
-    const labelTo = labelFrom + match[1].length;
-    decorations.push(Decoration.replace({ inclusive: false }).range(from, labelFrom));
-    decorations.push(Decoration.mark({ class: 'cm-live-link' }).range(labelFrom, labelTo));
-    decorations.push(Decoration.replace({ inclusive: false }).range(labelTo, to));
   }
 
   return Decoration.set(decorations, true);
 }
 
-const livePreviewPlugin = ViewPlugin.fromClass(class {
+const syntaxPreviewPlugin = ViewPlugin.fromClass(class {
   constructor(view) {
-    this.decorations = buildLivePreviewDecorations(view);
+    this.decorations = buildSyntaxDecorations(view);
   }
 
   update(update) {
     if (update.docChanged || update.selectionSet || update.viewportChanged) {
-      this.decorations = buildLivePreviewDecorations(update.view);
+      this.decorations = buildSyntaxDecorations(update.view);
     }
   }
 }, {
   decorations: (value) => value.decorations
 });
+
+function buildMathDecorations(state) {
+  const decorations = [];
+  for (const token of findMathTokens(state)) {
+    if (rangeContainsSelection(state, token.from, token.to)) continue;
+    decorations.push(
+      Decoration.replace({
+        widget: new MathPreviewWidget(token.expression, token.displayMode, Math.min(token.from + 2, token.to)),
+        inclusive: false,
+        block: token.block
+      }).range(token.from, token.to)
+    );
+  }
+  return Decoration.set(decorations, true);
+}
+
+const mathPreviewField = StateField.define({
+  create: buildMathDecorations,
+  update(decorations, transaction) {
+    if (transaction.docChanged || transaction.selection) return buildMathDecorations(transaction.state);
+    return decorations;
+  },
+  provide: (field) => EditorView.decorations.from(field)
+});
+
+const livePreviewExtensions = [syntaxPreviewPlugin, mathPreviewField];
 
 function dispatchWholeDocumentChange(view, change) {
   const current = view.state.doc.toString();
@@ -318,7 +401,7 @@ const LiveMarkdownEditor = forwardRef(function LiveMarkdownEditor({
         drawSelection(),
         dropCursor(),
         highlightActiveLine(),
-        markdown(),
+        markdown({ extensions: GFM }),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         EditorState.tabSize.of(4),
         indentUnit.of('    '),
@@ -331,7 +414,7 @@ const LiveMarkdownEditor = forwardRef(function LiveMarkdownEditor({
         placeholder(editorPlaceholder),
         editorTheme,
         keymap.of([...defaultKeymap, ...historyKeymap]),
-        livePreviewCompartmentRef.current.of(autoRender ? livePreviewPlugin : []),
+        livePreviewCompartmentRef.current.of(autoRender ? livePreviewExtensions : []),
         eventHandlers,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) onChangeRef.current?.(update.state.doc.toString());
@@ -365,7 +448,7 @@ const LiveMarkdownEditor = forwardRef(function LiveMarkdownEditor({
     const view = viewRef.current;
     if (!view) return;
     view.dispatch({
-      effects: livePreviewCompartmentRef.current.reconfigure(autoRender ? livePreviewPlugin : [])
+      effects: livePreviewCompartmentRef.current.reconfigure(autoRender ? livePreviewExtensions : [])
     });
   }, [autoRender]);
 

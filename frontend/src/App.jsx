@@ -558,6 +558,13 @@ const writingTemplates = [
 
 const releaseRoadmap = [
   {
+    version: 'v6.9.3',
+    title: 'Live Preview 编辑手感重构',
+    date: '2026-09-05',
+    status: '已上线',
+    points: ['Markdown 装饰改用语法树并只处理可见内容', '当前行显示源码标记但保持最终文字样式，减少编辑跳动', '多行公式、任务框和代码围栏获得更稳定的就地预览']
+  },
+  {
     version: 'v6.9.2',
     title: 'Obsidian 风格实时编辑',
     date: '2026-09-05',
