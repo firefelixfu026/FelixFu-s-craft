@@ -22,7 +22,11 @@ if [[ "${SKIP_GIT_PULL:-0}" != "1" ]]; then
   done
 fi
 
-docker compose up -d --build
+if [[ "${SKIP_DOCKER_BUILD:-0}" == "1" ]]; then
+  docker compose up -d --no-build --pull never
+else
+  docker compose up -d --build
+fi
 
 docker compose ps
 

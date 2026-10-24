@@ -43,6 +43,14 @@ jobs:
           test -n "$DEPLOY_USER" || (echo "DEPLOY_USER is required" && exit 1)
           test -n "$DEPLOY_SSH_KEY" || (echo "DEPLOY_SSH_KEY is required" && exit 1)
 
+      - name: Build production images on GitHub
+        env:
+          NPM_REGISTRY: https://registry.npmjs.org
+        run: |
+          docker build -t felixfu-blog-backend:deploy -f backend/Dockerfile backend
+          docker build --build-arg NPM_REGISTRY="$NPM_REGISTRY" \
+            -t felixfu-blog-frontend:deploy -f frontend/Dockerfile .
+
       - name: Build deployment bundle
         run: |
           git branch -f codex-deploy-source "$DEPLOY_SHA"
@@ -63,6 +71,14 @@ jobs:
           ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
             -i ~/.ssh/felixfu_deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
             "echo ssh-ok"
+
+      - name: Transfer production images
+        run: |
+          set -o pipefail
+          docker save felixfu-blog-backend:deploy felixfu-blog-frontend:deploy | gzip -1 | \
+            ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
+              -i ~/.ssh/felixfu_deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+              'gunzip | docker load'
 
       - name: Deploy on server
         run: |
@@ -85,5 +101,5 @@ jobs:
 
           git -c core.fileMode=false fetch "$BUNDLE_PATH" refs/heads/codex-deploy-source
           git -c core.fileMode=false merge --ff-only FETCH_HEAD
-          SKIP_GIT_PULL=1 bash scripts/deploy-production.sh
+          SKIP_GIT_PULL=1 SKIP_DOCKER_BUILD=1 bash scripts/deploy-production.sh
           REMOTE
