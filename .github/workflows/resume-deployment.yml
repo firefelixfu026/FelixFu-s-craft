@@ -1,0 +1,52 @@
+name: Resume prepared deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Full commit SHA already prepared on the server
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/felixfu-blog' }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+    steps:
+      - name: Resume containers from prepared code and images
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/felixfu_deploy_key
+          chmod 600 ~/.ssh/felixfu_deploy_key
+          ssh-keyscan -T 20 -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          printf -v remote_command 'DEPLOY_PATH=%q EXPECTED_SHA=%q bash -s' "$DEPLOY_PATH" "$EXPECTED_SHA"
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
+            -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
+            -i ~/.ssh/felixfu_deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "$remote_command" <<'REMOTE'
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          SKIP_GIT_PULL=1 SKIP_DOCKER_BUILD=1 bash scripts/deploy-production.sh
+          REMOTE
